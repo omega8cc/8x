@@ -540,8 +540,8 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
     }
 
     // Add site-specific service providers.
-    if (!empty($GLOBALS['conf']['container_service_providers'])) {
-      foreach ($GLOBALS['conf']['container_service_providers'] as $class) {
+    if (!empty($GLOBALS['config']['container_service_providers'])) {
+      foreach ($GLOBALS['config']['container_service_providers'] as $class) {
         if (class_exists($class)) {
           $this->serviceProviderClasses['site'][] = $class;
         }

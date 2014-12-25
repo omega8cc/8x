@@ -598,7 +598,7 @@ function drupal_verify_profile($install_state) {
  */
 function drupal_install_system($install_state) {
   // Remove the service provider of the early installer.
-  unset($GLOBALS['conf']['container_service_providers']['InstallerServiceProvider']);
+  unset($GLOBALS['config']['container_service_providers']['InstallerServiceProvider']);
 
   $request = \Drupal::request();
   // Reboot into a full production environment to continue the installation.

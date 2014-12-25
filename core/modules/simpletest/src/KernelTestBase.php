@@ -147,7 +147,7 @@ abstract class KernelTestBase extends TestBase {
 
     // Add this test class as a service provider.
     // @todo Remove the indirection; implement ServiceProviderInterface instead.
-    $GLOBALS['conf']['container_service_providers']['TestServiceProvider'] = 'Drupal\simpletest\TestServiceProvider';
+    $GLOBALS['config']['container_service_providers']['TestServiceProvider'] = 'Drupal\simpletest\TestServiceProvider';
 
     // Back up settings from TestBase::prepareEnvironment().
     $settings = Settings::getAll();

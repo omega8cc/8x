@@ -16,7 +16,7 @@ use Symfony\Component\DependencyInjection\Reference;
  * Service provider for the early installer environment.
  *
  * This class is manually added by install_begin_request() via
- * $conf['container_service_providers'] and required to prevent various services
+ * $config['container_service_providers'] and required to prevent various services
  * from trying to retrieve data from storages that do not exist yet.
  */
 class InstallerServiceProvider implements ServiceProviderInterface, ServiceModifierInterface {

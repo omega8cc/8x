@@ -379,7 +379,7 @@ function install_begin_request($class_loader, &$install_state) {
   // replaced with a regular one in drupal_install_system().
   if (!$install_state['base_system_verified']) {
     $environment = 'install';
-    $GLOBALS['conf']['container_service_providers']['InstallerServiceProvider'] = 'Drupal\Core\Installer\InstallerServiceProvider';
+    $GLOBALS['config']['container_service_providers']['InstallerServiceProvider'] = 'Drupal\Core\Installer\InstallerServiceProvider';
   }
   else {
     $environment = 'prod';
