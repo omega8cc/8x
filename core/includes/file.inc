@@ -1549,28 +1549,43 @@ function file_directory_temp() {
  *   A string containing the path to the temporary directory.
  */
 function file_directory_os_temp() {
-  $directories = array();
+  static $temporary_directory;
 
-  // Has PHP been set with an upload_tmp_dir?
-  if (ini_get('upload_tmp_dir')) {
-    $directories[] = ini_get('upload_tmp_dir');
+  if (preg_match("/^\/home/", getenv('HOME')) || preg_match("/^\/data\/disk/", getenv('HOME')) || preg_match("/^\/var\/aegir/", getenv('HOME'))) {
+    $temporary_directory = getenv('HOME') . "/.tmp";
+  }
+  if (!is_dir($temporary_directory)) {
+    $temporary_directory = FALSE;
   }
 
-  // Operating system specific dirs.
-  if (substr(PHP_OS, 0, 3) == 'WIN') {
-    $directories[] = 'c:\\windows\\temp';
-    $directories[] = 'c:\\winnt\\temp';
+  if (!isset($temporary_directory)) {
+    $directories = array();
+
+    // Has PHP been set with an upload_tmp_dir?
+    if (ini_get('upload_tmp_dir')) {
+      $directories[] = ini_get('upload_tmp_dir');
+    }
+
+    // Operating system specific dirs.
+    if (substr(PHP_OS, 0, 3) == 'WIN') {
+      $directories[] = 'c:\\windows\\temp';
+      $directories[] = 'c:\\winnt\\temp';
+    }
+    else {
+      $directories[] = '/tmp';
+    }
+    // PHP may be able to find an alternative tmp directory.
+    $directories[] = sys_get_temp_dir();
+
+    foreach ($directories as $directory) {
+      if (is_dir($directory) && is_writable($directory)) {
+        return $directory;
+      }
+    }
   }
   else {
-    $directories[] = '/tmp';
-  }
-  // PHP may be able to find an alternative tmp directory.
-  $directories[] = sys_get_temp_dir();
-
-  foreach ($directories as $directory) {
-    if (is_dir($directory) && is_writable($directory)) {
-      return $directory;
-    }
+    $config->set('path.temporary', $temporary_directory)->save();
+    return $temporary_directory;
   }
   return FALSE;
 }
