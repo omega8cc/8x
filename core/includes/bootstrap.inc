@@ -139,9 +139,16 @@ const CONFIG_STAGING_DIRECTORY = 'staging';
 /**
  * Defines the root directory of the Drupal installation.
  *
- * This strips two levels of directories off the current directory.
+ * In some cases Drupal root might not be located two levels down of this file's
+ * directory. This may be the case when /core is symlinked. So __DIR__
+ * cannot be used for deriving DRUPAL_ROOT. We have to rely on the current
+ * working directory, but therefore scripts including bootstrap.inc have to
+ * chdir() to the appropriate Drupal root directory.
+ *
+ * @see core/install.php
+ * @see https://www.drupal.org/node/1792310
  */
-define('DRUPAL_ROOT', dirname(dirname(__DIR__)));
+define('DRUPAL_ROOT', getcwd());
 
 /**
  * Returns the appropriate configuration directory.

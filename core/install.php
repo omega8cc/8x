@@ -6,7 +6,7 @@
  */
 
 // Change the directory to the Drupal root.
-chdir('..');
+chdir(dirname(dirname($_SERVER['SCRIPT_FILENAME'])));
 
 /**
  * Global flag to indicate the site is in installation mode.
