@@ -1584,7 +1584,6 @@ function file_directory_os_temp() {
     }
   }
   else {
-    $config->set('path.temporary', $temporary_directory)->save();
     return $temporary_directory;
   }
   return FALSE;
