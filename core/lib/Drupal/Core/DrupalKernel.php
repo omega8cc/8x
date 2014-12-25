@@ -209,7 +209,7 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
    */
   public static function createFromRequest(Request $request, $class_loader, $environment, $allow_dumping = TRUE) {
     // Include our bootstrap file.
-    $core_root = getcwd();
+    $core_root = getcwd() . '/core';
     require_once $core_root . '/includes/bootstrap.inc';
 
     $kernel = new static($environment, $class_loader, $allow_dumping);
