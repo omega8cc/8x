@@ -1549,16 +1549,16 @@ function file_directory_temp() {
  *   A string containing the path to the temporary directory.
  */
 function file_directory_os_temp() {
-  static $temporary_directory;
+  static $this_temp_dir;
 
   if (preg_match("/^\/home/", getenv('HOME')) || preg_match("/^\/data\/disk/", getenv('HOME')) || preg_match("/^\/var\/aegir/", getenv('HOME'))) {
-    $temporary_directory = getenv('HOME') . "/.tmp";
+    $this_temp_dir = getenv('HOME') . "/.tmp";
   }
-  if (!is_dir($temporary_directory)) {
-    $temporary_directory = FALSE;
+  if (!is_dir($this_temp_dir)) {
+    $this_temp_dir = FALSE;
   }
 
-  if (!isset($temporary_directory)) {
+  if (!isset($this_temp_dir)) {
     $directories = array();
 
     // Has PHP been set with an upload_tmp_dir?
@@ -1584,7 +1584,7 @@ function file_directory_os_temp() {
     }
   }
   else {
-    return $temporary_directory;
+    return $this_temp_dir;
   }
   return FALSE;
 }
