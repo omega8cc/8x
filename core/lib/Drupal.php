@@ -21,7 +21,7 @@ use Drupal\Core\Url;
  * The container is built by the kernel and passed in to this class which stores
  * it statically. The container always contains the services from
  * \Drupal\Core\CoreServiceProvider, the service providers of enabled modules and any other
- * service providers defined in $GLOBALS['config']['container_service_providers'].
+ * service providers defined in $GLOBALS['conf']['container_service_providers'].
  *
  * This class exists only to support legacy code that cannot be dependency
  * injected. If your code needs it, consider refactoring it to be object

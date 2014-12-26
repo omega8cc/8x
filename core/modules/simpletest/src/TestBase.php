@@ -1023,6 +1023,9 @@ abstract class TestBase {
     $this->originalSite = conf_path();
     $this->originalSettings = Settings::getAll();
     $this->originalConfig = $GLOBALS['config'];
+    // @todo Remove all remnants of $GLOBALS['conf'].
+    // @see https://drupal.org/node/2183323
+    $this->originalConf = isset($GLOBALS['conf']) ? $GLOBALS['conf'] : NULL;
 
     // Backup statics and globals.
     $this->originalContainer = clone \Drupal::getContainer();
@@ -1090,6 +1093,7 @@ abstract class TestBase {
     // Unset globals.
     unset($GLOBALS['config_directories']);
     unset($GLOBALS['config']);
+    unset($GLOBALS['conf']);
 
     // Log fatal errors.
     ini_set('log_errors', 1);
@@ -1192,6 +1196,7 @@ abstract class TestBase {
 
     // Restore original in-memory configuration.
     $GLOBALS['config'] = $this->originalConfig;
+    $GLOBALS['conf'] = $this->originalConf;
     new Settings($this->originalSettings);
 
     // Restore original statics and globals.
