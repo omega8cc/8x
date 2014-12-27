@@ -28,7 +28,7 @@ use Symfony\Component\HttpFoundation\Response;
 use Drupal\Core\Site\Settings;
 
 // Change the directory to the Drupal root.
-chdir(dirname(dirname($_SERVER['SCRIPT_FILENAME'])));
+chdir(readlink(dirname(dirname($_SERVER['SCRIPT_FILENAME']))));
 
 $autoloader = require_once __DIR__ . '/vendor/autoload.php';
 

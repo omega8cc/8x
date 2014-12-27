@@ -148,7 +148,7 @@ const CONFIG_STAGING_DIRECTORY = 'staging';
  * @see core/install.php
  * @see https://www.drupal.org/node/1792310
  */
-define('DRUPAL_ROOT', getcwd());
+define('DRUPAL_ROOT', readlink(dirname(dirname(__DIR__))));
 
 /**
  * Returns the appropriate configuration directory.

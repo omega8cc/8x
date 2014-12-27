@@ -305,7 +305,7 @@ function install_begin_request($class_loader, &$install_state) {
   }
 
   $site_path = DrupalKernel::findSitePath($request, FALSE);
-  Settings::initialize(getcwd(), $site_path, $class_loader);
+  Settings::initialize(readlink(dirname(dirname(__DIR__))), $site_path, $class_loader);
 
   // Ensure that procedural dependencies are loaded as early as possible,
   // since the error/exception handlers depend on them.
