@@ -247,9 +247,14 @@ function config_get_config_directory($type = CONFIG_ACTIVE_DIRECTORY) {
  *   The filename of the requested item or NULL if the item is not found.
  */
 function drupal_get_filename($type, $name, $filename = NULL) {
+  // Return NULL right away if $type or $name is empty.
+  if (empty($type) || empty($name)) {
+    return NULL;
+  }
+
   // The location of files will not change during the request, so do not use
   // drupal_static().
-  static $files = array();
+  static $files = array(), $bad = NULL;
 
   // Type 'core' only exists to simplify application-level logic; it always maps
   // to the /core directory, whereas $name is ignored. It is only requested via
@@ -289,19 +294,40 @@ function drupal_get_filename($type, $name, $filename = NULL) {
     }
     // If still unknown, perform a filesystem scan.
     if (!isset($files[$type][$name])) {
-      $listing = new ExtensionDiscovery(DRUPAL_ROOT);
-      // Prevent an infinite recursion by this legacy function.
-      if ($original_type == 'profile') {
-        $listing->setProfileDirectories(array());
+      if (is_null($bad)) {
+        $bad = array();
+        if (\Drupal::hasService('cache')) {
+          $cache = Drupal::cache('bootstrap')->get('drupal_get_filename:bad', TRUE);
+          if ($cache && $cache->data) {
+            $bad = $cache->data;
+          }
+        }
       }
-      foreach ($listing->scan($original_type) as $extension_name => $file) {
-        $files[$type][$extension_name] = $file->getPathname();
+      if (!isset($bad[$type][$name])) {
+        $listing = new ExtensionDiscovery(DRUPAL_ROOT);
+        // Prevent an infinite recursion by this legacy function.
+        if ($original_type == 'profile') {
+          $listing->setProfileDirectories(array());
+        }
+        foreach ($listing->scan($original_type) as $extension_name => $file) {
+          $files[$type][$extension_name] = $file->getPathname();
+        }
       }
     }
   }
 
   if (isset($files[$type][$name])) {
     return $files[$type][$name];
+  }
+  elseif (!isset($bad[$type][$name])) {
+    // Add the missing file to a temporary cache and throw an alert.
+    $bad[$type][$name] = TRUE;
+    if (\Drupal::hasService('cache')) {
+      \Drupal::cache('bootstrap')->set('drupal_get_filename:bad', $bad, REQUEST_TIME);
+    }
+    if (\Drupal::hasService('logger')) {
+      \Drupal::logger('system')->error('The following @type is missing from the file system: @name', array('@type' => $type, '@name' => $name));
+    }
   }
 }
 

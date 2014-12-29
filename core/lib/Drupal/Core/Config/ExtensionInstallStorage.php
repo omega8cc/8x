@@ -99,7 +99,11 @@ class ExtensionInstallStorage extends InstallStorage {
       // The install profile can override module default configuration. We do
       // this by replacing the config file path from the module/theme with the
       // install profile version if there are any duplicates.
-      $profile_folders = $this->getComponentNames('profile', array(drupal_get_profile()));
+      $profile_folders = array();
+      $profile = drupal_get_profile();
+      if (!empty($profile)) {
+        $profile_folders = $this->getComponentNames('profile', array($profile));
+      }
       $folders_to_replace = array_intersect_key($profile_folders, $this->folders);
       if (!empty($folders_to_replace)) {
         $this->folders = array_merge($this->folders, $folders_to_replace);
