@@ -294,10 +294,25 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
       $form_object
         ->setStringTranslation($this->translationManager)
         ->setModuleHandler($this->moduleHandler)
+        ->setEntityManager($this)
         ->setOperation($operation);
       $this->handlers['form'][$operation][$entity_type] = $form_object;
     }
     return $this->handlers['form'][$operation][$entity_type];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getRouteProviders($entity_type) {
+    if (!isset($this->handlers['route_provider'][$entity_type])) {
+      $route_provider_classes = $this->getDefinition($entity_type, TRUE)->getRouteProviderClasses();
+
+      foreach ($route_provider_classes as $type => $class) {
+        $this->handlers['route_provider'][$entity_type][$type] = $this->createHandlerInstance($class, $this->getDefinition($entity_type));
+      }
+    }
+    return isset($this->handlers['route_provider'][$entity_type]) ? $this->handlers['route_provider'][$entity_type] : [];
   }
 
   /**

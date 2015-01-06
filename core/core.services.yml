@@ -311,6 +311,11 @@ services:
     parent: container.trait
     tags:
       - { name: plugin_manager_cache_clear }
+  entity_route_subscriber:
+    class: Drupal\Core\EventSubscriber\EntityRouteProviderSubscriber
+    arguments: ['@entity.manager']
+    tags:
+      - { name: event_subscriber }
   entity.definitions.installed:
     class: Drupal\Core\KeyValueStore\KeyValueStoreInterface
     factory_method: get
@@ -362,10 +367,10 @@ services:
     arguments: ['@menu.link_tree', '@entity.manager', '@string_translation']
   plugin.manager.menu.local_action:
     class: Drupal\Core\Menu\LocalActionManager
-    arguments: ['@controller_resolver', '@request_stack', '@router.route_provider', '@module_handler', '@cache.discovery', '@language_manager', '@access_manager', '@current_user']
+    arguments: ['@controller_resolver', '@request_stack', '@current_route_match', '@router.route_provider', '@module_handler', '@cache.discovery', '@language_manager', '@access_manager', '@current_user']
   plugin.manager.menu.local_task:
     class: Drupal\Core\Menu\LocalTaskManager
-    arguments: ['@controller_resolver', '@request_stack', '@router.route_provider', '@router.builder', '@module_handler', '@cache.discovery', '@language_manager', '@access_manager', '@current_user']
+    arguments: ['@controller_resolver', '@request_stack', '@current_route_match', '@router.route_provider', '@router.builder', '@module_handler', '@cache.discovery', '@language_manager', '@access_manager', '@current_user']
   plugin.manager.menu.contextual_link:
     class: Drupal\Core\Menu\ContextualLinkManager
     arguments: ['@controller_resolver', '@module_handler', '@cache.discovery', '@language_manager', '@access_manager', '@current_user', '@request_stack']
@@ -858,10 +863,6 @@ services:
       - { name: path_processor_inbound, priority: 200 }
       - { name: path_processor_outbound, priority: 200 }
     arguments: ['@config.factory']
-  route_processor_none:
-    class: Drupal\Core\RouteProcessor\RouteProcessorNone
-    tags:
-      - { name: route_processor_outbound, priority: 200 }
   route_processor_current:
     class: Drupal\Core\RouteProcessor\RouteProcessorCurrent
     arguments: ['@current_route_match']

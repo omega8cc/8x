@@ -10,14 +10,13 @@ namespace Drupal\Tests\Core\Entity {
 use Drupal\Component\Plugin\Discovery\DiscoveryInterface;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Config\Entity\ConfigEntityStorage;
-use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
-use Drupal\Core\Entity\ContentEntityBase;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityHandlerBase;
 use Drupal\Core\Entity\EntityHandlerInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManager;
+use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageInterface;
@@ -1367,6 +1366,24 @@ class EntityManagerTest extends UnitTestCase {
   }
 
   /**
+   * @covers ::getRouteProviders
+   */
+  public function testGetRouteProviders() {
+    $apple = $this->getMock('Drupal\Core\Entity\EntityTypeInterface');
+    $apple->expects($this->once())
+      ->method('getRouteProviderClasses')
+      ->willReturn(['default' => 'Drupal\Tests\Core\Entity\TestRouteProvider']);
+    $this->setUpEntityManager(array(
+      'apple' => $apple,
+    ));
+
+    $apple_route_provider = $this->entityManager->getRouteProviders('apple');
+    $this->assertInstanceOf('Drupal\Tests\Core\Entity\TestRouteProvider', $apple_route_provider['default']);
+    $this->assertAttributeInstanceOf('Drupal\Core\Extension\ModuleHandlerInterface', 'moduleHandler', $apple_route_provider['default']);
+    $this->assertAttributeInstanceOf('Drupal\Core\StringTranslation\TranslationInterface', 'stringTranslation', $apple_route_provider['default']);
+  }
+
+  /**
    * Gets a mock controller class name.
    *
    * @return string
@@ -1486,6 +1503,13 @@ class TestEntityHandlerInjected implements EntityHandlerInterface {
 class TestEntityForm extends EntityHandlerBase {
 
   /**
+   * The entity manager.
+   *
+   * @var \Drupal\Tests\Core\Entity\TestEntityManager
+   */
+  protected $entityManager;
+
+  /**
    * {@inheritdoc}
    */
   public function getBaseFormId() {
@@ -1510,6 +1534,14 @@ class TestEntityForm extends EntityHandlerBase {
    * {@inheritdoc}
    */
   public function setOperation($operation) {
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setEntityManager(EntityManagerInterface $entity_manager) {
+    $this->entityManager = $entity_manager;
     return $this;
   }
 
@@ -1545,6 +1577,14 @@ class TestEntityFormInjected extends TestEntityForm implements ContainerInjectio
   }
 
 }
+
+/**
+ * Provides a test entity route provider.
+ */
+class TestRouteProvider extends EntityHandlerBase {
+
+}
+
 
 /**
  * Provides a test config entity storage for base field overrides.
