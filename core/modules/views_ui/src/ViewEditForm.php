@@ -107,6 +107,7 @@ class ViewEditForm extends ViewFormBase {
     $form['#attached']['library'][] = 'core/jquery.ui.dialog';
     $form['#attached']['library'][] = 'core/drupal.states';
     $form['#attached']['library'][] = 'core/drupal.tabledrag';
+    $form['#attached']['library'][] = 'views/views.exposed-form';
     $form['#attached']['library'][] = 'views_ui/views_ui.admin';
     $form['#attached']['library'][] = 'views_ui/admin.styling';
 
@@ -855,7 +856,7 @@ class ViewEditForm extends ViewFormBase {
    * Submit handler to Duplicate a display as another display type.
    */
   public function submitDuplicateDisplayAsType($form, FormStateInterface $form_state) {
-    /** @var \Drupal\views\ViewStorageInterface $view */
+    /** @var \Drupal\views\ViewEntityInterface $view */
     $view = $this->entity;
     $display_id = $this->displayID;
 

@@ -314,9 +314,9 @@ function comment_view_multiple($comments, $view_mode = 'full', $langcode = NULL)
  * Implements hook_form_FORM_ID_alter() for field_ui_field_storage_add_form.
  */
 function comment_form_field_ui_field_storage_add_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form_state->get('entity_type_id') == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+  $route_match = \Drupal::routeMatch();
+  if ($form_state->get('entity_type_id') == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
   if (!_comment_entity_uses_integer_id($form_state->get('entity_type_id'))) {
     // You cannot use comment fields on entity types with non-integer IDs.
@@ -328,9 +328,9 @@ function comment_form_field_ui_field_storage_add_form_alter(&$form, FormStateInt
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_form_field_ui_form_display_overview_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form['#entity_type'] == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+  $route_match = \Drupal::routeMatch();
+  if ($form['#entity_type'] == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
 }
 
@@ -338,9 +338,9 @@ function comment_form_field_ui_form_display_overview_form_alter(&$form, FormStat
  * Implements hook_form_FORM_ID_alter().
  */
 function comment_form_field_ui_display_overview_form_alter(&$form, FormStateInterface $form_state) {
-  $request = \Drupal::request();
-  if ($form['#entity_type'] == 'comment' && $request->attributes->has('commented_entity_type')) {
-    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($request->attributes->get('commented_entity_type'), $request->attributes->get('field_name'));
+  $route_match = \Drupal::routeMatch();
+  if ($form['#entity_type'] == 'comment' && $route_match->getParameter('commented_entity_type')) {
+    $form['#title'] = \Drupal::service('comment.manager')->getFieldUIPageTitle($route_match->getParameter('commented_entity_type'), $route_match->getParameter('field_name'));
   }
 }
 
@@ -351,8 +351,8 @@ function comment_form_field_ui_field_storage_edit_form_alter(&$form, FormStateIn
   if ($form['#field']->getType() == 'comment') {
     // We only support posting one comment at the time so it doesn't make sense
     // to let the site builder choose anything else.
-    $form['field']['cardinality_container']['cardinality']['#options'] = array(1 => 1);
-    $form['field']['cardinality_container']['#access'] = FALSE;
+    $form['field_storage']['cardinality_container']['cardinality']['#default_value'] = 1;
+    $form['field_storage']['cardinality_container']['#access'] = FALSE;
   }
 }
 
@@ -530,7 +530,7 @@ function comment_node_search_result(EntityInterface $node) {
   // Do not make a string if there are no comment fields, or no comments exist
   // or all comment fields are hidden.
   if ($comments > 0 || $open) {
-    return array('comment' => format_plural($comments, '1 comment', '@count comments'));
+    return array('comment' => \Drupal::translation()->formatPlural($comments, '1 comment', '@count comments'));
   }
 }
 

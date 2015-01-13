@@ -2,10 +2,10 @@
 
 /**
  * @file
- * Definition of Drupal\field\Plugin\views\field\Field.
+ * Contains \Drupal\views\Plugin\views\field\Field.
  */
 
-namespace Drupal\field\Plugin\views\field;
+namespace Drupal\views\Plugin\views\field;
 
 use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\Xss;
@@ -341,19 +341,22 @@ class Field extends FieldPluginBase implements CacheablePluginInterface, MultiIt
   }
 
   /**
-   * Determine if this field is click sortable.
+   * {@inheritdoc}
    */
   public function clickSortable() {
-    // Not click sortable in any case.
-    if (empty($this->definition['click sortable'])) {
-      return FALSE;
-    }
     // A field is not click sortable if it's a multiple field with
     // "group multiple values" checked, since a click sort in that case would
     // add a join to the field table, which would produce unwanted duplicates.
     if ($this->multiple && $this->options['group_rows']) {
       return FALSE;
     }
+
+    // If field definition is set, use that.
+    if (isset($this->definition['click sortable'])) {
+      return (bool) $this->definition['click sortable'];
+    }
+
+    // Default to true.
     return TRUE;
   }
 
@@ -739,7 +742,7 @@ class Field extends FieldPluginBase implements CacheablePluginInterface, MultiIt
     if (!$original_entity) {
       return array();
     }
-    $entity = $this->process_entity($original_entity);
+    $entity = $this->process_entity($values, $original_entity);
     if (!$entity) {
       return array();
     }
@@ -781,13 +784,15 @@ class Field extends FieldPluginBase implements CacheablePluginInterface, MultiIt
    * Replaces values with aggregated values if aggregation is enabled.
    * Takes delta settings into account (@todo remove in #1758616).
    *
+   * @param \Drupal\views\ResultRow $values
+   *   The result row object containing the values.
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity to be processed.
    *
    * @return
    *   TRUE if the processing completed successfully, otherwise FALSE.
    */
-  function process_entity(EntityInterface $entity) {
+  function process_entity(ResultRow $values, EntityInterface $entity) {
     $processed_entity = clone $entity;
 
     $langcode = $this->field_langcode($processed_entity);
@@ -890,7 +895,7 @@ class Field extends FieldPluginBase implements CacheablePluginInterface, MultiIt
   protected function documentSelfTokens(&$tokens) {
     $field = $this->getFieldDefinition();
     foreach ($field->getColumns() as $id => $column) {
-      $tokens['[' . $this->options['id'] . '-' . $id . ']'] = $this->t('Raw @column', array('@column' => $id));
+      $tokens['{{ ' . $this->options['id'] . '-' . $id . ' }}'] = $this->t('Raw @column', array('@column' => $id));
     }
   }
 
@@ -908,11 +913,11 @@ class Field extends FieldPluginBase implements CacheablePluginInterface, MultiIt
                (is_object($item['raw']) ? (array)$item['raw'] : NULL);
       }
       if (isset($raw) && isset($raw[$id]) && is_scalar($raw[$id])) {
-        $tokens['[' . $this->options['id'] . '-' . $id . ']'] = Xss::filterAdmin($raw[$id]);
+        $tokens['{{ ' . $this->options['id'] . '-' . $id . ' }}'] = Xss::filterAdmin($raw[$id]);
       }
       else {
         // Make sure that empty values are replaced as well.
-        $tokens['[' . $this->options['id'] . '-' . $id . ']'] = '';
+        $tokens['{{ ' . $this->options['id'] . '-' . $id . ' }}'] = '';
       }
     }
   }

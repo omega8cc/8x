@@ -22,7 +22,7 @@ class MigrateCckFieldValuesTest extends MigrateNodeTestBase {
    *
    * @var array
    */
-  public static $modules = array('node', 'text', 'link');
+  public static $modules = array('node', 'text', 'link', 'file');
 
   /**
    * {@inheritdoc}
@@ -126,6 +126,17 @@ class MigrateCckFieldValuesTest extends MigrateNodeTestBase {
       'bundle' => 'story',
     ))->save();
 
+    entity_create('field_storage_config', array(
+      'entity_type' => 'node',
+      'field_name' => 'field_test_filefield',
+      'type' => 'file',
+    ))->save();
+    entity_create('field_config', array(
+      'entity_type' => 'node',
+      'field_name' => 'field_test_filefield',
+      'bundle' => 'story',
+    ))->save();
+
     // Add some id mappings for the dependant migrations.
     $id_mappings = array(
       'd6_field_formatter_settings' => array(
@@ -156,7 +167,7 @@ class MigrateCckFieldValuesTest extends MigrateNodeTestBase {
   public function testCckFields() {
     $node = Node::load(1);
     $this->assertEqual($node->field_test->value, 'This is a shared text field', "Shared field storage field is correct.");
-    $this->assertEqual($node->field_test->format, 1, "Shared field storage field with multiple columns is correct.");
+    $this->assertEqual($node->field_test->format, 'filtered_html');
     $this->assertEqual($node->field_test_two->value, 10, 'Multi field storage field is correct');
     $this->assertEqual($node->field_test_two[1]->value, 20, 'Multi field second value is correct.');
     $this->assertEqual($node->field_test_three->value, '42.42', 'Single field second value is correct.');
@@ -170,6 +181,10 @@ class MigrateCckFieldValuesTest extends MigrateNodeTestBase {
     $this->assertIdentical($node->field_test_link->title, 'Drupal project page');
     $this->assertIdentical($node->field_test_link->route_parameters, []);
     $this->assertIdentical($node->field_test_link->options['attributes'], ['target' => '_blank']);
+
+    // Test the file field meta.
+    $this->assertIdentical($node->field_test_filefield->description, 'desc');
+    $this->assertIdentical($node->field_test_filefield->target_id, '1');
 
     $planet_node = Node::load(3);
     $this->assertEqual($planet_node->field_multivalue->value, 33);

@@ -159,13 +159,6 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
   protected $serviceProviders;
 
   /**
-   * Whether the request globals have been initialized.
-   *
-   * @var bool
-   */
-  protected static $isRequestInitialized = FALSE;
-
-  /**
    * Whether the PHP environment has been initialized.
    *
    * This legacy phase can only be booted once because it sets session INI
@@ -383,22 +376,6 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
     // Start a page timer:
     Timer::start('page');
 
-    // Load legacy and other functional code.
-    require_once $this->root . '/core/includes/common.inc';
-    require_once $this->root . '/core/includes/database.inc';
-    require_once $this->root . '/core/includes/path.inc';
-    require_once $this->root . '/core/includes/module.inc';
-    require_once $this->root . '/core/includes/theme.inc';
-    require_once $this->root . '/core/includes/pager.inc';
-    require_once $this->root . '/core/includes/menu.inc';
-    require_once $this->root . '/core/includes/tablesort.inc';
-    require_once $this->root . '/core/includes/file.inc';
-    require_once $this->root . '/core/includes/unicode.inc';
-    require_once $this->root . '/core/includes/form.inc';
-    require_once $this->root . '/core/includes/errors.inc';
-    require_once $this->root . '/core/includes/schema.inc';
-    require_once $this->root . '/core/includes/entity.inc';
-
     // Ensure that findSitePath is set.
     if (!$this->sitePath) {
       throw new \Exception('Kernel does not have site path set before calling boot()');
@@ -440,7 +417,30 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
   /**
    * {@inheritdoc}
    */
+  public function loadLegacyIncludes() {
+    require_once $this->root . '/core/includes/common.inc';
+    require_once $this->root . '/core/includes/database.inc';
+    require_once $this->root . '/core/includes/path.inc';
+    require_once $this->root . '/core/includes/module.inc';
+    require_once $this->root . '/core/includes/theme.inc';
+    require_once $this->root . '/core/includes/pager.inc';
+    require_once $this->root . '/core/includes/menu.inc';
+    require_once $this->root . '/core/includes/tablesort.inc';
+    require_once $this->root . '/core/includes/file.inc';
+    require_once $this->root . '/core/includes/unicode.inc';
+    require_once $this->root . '/core/includes/form.inc';
+    require_once $this->root . '/core/includes/errors.inc';
+    require_once $this->root . '/core/includes/schema.inc';
+    require_once $this->root . '/core/includes/entity.inc';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function preHandle(Request $request) {
+
+    $this->loadLegacyIncludes();
+
     // Load all enabled modules.
     $this->container->get('module_handler')->loadAll();
 
@@ -449,9 +449,6 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
 
     // Initialize legacy request globals.
     $this->initializeRequestGlobals($request);
-
-    // Initialize cookie globals.
-    $this->initializeCookieGlobals($request);
 
     // Put the request on the stack.
     $this->container->get('request_stack')->push($request);
@@ -478,7 +475,6 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
    */
   public function handlePageCache(Request $request) {
     $this->boot();
-    $this->initializeCookieGlobals($request);
 
     // Check for a cache mode force from settings.php.
     if (Settings::get('page_cache_without_database')) {
@@ -889,64 +885,6 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
       }
     }
 
-  }
-
-  /**
-   * Initialize cookie settings.
-   *
-   * @param \Symfony\Component\HttpFoundation\Request $request
-   *   The current request.
-   *
-   * @todo D8: Eliminate this entirely in favor of a session object.
-   */
-  protected function initializeCookieGlobals(Request $request) {
-    // If we do this more then once per page request we are likely to cause
-    // errors.
-    if (static::$isRequestInitialized) {
-      return;
-    }
-    global $cookie_domain;
-
-    if ($cookie_domain) {
-      // If the user specifies the cookie domain, also use it for session name.
-      $session_name = $cookie_domain;
-    }
-    else {
-      // Otherwise use $base_url as session name, without the protocol
-      // to use the same session identifiers across HTTP and HTTPS.
-      $session_name = $request->getHost() . $request->getBasePath();
-      // Replace "core" out of session_name so core scripts redirect properly,
-      // specifically install.php.
-      $session_name = preg_replace('/\/core$/', '', $session_name);
-      if ($cookie_domain = $request->getHost()) {
-        // Strip leading periods and www. from cookie domain.
-        $cookie_domain = ltrim($cookie_domain, '.');
-        if (strpos($cookie_domain, 'www.') === 0) {
-          $cookie_domain = substr($cookie_domain, 4);
-        }
-        $cookie_domain = '.' . $cookie_domain;
-      }
-    }
-    // Per RFC 2109, cookie domains must contain at least one dot other than the
-    // first. For hosts such as 'localhost' or IP Addresses we don't set a
-    // cookie domain.
-    if (count(explode('.', $cookie_domain)) > 2 && !is_numeric(str_replace('.', '', $cookie_domain))) {
-      ini_set('session.cookie_domain', $cookie_domain);
-    }
-    // To prevent session cookies from being hijacked, a user can configure the
-    // SSL version of their website to only transfer session cookies via SSL by
-    // using PHP's session.cookie_secure setting. The browser will then use two
-    // separate session cookies for the HTTPS and HTTP versions of the site. So
-    // we must use different session identifiers for HTTPS and HTTP to prevent a
-    // cookie collision.
-    if ($request->isSecure()) {
-      ini_set('session.cookie_secure', TRUE);
-    }
-    $prefix = ini_get('session.cookie_secure') ? 'SSESS' : 'SESS';
-
-    session_name($prefix . substr(hash('sha256', $session_name), 0, 32));
-
-    static::$isRequestInitialized = TRUE;
   }
 
   /**

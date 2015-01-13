@@ -42,6 +42,7 @@
  *
  * - @link plugin_api Plugins @endlink
  * - @link container Services and the Dependency Injection Container @endlink
+ * - @link events Events @endlink
  * - @link i18n Internationalization @endlink
  * - @link cache Caching @endlink
  * - @link utility Utility classes and functions @endlink
@@ -460,18 +461,19 @@
  *
  * @section tags Cache Tags
  *
- * The fourth argument of the set() method can be used to specify cache tags,
- * which are used to identify what type of data is included in each cache item.
- * Each cache item can have multiple cache tags, and each cache tag has a string
- * key and a value. The value can be:
- * - TRUE, to indicate that this type of data is present in the cache item.
- * - An array of values. For example, the "node" tag indicates that particular
- *   node's data is present in the cache item, so its value is an array of node
- *   IDs.
- * Data that has been tagged can be deleted or invalidated as a group: no matter
+ * The fourth argument of the @code set() @endcode method can be used to specify
+ * cache tags, which are used to identify which data is included in each cache
+ * item. A cache item can have multiple cache tags (an array of cache tags), and
+ * each cache tag is a string. The convention is to generate cache tags of the
+ * form @code <prefix>:<suffix> @endcode. Usually, you'll want to associate the
+ * cache tags of entities, or entity listings. You won't have to manually
+ * construct cache tags for them — just get their cache tags via
+ * \Drupal\Core\Entity\EntityInterface::getCacheTags() and
+ * \Drupal\Core\Entity\EntityTypeInterface::getListCacheTags().
+ * Data that has been tagged can be invalidated as a group: no matter
  * the Cache ID (cid) of the cache item, no matter in which cache bin a cache
  * item lives; as long as it is tagged with a certain cache tag, it will be
- * deleted or invalidated.
+ * invalidated.
  *
  * Because of that, cache tags are a solution to the cache invalidation problem:
  * - For caching to be effective, each cache item must only be invalidated when
@@ -489,14 +491,14 @@
  * @code
  * // A cache item with nodes, users, and some custom module data.
  * $tags = array(
- *   'my_custom_tag' => TRUE,
- *   'node' => array(1, 3),
- *   'user' => array(7),
+ *   'my_custom_tag',
+ *   'node:1',
+ *   'node:3',
+ *   'user:7',
  * );
  * \Drupal::cache()->set($cid, $data, CacheBackendInterface::CACHE_PERMANENT, $tags);
  *
- * // Delete or invalidate all cache items with certain tags.
- * \Drupal\Core\Cache\Cache::deleteTags(array('node:1'));
+ * // Invalidate all cache items with certain tags.
  * \Drupal\Core\Cache\Cache::invalidateTags(array('user:1'));
  * @endcode
  *
@@ -512,8 +514,6 @@
  * \Drupal\Core\Entity\EntityTypeInterface::getListCacheTags(),
  * \Drupal\Core\Entity\Entity::invalidateTagsOnSave() and
  * \Drupal\Core\Entity\Entity::invalidateTagsOnDelete().
- *
- * @todo Update cache tag deletion in https://drupal.org/node/918538
  *
  * @section configuration Configuration
  *
@@ -1810,5 +1810,68 @@ function hook_display_variant_plugin_alter(array &$definitions) {
  * See @link container Services and Dependency Injection Container @endlink for
  * information on services and the dependency injection container.
  *
+ * @}
+ */
+
+/**
+ * @defgroup events Events
+ * @{
+ * Overview of event dispatch and subscribing
+ *
+ * @section sec_intro Introduction and terminology
+ * Events are part of the Symfony framework: they allow for different components
+ * of the system to interact and communicate with each other. Each event has a
+ * unique string name. One system component dispatches the event at an
+ * appropriate time; many events are dispatched by Drupal core and the Symfony
+ * framework in every request. Other system components can register as event
+ * subscribers; when an event is dispatched, a method is called on each
+ * registered subscriber, allowing each one to react. For more on the general
+ * concept of events, see
+ * http://symfony.com/doc/current/components/event_dispatcher/introduction.html
+ *
+ * @section sec_dispatch Dispatching events
+ * To dispatch an event, call the
+ * \Symfony\Component\EventDispatcher\EventDispatchInterface::dispatch() method
+ * on the 'event_dispatcher' service (see the
+ * @link container Services topic @endlink for more information about how to
+ * interact with services). The first argument is the unique event name, which
+ * you should normally define as a constant in a separate static class (see
+ * \Symfony\Component\HttpKernel\KernelEvents and
+ * \Drupal\Core\Config\ConfigEvents for examples). The second argument is a
+ * \Symfony\Component\EventDispatcher\Event object; normally you will need to
+ * extend this class, so that your event class can provide data to the event
+ * subscribers.
+ *
+ * @section sec_subscribe Registering event subscribers
+ * Here are the steps to register an event subscriber:
+ * - Define a service in your module, tagged with 'event_subscriber' (see the
+ *   @link container Services topic @endlink for instructions).
+ * - Define a class for your subscriber service that implements
+ *   \Symfony\Component\EventDispatcher\EventSubscriberInterface
+ * - In your class, the getSubscribedEvents method returns a list of the events
+ *   this class is subscribed to, and which methods on the class should be
+ *   called for each one. Example:
+ *   @code
+ *   public function getSubscribedEvents() {
+ *     // Subscribe to kernel terminate with priority 100.
+ *     $events[KernelEvents::TERMINATE][] = array('onTerminate', 100);
+ *     // Subscribe to kernel request with default priority of 0.
+ *     $events[KernelEvents::REQUEST][] = array('onRequest');
+ *     return $events;
+ *   }
+ *   @endcode
+ * - Write the methods that respond to the events; each one receives the
+ *   event object provided in the dispatch as its one argument. In the above
+ *   example, you would need to write onTerminate() and onRequest() methods.
+ *
+ * Note that in your getSubscribedEvents() method, you can optionally set the
+ * priority of your event subscriber (see terminate example above). Event
+ * subscribers with higher priority numbers get executed first; the default
+ * priority is zero. If two event subscribers for the same event have the same
+ * priority, the one defined in a module with a lower module weight will fire
+ * first. Subscribers defined in the same services file are fired in
+ * definition order. If order matters defining a priority is strongly advised
+ * instead of relying on these two tie breaker rules as they might change in a
+ * minor release.
  * @}
  */

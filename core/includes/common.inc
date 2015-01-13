@@ -145,39 +145,6 @@ const JS_THEME = 100;
 const LOCALE_PLURAL_DELIMITER = "\03";
 
 /**
- * Gets the name of the currently active installation profile.
- *
- * When this function is called during Drupal's initial installation process,
- * the name of the profile that's about to be installed is stored in the global
- * installation state. At all other times, the "install_profile" setting will be
- * available in settings.php.
- *
- * @return string|null $profile
- *   The name of the installation profile or NULL if no installation profile is
- *   currently active. This is the case for example during the first steps of
- *   the installer or during unit tests.
- */
-function drupal_get_profile() {
-  global $install_state;
-
-  if (drupal_installation_attempted()) {
-    // If the profile has been selected return it.
-    if (isset($install_state['parameters']['profile'])) {
-      $profile = $install_state['parameters']['profile'];
-    }
-    else {
-      $profile = NULL;
-    }
-  }
-  else {
-    // Fall back to NULL, if there is no 'install_profile' setting.
-    $profile = Settings::get('install_profile');
-  }
-
-  return $profile;
-}
-
-/**
  * Adds output to the HEAD tag of the HTML page.
  *
  * This function can be called as long as the headers aren't sent. Pass no
@@ -385,59 +352,6 @@ function format_xml_elements($array) {
 }
 
 /**
- * Formats a string containing a count of items.
- *
- * This function ensures that the string is pluralized correctly. Since t() is
- * called by this function, make sure not to pass already-localized strings to
- * it.
- *
- * For example:
- * @code
- *   $output = format_plural($node->comment_count, '1 comment', '@count comments');
- * @endcode
- *
- * Example with additional replacements:
- * @code
- *   $output = format_plural($update_count,
- *     'Changed the content type of 1 post from %old-type to %new-type.',
- *     'Changed the content type of @count posts from %old-type to %new-type.',
- *     array('%old-type' => $info->old_type, '%new-type' => $info->new_type));
- * @endcode
- *
- * @param $count
- *   The item count to display.
- * @param $singular
- *   The string for the singular case. Make sure it is clear this is singular,
- *   to ease translation (e.g. use "1 new comment" instead of "1 new"). Do not
- *   use @count in the singular string.
- * @param $plural
- *   The string for the plural case. Make sure it is clear this is plural, to
- *   ease translation. Use @count in place of the item count, as in
- *   "@count new comments".
- * @param $args
- *   An associative array of replacements to make after translation. Instances
- *   of any key in this array are replaced with the corresponding value.
- *   Based on the first character of the key, the value is escaped and/or
- *   themed. See format_string(). Note that you do not need to include @count
- *   in this array; this replacement is done automatically for the plural case.
- * @param $options
- *   An associative array of additional options. See t() for allowed keys.
- *
- * @return
- *   A translated string.
- *
- * @see t()
- * @see format_string()
- * @see \Drupal\Core\StringTranslation\TranslationManager->formatPlural()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
- *   Use \Drupal::translation()->formatPlural().
- */
-function format_plural($count, $singular, $plural, array $args = array(), array $options = array()) {
-  return \Drupal::translation()->formatPlural($count, $singular, $plural, $args, $options);
-}
-
-/**
  * Generates a string representation for the given byte count.
  *
  * @param $size
@@ -451,7 +365,7 @@ function format_plural($count, $singular, $plural, array $args = array(), array 
  */
 function format_size($size, $langcode = NULL) {
   if ($size < Bytes::KILOBYTE) {
-    return format_plural($size, '1 byte', '@count bytes', array(), array('langcode' => $langcode));
+    return \Drupal::translation()->formatPlural($size, '1 byte', '@count bytes', array(), array('langcode' => $langcode));
   }
   else {
     $size = $size / Bytes::KILOBYTE; // Convert bytes to kilobytes.
@@ -506,7 +420,7 @@ function format_size($size, $langcode = NULL) {
  * @return
  *   A translated date string in the requested format.
  *
- * @see \Drupal\Component\Datetime\DateFormatter::format()
+ * @see \Drupal\Core\Datetime\DateFormatter::format()
  */
 function format_date($timestamp, $type = 'medium', $format = '', $timezone = NULL, $langcode = NULL) {
   return \Drupal::service('date.formatter')->format($timestamp, $type, $format, $timezone, $langcode);
@@ -796,23 +710,6 @@ function drupal_set_time_limit($time_limit) {
       @set_time_limit($time_limit);
     }
   }
-}
-
-/**
- * Returns the path to a system item (module, theme, etc.).
- *
- * @param $type
- *   The type of the item; one of 'core', 'profile', 'module', 'theme', or
- *   'theme_engine'.
- * @param $name
- *   The name of the item for which the path is requested. Ignored for
- *   $type 'core'.
- *
- * @return
- *   The path to the requested item or an empty string if the item is not found.
- */
-function drupal_get_path($type, $name) {
-  return dirname(drupal_get_filename($type, $name));
 }
 
 /**
