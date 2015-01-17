@@ -36,8 +36,8 @@ use Drupal\Core\Entity\EntityStorageInterface;
  *     "id" = "id"
  *   },
  *   links = {
- *     "delete-form" = "entity.block.delete_form",
- *     "edit-form" = "entity.block.edit_form"
+ *     "delete-form" = "/admin/structure/block/manage/{block}/delete",
+ *     "edit-form" = "/admin/structure/block/manage/{block}"
  *   }
  * )
  */
@@ -235,19 +235,6 @@ class Block extends ConfigEntityBase implements BlockInterface, EntityWithPlugin
     if (!$update) {
       Cache::invalidateTags($this->getCacheTags());
     }
-  }
-
-  /**
-   * {@inheritdoc}
-   *
-   * Block configuration entities are a special case: one block entity stores
-   * the placement of one block in one theme. Changing these entities may affect
-   * any page that is rendered in a certain theme, even if the block doesn't
-   * appear there currently. Hence a block configuration entity must also return
-   * the associated theme's cache tag.
-   */
-  public function getCacheTags() {
-    return Cache::mergeTags(parent::getCacheTags(), ['theme:' . $this->theme]);
   }
 
   /**

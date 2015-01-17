@@ -100,12 +100,12 @@ function node_help($route_name, RouteMatchInterface $route_match) {
     case 'node.type_add':
       return '<p>' . t('Individual content types can have different fields, behaviors, and permissions assigned to them.') . '</p>';
 
-    case 'field_ui.form_display_overview_node':
+    case "entity.node.field_ui_form_display":
     case 'field_ui.form_display_overview_form_mode_node':
       $type = $route_match->getParameter('node_type');
       return '<p>' . t('Content items can be edited using different form modes. Here, you can define which fields are shown and hidden when %type content is edited in each form mode, and define how the field form widgets are displayed in each form mode.', array('%type' => $type->label())) . '</p>' ;
 
-    case 'field_ui.display_overview_node':
+    case 'entity.node.field_ui_display':
     case 'field_ui.display_overview_view_mode_node':
       $type = $route_match->getParameter('node_type');
       return '<p>' . t('Content items can be displayed using different view modes: Teaser, Full content, Print, RSS, etc. <em>Teaser</em> is a short format that is typically used in lists of multiple content items. <em>Full content</em> is typically used when the content is displayed on its own page.') . '</p>' .
@@ -843,7 +843,7 @@ function node_form_system_themes_admin_form_alter(&$form, FormStateInterface $fo
   $form['admin_theme']['use_admin_theme'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use the administration theme when editing or creating content'),
-    '#default_value' => \Drupal::config('node.settings')->get('use_admin_theme'),
+    '#default_value' => \Drupal::configFactory()->getEditable('node.settings')->get('use_admin_theme'),
   );
   $form['#submit'][] = 'node_form_system_themes_admin_form_submit';
 }
@@ -854,7 +854,7 @@ function node_form_system_themes_admin_form_alter(&$form, FormStateInterface $fo
  * @see node_form_system_themes_admin_form_alter()
  */
 function node_form_system_themes_admin_form_submit($form, FormStateInterface $form_state) {
-  \Drupal::config('node.settings')
+  \Drupal::configFactory()->getEditable('node.settings')
     ->set('use_admin_theme', $form_state->getValue('use_admin_theme'))
     ->save();
   \Drupal::service('router.builder_indicator')->setRebuildNeeded();

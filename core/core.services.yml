@@ -179,6 +179,7 @@ services:
   cron:
     class: Drupal\Core\Cron
     arguments: ['@module_handler', '@lock', '@queue', '@state', '@account_switcher', '@logger.channel.cron', '@plugin.manager.queue_worker']
+    lazy: true
   diff.formatter:
     class: Drupal\Core\Diff\DiffFormatter
     arguments: ['@config.factory']
@@ -397,6 +398,7 @@ services:
     parent: default_plugin_manager
   plugin.cache_clearer:
     class: Drupal\Core\Plugin\CachedDiscoveryClearer
+    lazy: true
   paramconverter.menu_link:
     class: Drupal\Core\ParamConverter\MenuLinkPluginConverter
     tags:
@@ -404,7 +406,7 @@ services:
     arguments: ['@plugin.manager.menu.link']
   menu.tree_storage:
     class: Drupal\Core\Menu\MenuTreeStorage
-    arguments: ['@database', '@cache.menu', 'menu_tree']
+    arguments: ['@database', '@cache.menu', '@cache_tags.invalidator', 'menu_tree']
     public: false  # Private to plugin.manager.menu.link and menu.link_tree
     tags:
       - { name: backend_overridable }
@@ -527,7 +529,17 @@ services:
     calls:
       - [setFinalMatcher, ['@router.matcher.final_matcher']]
     tags:
-      - { name: service_collector, tag: route_filter, call: addRouteFilter }
+      - { name: service_collector, tag: non_lazy_route_filter, call: addRouteFilter }
+  route_filter.lazy_collector:
+    class: Drupal\Core\Routing\LazyRouteFilter
+    tags:
+      - { name: non_lazy_route_filter }
+    parent: container.trait
+  route_filter_subscriber:
+    class: Drupal\Core\EventSubscriber\RouteFilterSubscriber
+    arguments: ['@route_filter.lazy_collector']
+    tags:
+      - { name: event_subscriber }
   url_generator:
     class: Drupal\Core\Routing\UrlGenerator
     arguments: ['@router.route_provider', '@path_processor_manager', '@route_processor_manager', '@config.factory', '@logger.channel.default', '@request_stack']
@@ -546,7 +558,7 @@ services:
     class: Symfony\Cmf\Component\Routing\DynamicRouter
     arguments: ['@router.request_context', '@router.matcher', '@url_generator']
     tags:
-      - { name: service_collector, tag: route_enhancer, call: addRouteEnhancer }
+      - { name: service_collector, tag: non_lazy_route_enhancer, call: addRouteEnhancer }
   router.no_access_checks:
     class: Symfony\Cmf\Component\Routing\ChainRouter
     calls:
@@ -661,6 +673,16 @@ services:
     class: Drupal\Core\EventSubscriber\AjaxSubscriber
     tags:
       - { name: event_subscriber }
+  route_enhancer.lazy_collector:
+    class: Drupal\Core\Routing\LazyRouteEnhancer
+    tags:
+      - { name: non_lazy_route_enhancer, priority: 5000 }
+    parent: container.trait
+  route_enhancer_subscriber:
+    class: Drupal\Core\EventSubscriber\RouteEnhancerSubscriber
+    arguments: ['@route_enhancer.lazy_collector']
+    tags:
+      - { name: event_subscriber }
   route_enhancer.param_conversion:
     class: Drupal\Core\Routing\Enhancer\ParamConversionEnhancer
     arguments: ['@paramconverter_manager']
@@ -768,6 +790,7 @@ services:
       - { name: access_check, applies_to: _entity_create_access }
   access_check.theme:
     class: Drupal\Core\Theme\ThemeAccessCheck
+    arguments: ['@theme_handler']
     tags:
       - { name: access_check, applies_to: _access_theme }
   access_check.custom:
@@ -895,7 +918,7 @@ services:
       - { name: route_processor_outbound }
     arguments: ['@csrf_token']
   transliteration:
-    class: Drupal\Core\Transliteration\PHPTransliteration
+    class: Drupal\Core\Transliteration\PhpTransliteration
   flood:
     class: Drupal\Core\Flood\DatabaseBackend
     arguments: ['@database', '@request_stack']
@@ -1028,7 +1051,7 @@ services:
     arguments: ['@app.root', '@theme_handler', '@state']
   theme.registry:
     class: Drupal\Core\Theme\Registry
-    arguments: ['@app.root', '@cache.default', '@lock', '@module_handler']
+    arguments: ['@app.root', '@cache.default', '@lock', '@module_handler', '@theme_handler']
     tags:
       - { name: needs_destruction }
   authentication:
@@ -1130,4 +1153,4 @@ services:
       - { name: mime_type_guesser }
   renderer:
     class: Drupal\Core\Render\Renderer
-    arguments: ['@controller_resolver', '@theme.manager', '@plugin.manager.element_info']
+    arguments: ['@controller_resolver', '@theme.manager', '@plugin.manager.element_info', '@request_stack', '@cache_factory', '@cache_contexts']

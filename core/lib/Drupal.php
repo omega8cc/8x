@@ -298,8 +298,8 @@ class Drupal {
    *   a configuration file. For @code \Drupal::config('book.admin') @endcode, the config
    *   object returned will contain the contents of book.admin configuration file.
    *
-   * @return \Drupal\Core\Config\Config
-   *   A configuration object.
+   * @return \Drupal\Core\Config\ImmutableConfig
+   *   An immutable configuration object.
    */
   public static function config($name) {
     return static::$container->get('config.factory')->get($name);
@@ -568,7 +568,7 @@ class Drupal {
   /**
    * Returns the transliteration service.
    *
-   * @return \Drupal\Core\Transliteration\PHPTransliteration
+   * @return \Drupal\Core\Transliteration\PhpTransliteration
    *   The transliteration manager.
    */
   public static function transliteration() {

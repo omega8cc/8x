@@ -246,8 +246,13 @@ class ConfigEntityStorageTest extends UnitTestCase {
         $this->entityTypeId . '_list', // List cache tag.
       ));
 
-    $this->configFactory->expects($this->exactly(2))
+    $this->configFactory->expects($this->exactly(1))
       ->method('get')
+      ->with('the_config_prefix.foo')
+      ->will($this->returnValue($config_object));
+
+    $this->configFactory->expects($this->exactly(1))
+      ->method('getEditable')
       ->with('the_config_prefix.foo')
       ->will($this->returnValue($config_object));
 
@@ -302,16 +307,21 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->cacheTagsInvalidator->expects($this->once())
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId . ':foo', // Own cache tag.
-        $this->entityTypeId . '_list', // List cache tag.
+        // List cache tag only; the own cache tag is invalidated by the config
+        // system.
+        $this->entityTypeId . '_list',
       ));
 
     $this->configFactory->expects($this->exactly(2))
       ->method('loadMultiple')
       ->with(array('the_config_prefix.foo'))
       ->will($this->returnValue(array()));
-    $this->configFactory->expects($this->exactly(2))
+    $this->configFactory->expects($this->exactly(1))
       ->method('get')
+      ->with('the_config_prefix.foo')
+      ->will($this->returnValue($config_object));
+    $this->configFactory->expects($this->exactly(1))
+      ->method('getEditable')
       ->with('the_config_prefix.foo')
       ->will($this->returnValue($config_object));
 
@@ -362,12 +372,17 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->cacheTagsInvalidator->expects($this->once())
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId .':bar', // Own cache tag.
-        $this->entityTypeId . '_list', // List cache tag.
+        // List cache tag only; the own cache tag is invalidated by the config
+        // system.
+        $this->entityTypeId . '_list',
       ));
 
     $this->configFactory->expects($this->once())
       ->method('rename')
+      ->willReturn($this->configFactory);
+    $this->configFactory->expects($this->exactly(1))
+      ->method('getEditable')
+      ->with('the_config_prefix.bar')
       ->will($this->returnValue($config_object));
     $this->configFactory->expects($this->exactly(2))
       ->method('loadMultiple')
@@ -504,8 +519,11 @@ class ConfigEntityStorageTest extends UnitTestCase {
       ->will($this->returnValue($config_object));
     $this->configFactory->expects($this->once())
       ->method('rename')
+      ->willReturn($this->configFactory);
+    $this->configFactory->expects($this->exactly(1))
+      ->method('getEditable')
+      ->with('the_config_prefix.foo')
       ->will($this->returnValue($config_object));
-
     $this->entityQuery->expects($this->once())
       ->method('condition')
       ->will($this->returnSelf());
@@ -728,13 +746,13 @@ class ConfigEntityStorageTest extends UnitTestCase {
     $this->cacheTagsInvalidator->expects($this->once())
       ->method('invalidateTags')
       ->with(array(
-        $this->entityTypeId . ':bar', // Own cache tag.
-        $this->entityTypeId . ':foo', // Own cache tag.
-        $this->entityTypeId . '_list', // List cache tag.
+        // List cache tag only; the own cache tag is invalidated by the config
+        // system.
+        $this->entityTypeId . '_list',
       ));
 
     $this->configFactory->expects($this->exactly(2))
-      ->method('get')
+      ->method('getEditable')
       ->will($this->returnValueMap($config_map));
 
     $this->moduleHandler->expects($this->at(0))
