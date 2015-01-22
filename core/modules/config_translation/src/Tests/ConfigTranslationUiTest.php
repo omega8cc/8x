@@ -348,7 +348,7 @@ class ConfigTranslationUiTest extends WebTestBase {
 
     // Test that delete links work and operations perform properly.
     foreach ($this->langcodes as $langcode) {
-      $replacements = array('%label' => t('!label !entity_type', array('!label' => $label, '!entity_type' => Unicode::strtolower(t('Contact form')))), '@language' => language_load($langcode)->getName());
+      $replacements = array('%label' => t('!label !entity_type', array('!label' => $label, '!entity_type' => Unicode::strtolower(t('Contact form')))), '@language' => \Drupal::languageManager()->getLanguage($langcode)->getName());
 
       $this->drupalGet("$translation_base_url/$langcode/delete");
       $this->assertRaw(t('Are you sure you want to delete the @language translation of %label?', $replacements));
@@ -715,9 +715,8 @@ class ConfigTranslationUiTest extends WebTestBase {
       'format' => 'plain_text',
     );
     $actual = $config_factory
-      ->setOverrideState(FALSE)
       ->get('config_translation_test.content')
-      ->get('content');
+      ->getOriginal('content', FALSE);
     $this->assertEqual($expected, $actual);
 
     $translation_base_url = 'admin/config/media/file-system/translate';
@@ -749,7 +748,6 @@ class ConfigTranslationUiTest extends WebTestBase {
     $this->container->get('language.config_factory_override')
       ->setLanguage(new Language(array('id' => 'fr')));
     $actual = $config_factory
-      ->setOverrideState(TRUE)
       ->get('config_translation_test.content')
       ->get('content');
     $this->assertEqual($expected, $actual);
@@ -758,13 +756,11 @@ class ConfigTranslationUiTest extends WebTestBase {
     // text format of the translation does not change because that could lead to
     // security vulnerabilities.
     $config_factory
-      ->setOverrideState(FALSE)
       ->getEditable('config_translation_test.content')
       ->set('content.format', 'full_html')
       ->save();
 
     $actual = $config_factory
-      ->setOverrideState(TRUE)
       ->get('config_translation_test.content')
       ->get('content');
     // The translation should not have changed, so re-use $expected.

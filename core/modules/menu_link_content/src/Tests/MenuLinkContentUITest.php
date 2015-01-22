@@ -56,7 +56,7 @@ class MenuLinkContentUITest extends ContentTranslationUITest {
    */
   protected function createEntity($values, $langcode, $bundle_name = NULL) {
     $values['menu_name'] = 'tools';
-    $values['route_name'] = 'menu_ui.overview_page';
+    $values['route_name'] = 'entity.menu.collection';
     $values['title'] = 'Test title';
 
     return parent::createEntity($values, $langcode, $bundle_name);
@@ -75,9 +75,9 @@ class MenuLinkContentUITest extends ContentTranslationUITest {
     $edit['admin_theme'] = 'seven';
     $this->drupalPostForm('admin/appearance', $edit, t('Save configuration'));
     $this->drupalGet('admin/structure/menu/item/' . $entityId . '/edit');
-    $this->assertRaw('"theme":"seven"', 'Edit uses admin theme.');
+    $this->assertRaw('core/themes/seven/css/base/elements.css', 'Edit uses admin theme.');
     $this->drupalGet('admin/structure/menu/item/' . $entityId . '/edit/translations');
-    $this->assertRaw('"theme":"seven"', 'Translation uses admin theme as well.');
+    $this->assertRaw('core/themes/seven/css/base/elements.css', 'Translation uses admin theme as well.');
   }
 
 }

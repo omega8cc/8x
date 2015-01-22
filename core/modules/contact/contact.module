@@ -7,6 +7,7 @@
 
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\user\Entity\User;
 
 /**
  * Implements hook_help().
@@ -24,15 +25,15 @@ function contact_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<dt>' . t('Site-wide contact forms') . '</dt>';
       $output .= '<dd>' . t('The <a href="@contact">Contact page</a> provides a simple form for users with the <em>Use the site-wide contact form</em> permission to send comments, feedback, or other requests. You can create forms for directing the contact messages to a set of defined recipients. Common forms for a business site, for example, might include "Website feedback" (messages are forwarded to website administrators) and "Product information" (messages are forwarded to members of the sales department). Email addresses defined within a form are not displayed publicly.', array('@contact' => \Drupal::url('contact.site_page'))) . '</p>';
       $output .= '<dt>' . t('Navigation') . '</dt>';
-      $output .= '<dd>' . t('When the site-wide contact form is enabled, a link in the <em>Footer</em> menu is created, which you can modify on the <a href="@menu">Menus administration page</a>.', array('@menu' => \Drupal::url('menu_ui.overview_page'))) . '</dd>';
+      $output .= '<dd>' . t('When the site-wide contact form is enabled, a link in the <em>Footer</em> menu is created, which you can modify on the <a href="@menu">Menus administration page</a>.', array('@menu' => \Drupal::url('entity.menu.collection'))) . '</dd>';
       $output .= '<dt>' . t('Customization') . '</dt>';
       $output .= '<dd>' . t('If you would like additional text to appear on the site-wide or personal contact page, use a block. You can create and edit blocks on the <a href="@blocks">Blocks administration page</a>.', array('@blocks' => \Drupal::url('block.admin_display'))) . '</dd>';
       $output .= '</dl>';
       return $output;
 
-    case 'contact.form_list':
+    case 'entity.contact_form.collection':
       $output = '<p>' . t('Add one or more forms on this page to set up your site-wide <a href="@form">contact form</a>.', array('@form' => \Drupal::url('contact.site_page'))) . '</p>';
-      $output .= '<p>' . t('A <em>Contact</em> menu item is added to the <em>Footer</em> menu, which you can modify on the <a href="@menu-settings">Menus administration page</a>.', array('@menu-settings' => \Drupal::url('menu_ui.overview_page'))) . '</p>';
+      $output .= '<p>' . t('A <em>Contact</em> menu item is added to the <em>Footer</em> menu, which you can modify on the <a href="@menu-settings">Menus administration page</a>.', array('@menu-settings' => \Drupal::url('entity.menu.collection'))) . '</p>';
       $output .= '<p>' . t('If you would like additional text to appear on the site-wide contact page, use a block. You can create and edit blocks on the <a href="@blocks">Blocks administration page</a>.', array('@blocks' => \Drupal::url('block.admin_display'))) . '</p>';
       return $output;
   }
@@ -85,13 +86,33 @@ function contact_entity_extra_field_info() {
 }
 
 /**
+ * Implements hook_menu_local_tasks_alter().
+ *
+ * Hides the 'Contact' tab on the user profile if the user does not have an
+ * email address configured.
+ */
+function contact_menu_local_tasks_alter(&$data, $route_name) {
+  if ($route_name == 'entity.user.canonical') {
+    foreach ($data['tabs'][0] as $href => $tab_data) {
+      if ($href == 'entity.user.contact_form') {
+        $link_params = $tab_data['#link']['url']->getRouteParameters();
+        $account = User::load($link_params['user']);
+        if (!$account->getEmail()) {
+          unset($data['tabs'][0]['entity.user.contact_form']);
+        }
+      }
+    }
+  }
+}
+
+/**
  * Implements hook_mail().
  */
 function contact_mail($key, &$message, $params) {
   $contact_message = $params['contact_message'];
   /** @var $sender \Drupal\user\UserInterface */
   $sender = $params['sender'];
-  $language = language_load($message['langcode']);
+  $language = \Drupal::languageManager()->getLanguage($message['langcode']);
 
   $variables = array(
     '!site-name' => \Drupal::config('system.site')->get('name'),

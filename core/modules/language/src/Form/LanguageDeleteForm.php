@@ -10,11 +10,9 @@ namespace Drupal\language\Form;
 use Drupal\Core\Entity\EntityConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\UrlGeneratorInterface;
-use Drupal\Core\Url;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -70,7 +68,7 @@ class LanguageDeleteForm extends EntityConfirmFormBase {
    * {@inheritdoc}
    */
   public function getCancelUrl() {
-    return new Url('language.admin_overview');
+    return $this->entity->urlInfo('collection');
   }
 
   /**
@@ -101,7 +99,7 @@ class LanguageDeleteForm extends EntityConfirmFormBase {
     $langcode = $this->entity->id();
 
     // Warn and redirect user when attempting to delete the default language.
-    if (language_default()->getId() == $langcode) {
+    if ($this->languageManager->getDefaultLanguage()->getId() == $langcode) {
       drupal_set_message($this->t('The default language cannot be deleted.'));
       $url = $this->urlGenerator->generateFromPath('admin/config/regional/language', array('absolute' => TRUE));
       return new RedirectResponse($url);
