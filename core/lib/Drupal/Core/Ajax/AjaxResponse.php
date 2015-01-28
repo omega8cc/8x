@@ -8,6 +8,7 @@
 namespace Drupal\Core\Ajax;
 
 use Drupal\Core\Asset\AttachedAssets;
+use Drupal\Core\Render\Renderer;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -70,6 +71,15 @@ class AjaxResponse extends JsonResponse {
     }
     else {
       $this->commands[] = $command->render();
+    }
+    if ($command instanceof CommandWithAttachedAssetsInterface) {
+      $assets = $command->getAttachedAssets();
+      $attachments = [
+        'library' => $assets->getLibraries(),
+        'drupalSettings' => $assets->getSettings(),
+      ];
+      $attachments = Renderer::mergeAttachments($this->attachments, $attachments);
+      $this->setAttachments($attachments);
     }
 
     return $this;
@@ -135,8 +145,15 @@ class AjaxResponse extends JsonResponse {
 
     // Render the HTML to load these files, and add AJAX commands to insert this
     // HTML in the page. Settings are handled separately, afterwards.
-    $settings = (isset($js_assets_header['drupalSettings'])) ? $js_assets_header['drupalSettings']['data'] : [];
-    unset($js_assets_header['drupalSettings']);
+    $settings = [];
+    if (isset($js_assets_header['drupalSettings'])) {
+      $settings = $js_assets_header['drupalSettings']['data'];
+      unset($js_assets_header['drupalSettings']);
+    }
+    if (isset($js_assets_footer['drupalSettings'])) {
+      $settings = $js_assets_footer['drupalSettings']['data'];
+      unset($js_assets_footer['drupalSettings']);
+    }
 
     // Prepend commands to add the assets, preserving their relative order.
     $resource_commands = array();

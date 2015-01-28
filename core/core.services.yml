@@ -124,6 +124,7 @@ services:
     class: Drupal\Core\PageCache\ChainResponsePolicy
     tags:
       - { name: service_collector, tag: page_cache_response_policy, call: addPolicy}
+    lazy: true
   page_cache_kill_switch:
     class: Drupal\Core\PageCache\ResponsePolicy\KillSwitch
     tags:
@@ -348,6 +349,9 @@ services:
     arguments: ['@config.manager', '@entity.manager']
     tags:
       - { name: event_subscriber }
+  plugin.manager.entity_reference_selection:
+    class: Drupal\Core\Entity\EntityReferenceSelection\SelectionPluginManager
+    parent: default_plugin_manager
   plugin.manager.block:
     class: Drupal\Core\Block\BlockManager
     parent: default_plugin_manager
@@ -452,7 +456,7 @@ services:
       - { name: http_middleware, priority: 300 }
   http_middleware.page_cache:
     class: Drupal\Core\StackMiddleware\PageCache
-    arguments: ['@kernel']
+    arguments: ['@cache.render', '@page_cache_request_policy', '@page_cache_response_policy', '@content_negotiation']
     tags:
       - { name: http_middleware, priority: 200 }
   http_middleware.kernel_pre_handle:
@@ -485,7 +489,7 @@ services:
     arguments: [replica]
   typed_data_manager:
     class: Drupal\Core\TypedData\TypedDataManager
-    parent: default_plugin_manager
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@class_resolver']
     calls:
       - [setValidationConstraintManager, ['@validation.constraint']]
     tags:
@@ -1125,7 +1129,7 @@ services:
     class: Drupal\Core\Extension\InfoParser
   twig:
     class: Drupal\Core\Template\TwigEnvironment
-    arguments: ['@app.root', '@twig.loader', '@module_handler', '@theme_handler', '%twig.config%']
+    arguments: ['@app.root', '@twig.loader', '%twig.config%']
     tags:
       - { name: service_collector, tag: 'twig.extension', call: addExtension }
   twig.extension:
@@ -1142,10 +1146,24 @@ services:
     tags:
       - { name: twig.extension }
   twig.loader:
-    alias: twig.loader.filesystem
+    class: Twig_Loader_Chain
+    public: false
+    tags:
+      - { name: service_collector, tag: twig.loader, call: addLoader, required: TRUE }
   twig.loader.filesystem:
-    class: Twig_Loader_Filesystem
-    arguments: ['@app.root']
+    class: Drupal\Core\Template\Loader\FilesystemLoader
+    arguments: ['@app.root', '@module_handler', '@theme_handler']
+    tags:
+      - { name: twig.loader, priority: 100 }
+  twig.loader.theme_registry:
+    class: Drupal\Core\Template\Loader\ThemeRegistryLoader
+    arguments: ['@theme.registry']
+    tags:
+      - { name: twig.loader, priority: 0 }
+  twig.loader.string:
+    class: Twig_Loader_String
+    tags:
+      - { name: twig.loader, priority: -100 }
   element_info:
     alias: plugin.manager.element_info
   file.mime_type.guesser:

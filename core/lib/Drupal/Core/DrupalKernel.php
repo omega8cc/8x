@@ -77,6 +77,13 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
   protected $booted = FALSE;
 
   /**
+   * Whether essential services have been set up properly by preHandle().
+   *
+   * @var bool
+   */
+  protected $prepared = FALSE;
+
+  /**
    * Holds the list of enabled modules.
    *
    * @var array
@@ -201,6 +208,9 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
    *   from disk. Defaults to TRUE.
    *
    * @return static
+   *
+   * @throws \Symfony\Component\HttpKernel\Exception\BadRequestHttpException
+   *   In case the host name in the request is not trusted.
    */
   public static function createFromRequest(Request $request, $class_loader, $environment, $allow_dumping = TRUE) {
     // Include our bootstrap file.
@@ -222,6 +232,15 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
     $site_path = static::findSitePath($request);
     $kernel->setSitePath($site_path);
     Settings::initialize(dirname($core_root), $site_path, $class_loader);
+
+    // Initialize our list of trusted HTTP Host headers to protect against
+    // header attacks.
+    $hostPatterns = Settings::get('trusted_host_patterns', array());
+    if (PHP_SAPI !== 'cli' && !empty($hostPatterns)) {
+      if (static::setupTrustedHosts($request, $hostPatterns) === FALSE) {
+        throw new BadRequestHttpException('The provided host name is not valid for this server.');
+      }
+    }
 
     // Redirect the user to the installation script if Drupal has not been
     // installed yet (i.e., if no $databases array has been defined in the
@@ -468,42 +487,8 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
 
     // Override of Symfony's mime type guesser singleton.
     MimeTypeGuesser::registerWithSymfonyGuesser($this->container);
-  }
 
-  /**
-   * {@inheritdoc}
-   *
-   * @todo Invoke proper request/response/terminate events.
-   */
-  public function handlePageCache(Request $request) {
-    $this->boot();
-
-    // Check for a cache mode force from settings.php.
-    if (Settings::get('page_cache_without_database')) {
-      $cache_enabled = TRUE;
-    }
-    else {
-      $config = $this->getContainer()->get('config.factory')->get('system.performance');
-      $cache_enabled = $config->get('cache.page.use_internal');
-    }
-
-    $request_policy = \Drupal::service('page_cache_request_policy');
-    if ($cache_enabled && $request_policy->check($request) === RequestPolicyInterface::ALLOW) {
-      // Get the page from the cache.
-      $response = drupal_page_get_cache($request);
-      // If there is a cached page, display it.
-      if ($response) {
-        $response->headers->set('X-Drupal-Cache', 'HIT');
-
-        drupal_serve_page_from_cache($response, $request);
-
-        // We are done.
-        $response->prepare($request);
-        $response->send();
-        exit;
-      }
-    }
-    return $this;
+    $this->prepared = TRUE;
   }
 
   /**
@@ -551,12 +536,8 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
         }
       }
     }
-    if ($container_yamls = Settings::get('container_yamls')) {
-      $this->serviceYamls['site'] = $container_yamls;
-    }
-    $site_services_yml = $this->getSitePath() . '/services.yml';
-    if (file_exists($site_services_yml) && is_readable($site_services_yml)) {
-      $this->serviceYamls['site'][] = $site_services_yml;
+    if (!$this->addServiceFiles(Settings::get('container_yamls'))) {
+      throw new \Exception('The container_yamls setting is missing from settings.php');
     }
   }
 
@@ -571,7 +552,9 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
    * {@inheritdoc}
    */
   public function terminate(Request $request, Response $response) {
-    if (FALSE === $this->booted) {
+    // Only run terminate() when essential services have been set up properly
+    // by preHandle() before.
+    if (FALSE === $this->prepared) {
       return;
     }
 
@@ -1272,4 +1255,63 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
     return TRUE;
   }
 
+  /**
+   * Sets up the lists of trusted HTTP Host headers.
+   *
+   * Since the HTTP Host header can be set by the user making the request, it
+   * is possible to create an attack vectors against a site by overriding this.
+   * Symfony provides a mechanism for creating a list of trusted Host values.
+   *
+   * Host patterns (as regular expressions) can be configured throught
+   * settings.php for multisite installations, sites using ServerAlias without
+   * canonical redirection, or configurations where the site responds to default
+   * requests. For example,
+   *
+   * @code
+   * $settings['trusted_host_patterns'] = array(
+   *   '^example\.com$',
+   *   '^*.example\.com$',
+   * );
+   * @endcode
+   *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The request object.
+   * @param array $hostPatterns
+   *   The array of trusted host patterns.
+   *
+   * @return boolean
+   *   TRUE if the Host header is trusted, FALSE otherwise.
+   *
+   * @see https://www.drupal.org/node/1992030
+   */
+  protected static function setupTrustedHosts(Request $request, $hostPatterns) {
+    $request->setTrustedHosts($hostPatterns);
+
+    // Get the host, which will validate the current request.
+    try {
+      $request->getHost();
+    }
+    catch (\UnexpectedValueException $e) {
+      return FALSE;
+    }
+
+    return TRUE;
+  }
+
+  /**
+   * Add service files.
+   *
+   * @param $service_yamls
+   *   A list of service files.
+   *
+   * @return bool
+   *   TRUE if the list was an array, FALSE otherwise.
+   */
+  protected function addServiceFiles($service_yamls) {
+    if (is_array($service_yamls)) {
+      $this->serviceYamls['site'] = array_filter($service_yamls, 'file_exists');
+      return TRUE;
+    }
+    return FALSE;
+  }
 }

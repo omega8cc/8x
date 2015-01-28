@@ -20,6 +20,7 @@ use Drupal\Component\Utility\SortArray;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Tags;
 use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Site\Settings;
@@ -32,6 +33,7 @@ use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Routing\GeneratorNotInitializedException;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Render\Renderer;
 use Drupal\Core\Session\AnonymousUserSession;
 
 /**
@@ -852,7 +854,7 @@ function drupal_js_defaults($data = NULL) {
  * Merges two #attached arrays.
  *
  * The values under the 'drupalSettings' key are merged in a special way, to
- * match the behavior of
+ * match the behavior of:
  *
  * @code
  *   jQuery.extend(true, {}, $settings_items[0], $settings_items[1], ...)
@@ -889,15 +891,12 @@ function drupal_js_defaults($data = NULL) {
  *
  * @return array
  *   The merged #attached array.
+ *
+ * @deprecated To be removed in Drupal 8.0.x. Use
+ *   \Drupal\Core\Render\Renderer::mergeAttachments() instead.
  */
 function drupal_merge_attached(array $a, array $b) {
-  // If both #attached arrays contain drupalSettings, then merge them correctly;
-  // adding the same settings multiple times needs to behave idempotently.
-  if (!empty($a['drupalSettings']) && !empty($b['drupalSettings'])) {
-    $a['drupalSettings'] = NestedArray::mergeDeepArray([$a['drupalSettings'], $b['drupalSettings']], TRUE);
-    unset($b['drupalSettings']);
-  }
-  return NestedArray::mergeDeep($a, $b);
+  return Renderer::mergeAttachments($a, $b);
 }
 
 /**
@@ -1265,48 +1264,6 @@ function drupal_attach_tabledrag(&$element, array $options) {
  */
 function drupal_clear_js_cache() {
   \Drupal::service('asset.js.collection_optimizer')->deleteAll();
-}
-
-/**
- * Stores the current page in the cache.
- *
- * If page_compression is enabled, a gzipped version of the page is stored in
- * the cache to avoid compressing the output on each request. The cache entry
- * is unzipped in the relatively rare event that the page is requested by a
- * client without gzip support.
- *
- * Page compression requires the PHP zlib extension
- * (http://php.net/manual/ref.zlib.php).
- *
- * @param \Symfony\Component\HttpFoundation\Response $response
- *   The fully populated response.
- * @param \Symfony\Component\HttpFoundation\Request $request
- *   The request for this page.
- */
-function drupal_page_set_cache(Response $response, Request $request) {
-  // Check if the current page may be compressed.
-  if (extension_loaded('zlib') && !$response->headers->get('Content-Encoding') &&
-      \Drupal::config('system.performance')->get('response.gzip')) {
-
-    $content = $response->getContent();
-    if ($content) {
-      $response->setContent(gzencode($content, 9, FORCE_GZIP));
-      $response->headers->set('Content-Encoding', 'gzip');
-    }
-
-    // When page compression is enabled, ensure that proxy caches will record
-    // and deliver different versions of a page depending on whether the
-    // client supports gzip or not.
-    $response->setVary('Accept-Encoding', FALSE);
-  }
-
-  // Use the actual timestamp from an Expires header, if available.
-  $date = $response->getExpires();
-  $expire = ($date > (new DateTime())) ? $date->getTimestamp() : Cache::PERMANENT;
-
-  $cid = drupal_page_cache_get_cid($request);
-  $tags = explode(' ', $response->headers->get('X-Drupal-Cache-Tags'));
-  \Drupal::cache('render')->set($cid, $response, $expire, $tags);
 }
 
 /**
