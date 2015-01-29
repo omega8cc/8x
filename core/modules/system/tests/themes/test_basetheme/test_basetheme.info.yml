@@ -1,8 +1,8 @@
 name: 'Theme test base theme'
 type: theme
 description: 'Test theme which acts as a base theme for other test subthemes.'
-version: VERSION
-core: 8.x
+# version: VERSION
+# core: 8.x
 libraries:
   - test_basetheme/global-styling
 stylesheets-override:
@@ -11,3 +11,9 @@ stylesheets-override:
 stylesheets-remove:
   - base-remove.css
   - base-remove.sub-override.css
+
+# Information added by Drupal.org packaging script on 2015-01-28
+version: '8.0.0-beta6'
+core: '8.x'
+project: 'drupal'
+datestamp: 1422443984
