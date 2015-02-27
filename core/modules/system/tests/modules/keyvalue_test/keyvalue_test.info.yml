@@ -6,7 +6,6 @@ package: Testing
 # version: VERSION
 hidden: true
 dependencies:
-  - config_test
   - entity_test
 
 # Information added by Drupal.org packaging script on 2015-01-28

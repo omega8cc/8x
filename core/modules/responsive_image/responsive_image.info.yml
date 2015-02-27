@@ -7,7 +7,7 @@ package: Core
 dependencies:
   - breakpoint
   - image
-configure: entity.responsive_image_mapping.collection
+configure: entity.responsive_image_style.collection
 
 # Information added by Drupal.org packaging script on 2015-01-28
 version: '8.0.0-beta6'
