@@ -23,6 +23,7 @@ use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Asset\AttachedAssets;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Render\Renderer;
 use Drupal\Core\Site\Settings;
 use Drupal\Core\Url;
 use Symfony\Component\HttpFoundation\Response;
@@ -33,7 +34,6 @@ use Drupal\Core\Datetime\DrupalDateTime;
 use Drupal\Core\Routing\GeneratorNotInitializedException;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Render\Element;
-use Drupal\Core\Render\Renderer;
 use Drupal\Core\Session\AnonymousUserSession;
 
 /**
@@ -634,27 +634,6 @@ function drupal_clear_css_cache() {
  */
 function drupal_html_id($id) {
   return Html::getUniqueId($id);
-}
-
-/**
- * Prepares a string for use as a valid HTML ID.
- *
- * Only use this function when you want to intentionally skip the uniqueness
- * guarantee of drupal_html_id().
- *
- * @param string $id
- *   The ID to clean.
- *
- * @return string
- *   The cleaned ID.
- *
- * @see drupal_html_id()
- *
- * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.0.
- *   Use \Drupal\Component\Utility\Html::getId()
- */
-function drupal_clean_id_identifier($id) {
-  return Html::getId($id);
 }
 
 /**
@@ -1346,9 +1325,9 @@ function show(&$element) {
 /**
  * Generates a render cache placeholder.
  *
- * This is used by drupal_pre_render_render_cache_placeholder() to generate
- * placeholders, but should also be called by #post_render_cache callbacks that
- * want to replace the placeholder with the final markup.
+ * This can be used to generate placeholders, and hence should also be used by
+ * #post_render_cache callbacks that want to replace the placeholder with the
+ * final markup.
  *
  * @param string $callback
  *   The #post_render_cache callback that will replace the placeholder with its
@@ -1363,28 +1342,11 @@ function show(&$element) {
  *
  * @throws \Exception
  *
- * @see \Drupal\Core\Render\Renderer::getFromCache()
+ * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 9.0.0.
+ *   Use \Drupal::service('renderer')->generateCachePlaceholder().
  */
 function drupal_render_cache_generate_placeholder($callback, array &$context) {
-  if (is_string($callback) && strpos($callback, '::') === FALSE) {
-    /** @var \Drupal\Core\Controller\ControllerResolverInterface $controller_resolver */
-    $controller_resolver = \Drupal::service('controller_resolver');
-    $callable = \Drupal::service('controller_resolver')->getControllerFromDefinition($callback);
-  }
-  else {
-   $callable = $callback;
-  }
-
-  if (!is_callable($callable)) {
-    throw new Exception(t('$callable must be a callable function or of the form service_id:method.'));
-  }
-
-  // Generate a unique token if one is not already provided.
-  $context += array(
-    'token' => \Drupal\Component\Utility\Crypt::randomBytesBase64(55),
-  );
-
-  return '<drupal-render-cache-placeholder callback="' . $callback . '" token="' . $context['token'] . '"></drupal-render-cache-placeholder>';
+  return \Drupal::service('renderer')->generateCachePlaceholder($callback, $context);
 }
 
 /**
