@@ -8,6 +8,7 @@
 namespace Drupal\views\Plugin\views\display;
 
 use Drupal\Component\Plugin\DependentPluginInterface;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\Cache;
@@ -186,7 +187,7 @@ abstract class DisplayPluginBase extends PluginBase implements DisplayPluginInte
         }
         else {
           $this->unpackOptions($this->options, $options);
-          \Drupal::cache('data')->set($cid, $this->options, Cache::PERMANENT, Cache::mergeTags(array('config:core.extension', 'extension:views'), $this->view->storage->getCacheTags()));
+          \Drupal::cache('data')->set($cid, $this->options, Cache::PERMANENT, $this->view->storage->getCacheTags());
         }
         static::$unpackOptions[$cid] = $this->options;
       }
@@ -1018,7 +1019,7 @@ abstract class DisplayPluginBase extends PluginBase implements DisplayPluginInte
       $title = $text;
     }
 
-    return \Drupal::l($text, new Url('views_ui.form_display', ['js' => 'nojs', 'view' => $this->view->storage->id(), 'display_id' => $this->display['id'], 'type' => $section], array('attributes' => array('class' => array('views-ajax-link', $class), 'title' => $title, 'id' => drupal_html_id('views-' . $this->display['id'] . '-' . $section)), 'html' => TRUE)));
+    return \Drupal::l($text, new Url('views_ui.form_display', ['js' => 'nojs', 'view' => $this->view->storage->id(), 'display_id' => $this->display['id'], 'type' => $section], array('attributes' => array('class' => array('views-ajax-link', $class), 'title' => $title, 'id' => Html::getUniqueId('views-' . $this->display['id'] . '-' . $section)), 'html' => TRUE)));
   }
 
   /**
@@ -2280,7 +2281,6 @@ abstract class DisplayPluginBase extends PluginBase implements DisplayPluginInte
       '#display_id' => $this->display['id'],
       '#arguments' => $args,
       '#embed' => FALSE,
-      '#pre_render' => [['\Drupal\views\Element\View', 'preRenderViewElement'], [$this, 'elementPreRender']],
       '#view' => $this->view,
     ];
   }
@@ -2569,10 +2569,12 @@ abstract class DisplayPluginBase extends PluginBase implements DisplayPluginInte
   protected function isBaseTableTranslatable() {
     $view_base_table = $this->view->storage->get('base_table');
     foreach (\Drupal::entityManager()->getDefinitions() as $entity_type) {
-      if ($entity_type->isTranslatable() && $base_table = $entity_type->getBaseTable()) {
-        if ($base_table === $view_base_table) {
-          return TRUE;
-        }
+      if ($entity_type->isTranslatable()) {
+        $base_table = $entity_type->getBaseTable();
+        $data_table = $entity_type->getDataTable();
+        $revision_table = $entity_type->getRevisionTable();
+        $revision_data_table = $entity_type->getRevisionDataTable();
+        return in_array($view_base_table, [$base_table, $data_table, $revision_table, $revision_data_table]);
       }
     }
     return FALSE;
