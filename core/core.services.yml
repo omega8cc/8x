@@ -382,7 +382,7 @@ services:
     parent: default_plugin_manager
   plugin.manager.field.field_type:
     class: Drupal\Core\Field\FieldTypePluginManager
-    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler']
+    arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@typed_data_manager']
   plugin.manager.field.widget:
     class: Drupal\Core\Field\WidgetPluginManager
     arguments: ['@container.namespaces', '@cache.discovery', '@module_handler', '@plugin.manager.field.field_type']
@@ -1227,7 +1227,7 @@ services:
     tags:
       - { name: twig.loader, priority: 0 }
   twig.loader.string:
-    class: Twig_Loader_String
+    class: Drupal\Core\Template\Loader\StringLoader
     tags:
       - { name: twig.loader, priority: -100 }
   element_info:

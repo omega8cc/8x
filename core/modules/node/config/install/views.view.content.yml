@@ -9,7 +9,7 @@ label: Content
 module: node
 description: 'Find and manage content.'
 tag: default
-base_table: node
+base_table: node_field_data
 base_field: nid
 core: 8.x
 display:
@@ -37,6 +37,11 @@ display:
         type: full
         options:
           items_per_page: 50
+          tags:
+            previous: '‹ previous'
+            next: 'next ›'
+            first: '« first'
+            last: 'last »'
       style:
         type: table
         options:

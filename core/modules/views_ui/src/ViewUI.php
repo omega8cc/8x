@@ -337,7 +337,7 @@ class ViewUI implements ViewEntityInterface {
       $form['actions']['submit'] = array(
         '#type' => 'submit',
         '#value' => $name,
-        '#id' => 'edit-submit-' . drupal_html_id($form_id),
+        '#id' => 'edit-submit-' . Html::getUniqueId($form_id),
         // The regular submit handler ($form_id . '_submit') does not apply if
         // we're updating the default display. It does apply if we're updating
         // the current display. Since we have no way of knowing at this point
@@ -727,7 +727,7 @@ class ViewUI implements ViewEntityInterface {
             if (isset($path)) {
               // @todo Views should expect and store a leading /. See:
               //   https://www.drupal.org/node/2423913
-              $path = \Drupal::l($path, Url::fromUserInput('/' . $path));
+              $path = \Drupal::l($path->toString(), $path);
             }
             else {
               $path = t('This display has no path.');
