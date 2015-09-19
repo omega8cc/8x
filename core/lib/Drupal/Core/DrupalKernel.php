@@ -886,7 +886,12 @@ class DrupalKernel implements DrupalKernelInterface, TerminableInterface {
     }
 
     // Include our bootstrap file.
-    $core_root = dirname(dirname(dirname(__DIR__)));
+    if (is_link(getcwd() . '/core')) {
+      $core_root = getcwd() . '/core';
+    }
+    else {
+      $core_root = dirname(dirname(dirname(__DIR__)));
+    }
     require_once $core_root . '/includes/bootstrap.inc';
 
     // Enforce E_STRICT, but allow users to set levels not part of E_STRICT.
