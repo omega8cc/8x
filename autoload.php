@@ -16,4 +16,10 @@
  * @see core/modules/statistics/statistics.php
  */
 
-return require __DIR__ . '/core/vendor/autoload.php';
+if (is_link(getcwd() . '/core')) {
+  $drupal_root = getcwd();
+}
+else {
+  $drupal_root = __DIR__;
+}
+return require $drupal_root . '/core/vendor/autoload.php';
