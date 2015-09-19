@@ -36,7 +36,13 @@ function drupal_phpunit_find_extension_directories($scan_directory) {
  *   An array of directories under which contributed extensions may exist.
  */
 function drupal_phpunit_contrib_extension_directory_roots() {
-  $root = dirname(dirname(__DIR__));
+  if (is_link(getcwd() . '/core')) {
+    $drupal_root = getcwd() . '/core';
+  }
+  else {
+    $drupal_root = dirname(dirname(__DIR__));
+  }
+  $root = $drupal_root;
   $paths = array(
     $root . '/core/modules',
     $root . '/core/profiles',

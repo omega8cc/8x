@@ -116,7 +116,13 @@ const CONFIG_STAGING_DIRECTORY = 'staging';
  *
  * This strips two levels of directories off the current directory.
  */
-define('DRUPAL_ROOT', dirname(dirname(__DIR__)));
+if (is_link(getcwd() . '/core')) {
+  $drupal_root = getcwd() . '/core';
+}
+else {
+  $drupal_root = dirname(dirname(__DIR__));
+}
+define('DRUPAL_ROOT', $drupal_root);
 
 /**
  * Returns the appropriate configuration directory.
