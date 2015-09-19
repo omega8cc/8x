@@ -8,7 +8,7 @@
 use Drupal\Core\DrupalKernel;
 use Symfony\Component\HttpFoundation\Request;
 
-chdir('../../..');
+chdir(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'])))));
 
 $autoloader = require_once getcwd() . '/vendor/autoload.php';
 
