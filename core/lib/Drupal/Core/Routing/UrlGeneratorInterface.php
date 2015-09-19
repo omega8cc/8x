@@ -70,9 +70,14 @@ interface UrlGeneratorInterface extends VersatileGeneratorInterface {
    *     set if _url() is invoked by Drupal\Core\Entity\Entity::uri().
    *   - 'entity': The entity object (such as a node) for which the URL is being
    *     generated. Only set if _url() is invoked by Drupal\Core\Entity\Entity::uri().
+   * @param bool $collect_bubbleable_metadata
+   *   (optional) Defaults to FALSE. When TRUE, both the generated URL and its
+   *   associated bubbleable metadata are returned.
    *
-   * @return
+   * @return string|\Drupal\Core\GeneratedUrl
    *   A string containing a URL to the given path.
+   *   When $collect_bubbleable_metadata is TRUE, a GeneratedUrl object is
+   *   returned, containing the generated URL plus bubbleable metadata.
    *
    * @throws \Drupal\Core\Routing\GeneratorNotInitializedException.
    *
@@ -85,14 +90,15 @@ interface UrlGeneratorInterface extends VersatileGeneratorInterface {
    * @see static::generateFromRoute()
    * @see \Drupal\Core\Utility\UnroutedUrlAssembler
    * @see \Drupal\Core\Url
+   * @see \Drupal\Core\GeneratedUrl
    */
-  public function generateFromPath($path = NULL, $options = array());
+  public function generateFromPath($path = NULL, $options = array(), $collect_bubbleable_metadata = FALSE);
 
   /**
    * Gets the internal path (system path) of a route.
    *
-   * @param string $name
-   *  The route name.
+   * @param string|\Symfony\Component\Routing\Route $name
+   *  The route name or a route object.
    * @param array $parameters
    *  An array of parameters as passed to
    *  \Symfony\Component\Routing\Generator\UrlGeneratorInterface::generate().
@@ -100,7 +106,7 @@ interface UrlGeneratorInterface extends VersatileGeneratorInterface {
    * @return string
    *  The internal Drupal path corresponding to the route.
    *
-   * @deprecated in Drupal 8.x-dev, will be removed before Drupal 8.0.
+   * @deprecated in Drupal 8.0.x-dev, will be removed before Drupal 8.0.0
    *   System paths should not be used - use route names and parameters.
    */
   public function getPathFromRoute($name, $parameters = array());
@@ -112,15 +118,15 @@ interface UrlGeneratorInterface extends VersatileGeneratorInterface {
    * substituted for them in the pattern. Extra params are added as query
    * strings to the URL.
    *
-   * @param string $name
-   *   The name of the route
+   * @param string|\Symfony\Component\Routing\Route $name
+   *   The route name or a route object.
    * @param array  $parameters
    *   An associative array of parameter names and values.
    * @param array $options
    *   (optional) An associative array of additional options, with the following
    *   elements:
    *   - 'query': An array of query key/value-pairs (without any URL-encoding)
-   *     to append to the URL. Merged with the parameters array.
+   *     to append to the URL.
    *   - 'fragment': A fragment identifier (named anchor) to append to the URL.
    *     Do not include the leading '#' character.
    *   - 'absolute': Defaults to FALSE. Whether to force the output to be an
@@ -136,18 +142,23 @@ interface UrlGeneratorInterface extends VersatileGeneratorInterface {
    *     modify the base URL when a language dependent URL requires so.
    *   - 'prefix': Only used internally, to modify the path when a language
    *     dependent URL requires so.
+   * @param bool $collect_bubbleable_metadata
+   *   (optional) Defaults to FALSE. When TRUE, both the generated URL and its
+   *   associated bubbleable metadata are returned.
    *
-   * @return string
+   * @return string|\Drupal\Core\GeneratedUrl
    *   The generated URL for the given route.
+   *   When $collect_bubbleable_metadata is TRUE, a GeneratedUrl object is
+   *   returned, containing the generated URL plus bubbleable metadata.
    *
    * @throws \Symfony\Component\Routing\Exception\RouteNotFoundException
-   *   Thrown when the named route doesn't exist.
+   *   Thrown when the named route does not exist.
    * @throws \Symfony\Component\Routing\Exception\MissingMandatoryParametersException
    *   Thrown when some parameters are missing that are mandatory for the route.
    * @throws \Symfony\Component\Routing\Exception\InvalidParameterException
    *   Thrown when a parameter value for a placeholder is not correct because it
    *   does not match the requirement.
    */
-  public function generateFromRoute($name, $parameters = array(), $options = array());
+  public function generateFromRoute($name, $parameters = array(), $options = array(), $collect_bubbleable_metadata = FALSE);
 
 }

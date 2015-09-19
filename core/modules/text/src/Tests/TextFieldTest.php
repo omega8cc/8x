@@ -2,12 +2,11 @@
 
 /**
  * @file
- * Definition of Drupal\text\TextFieldTest.
+ * Contains \Drupal\text\Tests\TextFieldTest.
  */
 
 namespace Drupal\text\Tests;
 
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\field\Tests\String\StringFieldTest;
 
@@ -88,6 +87,9 @@ class TextFieldTest extends StringFieldTest {
    * Helper function for testTextfieldWidgetsFormatted().
    */
   function _testTextfieldWidgetsFormatted($field_type, $widget_type) {
+    /** @var \Drupal\Core\Render\RendererInterface $renderer */
+    $renderer = $this->container->get('renderer');
+
     // Create a field.
     $field_name = Unicode::strtolower($this->randomMachineName());
     $field_storage = entity_create('field_storage_config', array(
@@ -139,7 +141,7 @@ class TextFieldTest extends StringFieldTest {
     $entity = entity_load('entity_test', $id);
     $display = entity_get_display($entity->getEntityTypeId(), $entity->bundle(), 'full');
     $content = $display->build($entity);
-    $this->setRawContent(drupal_render($content));
+    $this->setRawContent($renderer->renderRoot($content));
     $this->assertNoRaw($value, 'HTML tags are not displayed.');
     $this->assertEscaped($value, 'Escaped HTML is displayed correctly.');
 
@@ -178,7 +180,7 @@ class TextFieldTest extends StringFieldTest {
     $entity = entity_load('entity_test', $id);
     $display = entity_get_display($entity->getEntityTypeId(), $entity->bundle(), 'full');
     $content = $display->build($entity);
-    $this->setRawContent(drupal_render($content));
+    $this->setRawContent($renderer->renderRoot($content));
     $this->assertRaw($value, 'Value is displayed unfiltered');
   }
 

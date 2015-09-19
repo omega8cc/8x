@@ -7,12 +7,13 @@
 
 namespace Drupal\views\Plugin\views\argument;
 
-use Drupal\Component\Utility\String as UtilityString;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Field\AllowedTagsXssTrait;
+use Drupal\Core\Field\FieldFilteredString;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
-use Drupal\views\Plugin\views\argument\String;
+use Drupal\views\Plugin\views\argument\StringArgument;
 
 /**
  * Argument handler for list field to show the human readable name in the
@@ -22,7 +23,7 @@ use Drupal\views\Plugin\views\argument\String;
  *
  * @ViewsArgument("field_list_string")
  */
-class ListString extends String {
+class ListString extends StringArgument {
 
   use AllowedTagsXssTrait;
 
@@ -34,7 +35,7 @@ class ListString extends String {
   var $allowed_values = NULL;
 
   /**
-   * Overrides \Drupal\views\Plugin\views\argument\String::init().
+   * Overrides \Drupal\views\Plugin\views\argument\StringArgument::init().
    */
   public function init(ViewExecutable $view, DisplayPluginBase $display, array &$options = NULL) {
     parent::init($view, $display, $options);
@@ -72,12 +73,9 @@ class ListString extends String {
     $value = $data->{$this->name_alias};
     // If the list element has a human readable name show it,
     if (isset($this->allowed_values[$value]) && !empty($this->options['summary']['human'])) {
-      return $this->caseTransform($this->fieldfilterXss($this->allowed_values[$value]), $this->options['case']);
+      $value = $this->allowed_values[$value];
     }
-    // else fallback to the key.
-    else {
-      return $this->caseTransform(UtilityString::checkPlain($value), $this->options['case']);
-    }
+    return FieldFilteredString::create($this->caseTransform($value, $this->options['case']));
   }
 
 }

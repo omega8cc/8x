@@ -12,6 +12,7 @@ use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityStorageException;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\entity_reference\Tests\EntityReferenceTestTrait;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\user\Entity\Role;
 use Drupal\user\Entity\User;
@@ -24,7 +25,9 @@ use Drupal\user\UserInterface;
  * @group Entity
  */
 class EntityReferenceFieldTest extends EntityUnitTestBase {
+
   use SchemaCheckTestTrait;
+  use EntityReferenceTestTrait;
 
   /**
    * The entity type used in this test.
@@ -70,7 +73,7 @@ class EntityReferenceFieldTest extends EntityUnitTestBase {
     $this->installEntitySchema('entity_test_rev');
 
     // Create a field.
-    entity_reference_create_field(
+    $this->createEntityReferenceField(
       $this->entityType,
       $this->bundle,
       $this->fieldName,
@@ -103,7 +106,7 @@ class EntityReferenceFieldTest extends EntityUnitTestBase {
     $this->assertEqual($violations[0]->getMessage(), t('The referenced entity (%type: %id) does not exist.', array('%type' => $this->referencedEntityType, '%id' => 9999)));
 
     // @todo Implement a test case for invalid bundle references after
-    // https://drupal.org/node/2064191 is fixed
+    //   https://www.drupal.org/node/2064191 is fixed.
   }
 
   /**
@@ -178,7 +181,7 @@ class EntityReferenceFieldTest extends EntityUnitTestBase {
   public function testReferencedEntitiesStringId() {
     $field_name = 'entity_reference_string_id';
     $this->installEntitySchema('entity_test_string_id');
-    entity_reference_create_field(
+    $this->createEntityReferenceField(
       $this->entityType,
       $this->bundle,
       $field_name,

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\argument\ArgumentPluginBase.
+ * Contains \Drupal\views\Plugin\views\argument\ArgumentPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\argument;
@@ -10,7 +10,7 @@ namespace Drupal\views\Plugin\views\argument;
 use Drupal\Component\Plugin\DependentPluginInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\String as UtilityString;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Drupal\views\Plugin\CacheablePluginInterface;
@@ -651,7 +651,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
   }
 
   /**
-   * How to act if validation failes
+   * How to act if validation fails.
    */
   public function validateFail() {
     $info = $this->defaultActions($this->options['validate']['fail']);
@@ -849,7 +849,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
 
   /**
    * Sorts the summary based upon the user's selection. The base variant of
-   * this is usually adequte.
+   * this is usually adequate.
    *
    * @param $order
    *   The order selected in the UI.
@@ -882,7 +882,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
     if (empty($value) && !empty($this->definition['empty field name'])) {
       $value = $this->definition['empty field name'];
     }
-    return UtilityString::checkPlain($value);
+    return SafeMarkup::checkPlain($value);
   }
 
   /**
@@ -901,7 +901,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
    * This usually needs to be overridden to provide a proper title.
    */
   function title() {
-    return UtilityString::checkPlain($this->argument);
+    return SafeMarkup::checkPlain($this->argument);
   }
 
   /**
@@ -979,7 +979,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
       return $this->argument;
     }
 
-    // Otherwise, we have to pretend to process ourself to find the value.
+    // Otherwise, we have to pretend to process ourselves to find the value.
     $value = NULL;
     // Find the position of this argument within the view.
     $position = 0;
@@ -1138,7 +1138,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
   /**
    * Sanitize validator options including derivatives with : for js.
    *
-   * Reason and alternative: http://drupal.org/node/2035345
+   * Reason and alternative: https://www.drupal.org/node/2035345.
    *
    * @param string $id
    *   The identifier to be sanitized.
@@ -1153,10 +1153,10 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
   }
 
   /**
-   * Revert sanititized validator options.
+   * Revert sanitized validator options.
    *
    * @param string $id
-   *   The santitized identifier to be reverted.
+   *   The sanitized identifier to be reverted.
    *
    * @return string
    *   The original identifier.
@@ -1208,7 +1208,7 @@ abstract class ArgumentPluginBase extends HandlerBase implements CacheablePlugin
     // By definition arguments depends on the URL.
     // @todo Once contexts are properly injected into block views we could pull
     //   the information from there.
-    $contexts[] = 'cache.context.url';
+    $contexts[] = 'url';
 
     // Asks all subplugins (argument defaults, argument validator and styles).
     if (($plugin = $this->getPlugin('argument_default')) && $plugin instanceof CacheablePluginInterface) {

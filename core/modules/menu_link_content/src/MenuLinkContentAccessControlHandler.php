@@ -54,16 +54,17 @@ class MenuLinkContentAccessControlHandler extends EntityAccessControlHandler imp
   protected function checkAccess(EntityInterface $entity, $operation, $langcode, AccountInterface $account) {
     switch ($operation) {
       case 'view':
-        // There is no direct view.
-        return AccessResult::neutral();
+        // There is no direct viewing of a menu link, but still for purposes of
+        // content_translation we need a generic way to check access.
+        return AccessResult::allowedIfHasPermission($account, 'administer menu');
 
       case 'update':
         if (!$account->hasPermission('administer menu')) {
-          return AccessResult::neutral()->cachePerRole();
+          return AccessResult::neutral()->cachePerPermissions();
         }
         else {
           // If there is a URL, this is an external link so always accessible.
-          $access = AccessResult::allowed()->cachePerRole()->cacheUntilEntityChanges($entity);
+          $access = AccessResult::allowed()->cachePerPermissions()->cacheUntilEntityChanges($entity);
           /** @var \Drupal\menu_link_content\MenuLinkContentInterface $entity */
           // We allow access, but only if the link is accessible as well.
           if (($url_object = $entity->getUrlObject()) && $url_object->isRouted()) {
@@ -74,7 +75,7 @@ class MenuLinkContentAccessControlHandler extends EntityAccessControlHandler imp
         }
 
       case 'delete':
-        return AccessResult::allowedIf(!$entity->isNew() && $account->hasPermission('administer menu'))->cachePerRole()->cacheUntilEntityChanges($entity);
+        return AccessResult::allowedIf(!$entity->isNew() && $account->hasPermission('administer menu'))->cachePerPermissions()->cacheUntilEntityChanges($entity);
     }
   }
 

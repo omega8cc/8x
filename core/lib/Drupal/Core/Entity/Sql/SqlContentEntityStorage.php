@@ -7,11 +7,11 @@
 
 namespace Drupal\Core\Entity\Sql;
 
-use Drupal\Component\Utility\String;
-use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Database\Connection;
 use Drupal\Core\Database\Database;
+use Drupal\Core\Database\DatabaseExceptionWrapper;
+use Drupal\Core\Database\SchemaException;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\ContentEntityStorageBase;
 use Drupal\Core\Entity\EntityBundleListenerInterface;
@@ -67,6 +67,13 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   protected $langcodeKey = FALSE;
 
   /**
+   * The default language entity key.
+   *
+   * @var string
+   */
+  protected $defaultLangcodeKey = FALSE;
+
+  /**
    * The base table of the entity.
    *
    * @var string
@@ -102,25 +109,11 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   protected $database;
 
   /**
-   * The entity manager.
-   *
-   * @var \Drupal\Core\Entity\EntityManagerInterface
-   */
-  protected $entityManager;
-
-  /**
    * The entity type's storage schema object.
    *
    * @var \Drupal\Core\Entity\Schema\EntityStorageSchemaInterface
    */
   protected $storageSchema;
-
-  /**
-   * Cache backend.
-   *
-   * @var \Drupal\Core\Cache\CacheBackendInterface
-   */
-  protected $cacheBackend;
 
   /**
    * The language manager.
@@ -168,10 +161,8 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
    *   The language manager.
    */
   public function __construct(EntityTypeInterface $entity_type, Connection $database, EntityManagerInterface $entity_manager, CacheBackendInterface $cache, LanguageManagerInterface $language_manager) {
-    parent::__construct($entity_type);
+    parent::__construct($entity_type, $entity_manager, $cache);
     $this->database = $database;
-    $this->entityManager = $entity_manager;
-    $this->cacheBackend = $cache;
     $this->languageManager = $language_manager;
     $this->initTableLayout();
   }
@@ -189,7 +180,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     $this->revisionDataTable = NULL;
 
     // @todo Remove table names from the entity type definition in
-    //   https://drupal.org/node/2232465
+    //   https://www.drupal.org/node/2232465.
     $this->baseTable = $this->entityType->getBaseTable() ?: $this->entityTypeId;
     $revisionable = $this->entityType->isRevisionable();
     if ($revisionable) {
@@ -200,7 +191,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     if ($translatable) {
       $this->dataTable = $this->entityType->getDataTable() ?: $this->entityTypeId . '_field_data';
       $this->langcodeKey = $this->entityType->getKey('langcode');
-      $this->defaultLangcodeKey = $this->entityType->getKey('default_langcode') ?: 'default_langcode';
+      $this->defaultLangcodeKey = $this->entityType->getKey('default_langcode');
     }
     if ($revisionable && $translatable) {
       $this->revisionDataTable = $this->entityType->getRevisionDataTable() ?: $this->entityTypeId . '_field_revision';
@@ -208,7 +199,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns the base table name.
+   * Gets the base table name.
    *
    * @return string
    *   The table name.
@@ -218,7 +209,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns the revision table name.
+   * Gets the revision table name.
    *
    * @return string|false
    *   The table name or FALSE if it is not available.
@@ -228,7 +219,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns the data table name.
+   * Gets the data table name.
    *
    * @return string|false
    *   The table name or FALSE if it is not available.
@@ -238,7 +229,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns the revision data table name.
+   * Gets the revision data table name.
    *
    * @return string|false
    *   The table name or FALSE if it is not available.
@@ -248,7 +239,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns the entity type's storage schema object.
+   * Gets the entity type's storage schema object.
    *
    * @return \Drupal\Core\Entity\Sql\SqlContentEntityStorageSchema
    *   The schema object.
@@ -276,7 +267,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       $this->initTableLayout();
     }
     else {
-      throw new EntityStorageException(String::format('Unsupported entity type @id', array('@id' => $entity_type->id())));
+      throw new EntityStorageException("Unsupported entity type {$entity_type->id()}");
     }
   }
 
@@ -311,7 +302,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       // Nodes have all three of these fields, while custom blocks only have
       // log.
       // @todo Provide automatic definitions for revision metadata fields in
-      //   https://drupal.org/node/2248983.
+      //   https://www.drupal.org/node/2248983.
       $revision_metadata_fields = array_intersect(array(
         'revision_timestamp',
         'revision_uid',
@@ -342,11 +333,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         // the data table.
         $table_mapping
           ->setFieldNames($this->baseTable, $key_fields)
-          ->setFieldNames($this->dataTable, array_values(array_diff($all_fields, array($this->uuidKey))))
-          // Add the denormalized 'default_langcode' field to the mapping. Its
-          // value is identical to the query expression
-          // "base_table.langcode = data_table.langcode"
-          ->setExtraColumns($this->dataTable, array('default_langcode'));
+          ->setFieldNames($this->dataTable, array_values(array_diff($all_fields, array($this->uuidKey))));
       }
       elseif ($revisionable && $translatable) {
         // The revisionable multilingual layout stores key field values in the
@@ -356,31 +343,20 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         // holds the data field values for all non-revisionable fields. The data
         // field values of revisionable fields are denormalized in the data
         // table, as well.
-        $table_mapping->setFieldNames($this->baseTable, array_values(array_diff($key_fields, array($this->langcodeKey))));
+        $table_mapping->setFieldNames($this->baseTable, array_values($key_fields));
 
         // Like in the multilingual, non-revisionable case the UUID is not
         // in the data table. Additionally, do not store revision metadata
         // fields in the data table.
         $data_fields = array_values(array_diff($all_fields, array($this->uuidKey), $revision_metadata_fields));
-        $table_mapping
-          ->setFieldNames($this->dataTable, $data_fields)
-          // Add the denormalized 'default_langcode' field to the mapping. Its
-          // value is identical to the query expression
-          // "base_langcode = data_table.langcode" where "base_langcode" is
-          // the language code of the default revision.
-          ->setExtraColumns($this->dataTable, array('default_langcode'));
+        $table_mapping->setFieldNames($this->dataTable, $data_fields);
 
         $revision_base_fields = array_merge(array($this->idKey, $this->revisionKey, $this->langcodeKey), $revision_metadata_fields);
         $table_mapping->setFieldNames($this->revisionTable, $revision_base_fields);
 
         $revision_data_key_fields = array($this->idKey, $this->revisionKey, $this->langcodeKey);
         $revision_data_fields = array_diff($revisionable_fields, $revision_metadata_fields, array($this->langcodeKey));
-        $table_mapping
-          ->setFieldNames($this->revisionDataTable, array_merge($revision_data_key_fields, $revision_data_fields))
-          // Add the denormalized 'default_langcode' field to the mapping. Its
-          // value is identical to the query expression
-          // "revision_table.langcode = data_table.langcode".
-          ->setExtraColumns($this->revisionDataTable, array('default_langcode'));
+        $table_mapping->setFieldNames($this->revisionDataTable, array_merge($revision_data_key_fields, $revision_data_fields));
       }
 
       // Add dedicated tables.
@@ -421,8 +397,10 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     $entities_from_cache = $this->getFromPersistentCache($ids);
 
     // Load any remaining entities from the database.
-    $entities_from_storage = $this->getFromStorage($ids);
-    $this->setPersistentCache($entities_from_storage);
+    if ($entities_from_storage = $this->getFromStorage($ids)) {
+      $this->invokeStorageLoadHook($entities_from_storage);
+      $this->setPersistentCache($entities_from_storage);
+    }
 
     return $entities_from_cache + $entities_from_storage;
   }
@@ -454,155 +432,10 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       // Map the loaded records into entity objects and according fields.
       if ($records) {
         $entities = $this->mapFromStorageRecords($records);
-
-        // Call hook_entity_storage_load().
-        foreach ($this->moduleHandler()->getImplementations('entity_storage_load') as $module) {
-          $function = $module . '_entity_storage_load';
-          $function($entities, $this->entityTypeId);
-        }
-        // Call hook_TYPE_storage_load().
-        foreach ($this->moduleHandler()->getImplementations($this->entityTypeId . '_storage_load') as $module) {
-          $function = $module . '_' . $this->entityTypeId . '_storage_load';
-          $function($entities);
-        }
       }
     }
 
     return $entities;
-  }
-
-  /**
-   * Ensures integer entity IDs are valid.
-   *
-   * The identifier sanitization provided by this method has been introduced
-   * as Drupal used to rely on the database to facilitate this, which worked
-   * correctly with MySQL but led to errors with other DBMS such as PostgreSQL.
-   *
-   * @param array $ids
-   *   The entity IDs to verify.
-   * @return array
-   *   The sanitized list of entity IDs.
-   */
-  protected function cleanIds(array $ids) {
-    $definitions = $this->entityManager->getBaseFieldDefinitions($this->entityTypeId);
-    $id_definition = $definitions[$this->entityType->getKey('id')];
-    if ($id_definition->getType() == 'integer') {
-      $ids = array_filter($ids, function ($id) {
-        return is_numeric($id) && $id == (int) $id;
-      });
-      $ids = array_map('intval', $ids);
-    }
-    return $ids;
-  }
-
-  /**
-   * Gets entities from the persistent cache backend.
-   *
-   * @param array|null &$ids
-   *   If not empty, return entities that match these IDs. IDs that were found
-   *   will be removed from the list.
-   *
-   * @return \Drupal\Core\Entity\ContentEntityInterface[]
-   *   Array of entities from the persistent cache.
-   */
-  protected function getFromPersistentCache(array &$ids = NULL) {
-    if (!$this->entityType->isPersistentlyCacheable() || empty($ids)) {
-      return array();
-    }
-    $entities = array();
-    // Build the list of cache entries to retrieve.
-    $cid_map = array();
-    foreach ($ids as $id) {
-      $cid_map[$id] = $this->buildCacheId($id);
-    }
-    $cids = array_values($cid_map);
-    if ($cache = $this->cacheBackend->getMultiple($cids)) {
-      // Get the entities that were found in the cache.
-      foreach ($ids as $index => $id) {
-        $cid = $cid_map[$id];
-        if (isset($cache[$cid])) {
-          $entities[$id] = $cache[$cid]->data;
-          unset($ids[$index]);
-        }
-      }
-    }
-    return $entities;
-  }
-
-  /**
-   * Stores entities in the persistent cache backend.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface[] $entities
-   *   Entities to store in the cache.
-   */
-  protected function setPersistentCache($entities) {
-    if (!$this->entityType->isPersistentlyCacheable()) {
-      return;
-    }
-
-    $cache_tags = array(
-      $this->entityTypeId . '_values',
-      'entity_field_info',
-    );
-    foreach ($entities as $id => $entity) {
-      $this->cacheBackend->set($this->buildCacheId($id), $entity, CacheBackendInterface::CACHE_PERMANENT, $cache_tags);
-    }
-  }
-
-  /**
-   * Invokes hook_entity_load_uncached().
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface[] $entities
-   *   List of entities, keyed on the entity ID.
-   */
-  protected function invokeLoadUncachedHook(array &$entities) {
-    if (!empty($entities)) {
-      // Call hook_entity_load_uncached().
-      foreach ($this->moduleHandler()->getImplementations('entity_load_uncached') as $module) {
-        $function = $module . '_entity_load_uncached';
-        $function($entities, $this->entityTypeId);
-      }
-      // Call hook_TYPE_load_uncached().
-      foreach ($this->moduleHandler()->getImplementations($this->entityTypeId . '_load_uncached') as $module) {
-        $function = $module . '_' . $this->entityTypeId . '_load_uncached';
-        $function($entities);
-      }
-    }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function resetCache(array $ids = NULL) {
-    if ($ids) {
-      $cids = array();
-      foreach ($ids as $id) {
-        unset($this->entities[$id]);
-        $cids[] = $this->buildCacheId($id);
-      }
-      if ($this->entityType->isPersistentlyCacheable()) {
-        $this->cacheBackend->deleteMultiple($cids);
-      }
-    }
-    else {
-      $this->entities = array();
-      if ($this->entityType->isPersistentlyCacheable()) {
-        Cache::invalidateTags(array($this->entityTypeId . '_values'));
-      }
-    }
-  }
-
-  /**
-   * Returns the cache ID for the passed in entity ID.
-   *
-   * @param int $id
-   *   Entity ID for which the cache ID should be built.
-   *
-   * @return string
-   *   Cache ID that can be passed to the cache backend.
-   */
-  protected function buildCacheId($id) {
-    return "values:{$this->entityTypeId}:$id";
   }
 
   /**
@@ -610,18 +443,20 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
    *
    * @param array $records
    *   Associative array of query results, keyed on the entity ID.
+   * @param bool $load_from_revision
+   *   Flag to indicate whether revisions should be loaded or not.
    *
    * @return array
    *   An array of entity objects implementing the EntityInterface.
    */
-  protected function mapFromStorageRecords(array $records) {
+  protected function mapFromStorageRecords(array $records, $load_from_revision = FALSE) {
     if (!$records) {
       return array();
     }
 
-    $entities = array();
+    $values = array();
     foreach ($records as $id => $record) {
-      $entities[$id] = array();
+      $values[$id] = array();
       // Skip the item delta and item value levels (if possible) but let the
       // field assign the value as suiting. This avoids unnecessary array
       // hierarchies and saves memory here.
@@ -630,37 +465,42 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         // that store several properties).
         if ($field_name = strstr($name, '__', TRUE)) {
           $property_name = substr($name, strpos($name, '__') + 2);
-          $entities[$id][$field_name][LanguageInterface::LANGCODE_DEFAULT][$property_name] = $value;
+          $values[$id][$field_name][LanguageInterface::LANGCODE_DEFAULT][$property_name] = $value;
         }
         else {
           // Handle columns named directly after the field (e.g if the field
           // type only stores one property).
-          $entities[$id][$name][LanguageInterface::LANGCODE_DEFAULT] = $value;
+          $values[$id][$name][LanguageInterface::LANGCODE_DEFAULT] = $value;
         }
       }
-      // If we have no multilingual values we can instantiate entity objects
-      // right now, otherwise we need to collect all the field values first.
-      if (!$this->dataTable) {
-        $bundle = $this->bundleKey ? $record->{$this->bundleKey} : FALSE;
-        // Turn the record into an entity class.
-        $entities[$id] = new $this->entityClass($entities[$id], $this->entityTypeId, $bundle);
-      }
     }
-    $this->attachPropertyData($entities);
 
-    // Attach field values.
-    $this->loadFieldItems($entities);
+    // Initialize translations array.
+    $translations = array_fill_keys(array_keys($values), array());
+
+    // Load values from shared and dedicated tables.
+    $this->loadFromSharedTables($values, $translations);
+    $this->loadFromDedicatedTables($values, $load_from_revision);
+
+    $entities = array();
+    foreach ($values as $id => $entity_values) {
+      $bundle = $this->bundleKey ? $entity_values[$this->bundleKey][LanguageInterface::LANGCODE_DEFAULT] : FALSE;
+      // Turn the record into an entity class.
+      $entities[$id] = new $this->entityClass($entity_values, $this->entityTypeId, $bundle, array_keys($translations[$id]));
+    }
 
     return $entities;
   }
 
   /**
-   * Attaches property data in all languages for translatable properties.
+   * Loads values for fields stored in the shared data tables.
    *
-   * @param array &$entities
-   *   Associative array of entities, keyed on the entity ID.
+   * @param array &$values
+   *   Associative array of entities values, keyed on the entity ID.
+   * @param array &$translations
+   *   List of translations, keyed on the entity ID.
    */
-  protected function attachPropertyData(array &$entities) {
+  protected function loadFromSharedTables(array &$values, array &$translations) {
     if ($this->dataTable) {
       // If a revision table is available, we need all the properties of the
       // latest revision. Otherwise we fall back to the data table.
@@ -668,17 +508,19 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       $alias = $this->revisionDataTable ? 'revision' : 'data';
       $query = $this->database->select($table, $alias, array('fetch' => \PDO::FETCH_ASSOC))
         ->fields($alias)
-        ->condition($alias . '.' . $this->idKey, array_keys($entities), 'IN')
+        ->condition($alias . '.' . $this->idKey, array_keys($values), 'IN')
         ->orderBy($alias . '.' . $this->idKey);
 
       $table_mapping = $this->getTableMapping();
       if ($this->revisionDataTable) {
-        // Find revisioned fields that are not entity keys.
-        $fields = array_diff($table_mapping->getFieldNames($this->revisionDataTable), $table_mapping->getFieldNames($this->baseTable));
+        // Find revisioned fields that are not entity keys. Exclude the langcode
+        // key as the base table holds only the default language.
+        $base_fields = array_diff($table_mapping->getFieldNames($this->baseTable), array($this->langcodeKey));
+        $fields = array_diff($table_mapping->getFieldNames($this->revisionDataTable), $base_fields);
 
         // Find fields that are not revisioned or entity keys. Data fields have
         // the same value regardless of entity revision.
-        $data_fields = array_diff($table_mapping->getFieldNames($this->dataTable), $fields, $table_mapping->getFieldNames($this->baseTable));
+        $data_fields = array_diff($table_mapping->getFieldNames($this->dataTable), $fields, $base_fields);
         if ($data_fields) {
           $fields = array_merge($fields, $data_fields);
           $query->leftJoin($this->dataTable, 'data', "(revision.$this->idKey = data.$this->idKey)");
@@ -687,8 +529,8 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
 
         // Get the revision IDs.
         $revision_ids = array();
-        foreach ($entities as $values) {
-          $revision_ids[] = is_object($values) ? $values->getRevisionId() : $values[$this->revisionKey][LanguageInterface::LANGCODE_DEFAULT];
+        foreach ($values as $entity_values) {
+          $revision_ids[] = $entity_values[$this->revisionKey][LanguageInterface::LANGCODE_DEFAULT];
         }
         $query->condition('revision.' . $this->revisionKey, $revision_ids, 'IN');
       }
@@ -696,35 +538,28 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         $fields = $table_mapping->getFieldNames($this->dataTable);
       }
 
-      $translations = array();
-      $data = $query->execute();
-      foreach ($data as $values) {
-        $id = $values[$this->idKey];
+      $result = $query->execute();
+      foreach ($result as $row) {
+        $id = $row[$this->idKey];
 
         // Field values in default language are stored with
         // LanguageInterface::LANGCODE_DEFAULT as key.
-        $langcode = empty($values['default_langcode']) ? $values[$this->langcodeKey] : LanguageInterface::LANGCODE_DEFAULT;
-        $translations[$id][$langcode] = TRUE;
+        $langcode = empty($row[$this->defaultLangcodeKey]) ? $row[$this->langcodeKey] : LanguageInterface::LANGCODE_DEFAULT;
 
+        $translations[$id][$langcode] = TRUE;
 
         foreach ($fields as $field_name) {
           $columns = $table_mapping->getColumnNames($field_name);
           // Do not key single-column fields by property name.
           if (count($columns) == 1) {
-            $entities[$id][$field_name][$langcode] = $values[reset($columns)];
+            $values[$id][$field_name][$langcode] = $row[reset($columns)];
           }
           else {
             foreach ($columns as $property_name => $column_name) {
-              $entities[$id][$field_name][$langcode][$property_name] = $values[$column_name];
+              $values[$id][$field_name][$langcode][$property_name] = $row[$column_name];
             }
           }
         }
-      }
-
-      foreach ($entities as $id => $values) {
-        $bundle = $this->bundleKey ? $values[$this->bundleKey][LanguageInterface::LANGCODE_DEFAULT] : FALSE;
-        // Turn the record into an entity class.
-        $entities[$id] = new $this->entityClass($values, $this->entityTypeId, $bundle, array_keys($translations[$id]));
       }
     }
   }
@@ -732,39 +567,30 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   /**
    * {@inheritdoc}
    */
-  public function loadRevision($revision_id) {
+  protected function doLoadRevisionFieldItems($revision_id) {
+    $revision = NULL;
+
     // Build and execute the query.
     $query_result = $this->buildQuery(array(), $revision_id)->execute();
     $records = $query_result->fetchAllAssoc($this->idKey);
 
     if (!empty($records)) {
       // Convert the raw records to entity objects.
-      $entities = $this->mapFromStorageRecords($records);
-      $this->postLoad($entities);
-      $entity = reset($entities);
-      if ($entity) {
-        return $entity;
-      }
+      $entities = $this->mapFromStorageRecords($records, TRUE);
+      $revision = reset($entities) ?: NULL;
     }
+
+    return $revision;
   }
 
   /**
-   * Implements \Drupal\Core\Entity\EntityStorageInterface::deleteRevision().
+   * {@inheritdoc}
    */
-  public function deleteRevision($revision_id) {
-    if ($revision = $this->loadRevision($revision_id)) {
-      // Prevent deletion if this is the default revision.
-      if ($revision->isDefaultRevision()) {
-        throw new EntityStorageException('Default revision can not be deleted');
-      }
-
-      $this->database->delete($this->revisionTable)
-        ->condition($this->revisionKey, $revision->getRevisionId())
-        ->execute();
-      $this->invokeFieldMethod('deleteRevision', $revision);
-      $this->deleteFieldItemsRevision($revision);
-      $this->invokeHook('revision_delete', $revision);
-    }
+  protected function doDeleteRevisionFieldItems(ContentEntityInterface $revision) {
+    $this->database->delete($this->revisionTable)
+      ->condition($this->revisionKey, $revision->getRevisionId())
+      ->execute();
+    $this->deleteRevisionFromDedicatedTables($revision);
   }
 
   /**
@@ -773,16 +599,17 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   protected function buildPropertyQuery(QueryInterface $entity_query, array $values) {
     if ($this->dataTable) {
       // @todo We should not be using a condition to specify whether conditions
-      //   apply to the default language. See http://drupal.org/node/1866330.
+      //   apply to the default language. See
+      //   https://www.drupal.org/node/1866330.
       // Default to the original entity language if not explicitly specified
       // otherwise.
-      if (!array_key_exists('default_langcode', $values)) {
-        $values['default_langcode'] = 1;
+      if (!array_key_exists($this->defaultLangcodeKey, $values)) {
+        $values[$this->defaultLangcodeKey] = 1;
       }
       // If the 'default_langcode' flag is explicitly not set, we do not care
       // whether the queried values are in the original entity language or not.
-      elseif ($values['default_langcode'] === NULL) {
-        unset($values['default_langcode']);
+      elseif ($values[$this->defaultLangcodeKey] === NULL) {
+        unset($values[$this->defaultLangcodeKey]);
       }
     }
 
@@ -882,7 +709,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   /**
    * {@inheritdoc}
    */
-  protected function doDelete($entities) {
+  protected function doDeleteFieldItems($entities) {
     $ids = array_keys($entities);
 
     $this->database->delete($this->entityType->getBaseTable())
@@ -908,8 +735,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     }
 
     foreach ($entities as $entity) {
-      $this->invokeFieldMethod('delete', $entity);
-      $this->deleteFieldItems($entity);
+      $this->deleteFromDedicatedTables($entity);
     }
   }
 
@@ -919,9 +745,6 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   public function save(EntityInterface $entity) {
     $transaction = $this->database->startTransaction();
     try {
-      // Sync the changes made in the fields array to the internal values array.
-      $entity->updateOriginalValues();
-
       $return = parent::save($entity);
 
       // Ignore replica server temporarily.
@@ -938,77 +761,97 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   /**
    * {@inheritdoc}
    */
-  protected function doSave($id, EntityInterface $entity) {
-    // Create the storage record to be saved.
-    $record = $this->mapToStorageRecord($entity);
+  protected function doSaveFieldItems(ContentEntityInterface $entity, array $names = []) {
+    $full_save = empty($names);
+    $update = !$full_save || !$entity->isNew();
 
-    $is_new = $entity->isNew();
-    if (!$is_new) {
-      if ($entity->isDefaultRevision()) {
-        $this->database
-          ->update($this->baseTable)
-          ->fields((array) $record)
-          ->condition($this->idKey, $record->{$this->idKey})
-          ->execute();
-        $return = SAVED_UPDATED;
-      }
-      else {
-        // @todo, should a different value be returned when saving an entity
-        // with $isDefaultRevision = FALSE?
-        $return = FALSE;
-      }
-      if ($this->revisionTable) {
-        $entity->{$this->revisionKey}->value = $this->saveRevision($entity);
-      }
-      if ($this->dataTable) {
-        $this->savePropertyData($entity);
-      }
-      if ($this->revisionDataTable) {
-        $this->savePropertyData($entity, $this->revisionDataTable);
-      }
-      if ($this->revisionTable) {
-        $entity->setNewRevision(FALSE);
-      }
+    if ($full_save) {
+      $shared_table_fields = TRUE;
+      $dedicated_table_fields = TRUE;
     }
     else {
-      // Ensure the entity is still seen as new after assigning it an id,
-      // while storing its data.
-      $entity->enforceIsNew();
-      $insert_id = $this->database
-        ->insert($this->baseTable, array('return' => Database::RETURN_INSERT_ID))
-        ->fields((array) $record)
-        ->execute();
-      // Even if this is a new entity the ID key might have been set, in which
-      // case we should not override the provided ID. An ID key that is not set
-      // to any value is interpreted as NULL (or DEFAULT) and thus overridden.
-      if (!isset($record->{$this->idKey})) {
-        $record->{$this->idKey} = $insert_id;
-      }
-      $return = SAVED_NEW;
-      $entity->{$this->idKey}->value = (string) $record->{$this->idKey};
-      if ($this->revisionTable) {
-        $entity->setNewRevision();
-        $record->{$this->revisionKey} = $this->saveRevision($entity);
-      }
-      if ($this->dataTable) {
-        $this->savePropertyData($entity);
-      }
-      if ($this->revisionDataTable) {
-        $this->savePropertyData($entity, $this->revisionDataTable);
-      }
+      $table_mapping = $this->getTableMapping();
+      $storage_definitions = $this->entityManager->getFieldStorageDefinitions($this->entityTypeId);
+      $shared_table_fields = FALSE;
+      $dedicated_table_fields = [];
 
-      $entity->enforceIsNew(FALSE);
-      if ($this->revisionTable) {
-        $entity->setNewRevision(FALSE);
+      // Collect the name of fields to be written in dedicated tables and check
+      // whether shared table records need to be updated.
+      foreach ($names as $name) {
+        $storage_definition = $storage_definitions[$name];
+        if ($table_mapping->allowsSharedTableStorage($storage_definition)) {
+          $shared_table_fields = TRUE;
+        }
+        elseif ($table_mapping->requiresDedicatedTableStorage($storage_definition)) {
+          $dedicated_table_fields[] = $name;
+        }
       }
     }
-    $this->invokeFieldMethod($is_new ? 'insert' : 'update', $entity);
-    $this->saveFieldItems($entity, !$is_new);
 
-    if (!$is_new && $this->dataTable) {
-      $this->invokeTranslationHooks($entity);
+    // Update shared table records if necessary.
+    if ($shared_table_fields) {
+      $record = $this->mapToStorageRecord($entity->getUntranslated(), $this->baseTable);
+      // Create the storage record to be saved.
+      if ($update) {
+        $default_revision = $entity->isDefaultRevision();
+        if ($default_revision) {
+          $this->database
+            ->update($this->baseTable)
+            ->fields((array) $record)
+            ->condition($this->idKey, $record->{$this->idKey})
+            ->execute();
+        }
+        if ($this->revisionTable) {
+          if ($full_save) {
+            $entity->{$this->revisionKey} = $this->saveRevision($entity);
+          }
+          else {
+            $record = $this->mapToStorageRecord($entity->getUntranslated(), $this->revisionTable);
+            $entity->preSaveRevision($this, $record);
+            $this->database
+              ->update($this->revisionTable)
+              ->fields((array) $record)
+              ->condition($this->revisionKey, $record->{$this->revisionKey})
+              ->execute();
+          }
+        }
+        if ($default_revision && $this->dataTable) {
+          $this->saveToSharedTables($entity);
+        }
+        if ($this->revisionDataTable) {
+          $new_revision = $full_save && $entity->isNewRevision();
+          $this->saveToSharedTables($entity, $this->revisionDataTable, $new_revision);
+        }
+      }
+      else {
+        $insert_id = $this->database
+          ->insert($this->baseTable, array('return' => Database::RETURN_INSERT_ID))
+          ->fields((array) $record)
+          ->execute();
+        // Even if this is a new entity the ID key might have been set, in which
+        // case we should not override the provided ID. An ID key that is not set
+        // to any value is interpreted as NULL (or DEFAULT) and thus overridden.
+        if (!isset($record->{$this->idKey})) {
+          $record->{$this->idKey} = $insert_id;
+        }
+        $entity->{$this->idKey} = (string) $record->{$this->idKey};
+        if ($this->revisionTable) {
+          $record->{$this->revisionKey} = $this->saveRevision($entity);
+        }
+        if ($this->dataTable) {
+          $this->saveToSharedTables($entity);
+        }
+        if ($this->revisionDataTable) {
+          $this->saveToSharedTables($entity, $this->revisionDataTable);
+        }
+      }
     }
-    return $return;
+
+    // Update dedicated table records if necessary.
+    if ($dedicated_table_fields) {
+      $names = is_array($dedicated_table_fields) ? $dedicated_table_fields : [];
+      $this->saveToDedicatedTables($entity, $update, $names);
+    }
   }
 
   /**
@@ -1019,20 +862,26 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Stores the entity property language-aware data.
+   * Saves fields that use the shared tables.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity object.
    * @param string $table_name
    *   (optional) The table name to save to. Defaults to the data table.
+   * @param bool $new_revision
+   *   (optional) Whether we are dealing with a new revision. By default fetches
+   *   the information from the entity object.
    */
-  protected function savePropertyData(EntityInterface $entity, $table_name = NULL) {
+  protected function saveToSharedTables(ContentEntityInterface $entity, $table_name = NULL, $new_revision = NULL) {
     if (!isset($table_name)) {
       $table_name = $this->dataTable;
     }
+    if (!isset($new_revision)) {
+      $new_revision = $entity->isNewRevision();
+    }
     $revision = $table_name != $this->dataTable;
 
-    if (!$revision || !$entity->isNewRevision()) {
+    if (!$revision || !$new_revision) {
       $key = $revision ? $this->revisionKey : $this->idKey;
       $value = $revision ? $entity->getRevisionId() : $entity->id();
       // Delete and insert to handle removed values.
@@ -1076,7 +925,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     foreach ($table_mapping->getFieldNames($table_name) as $field_name) {
 
       if (empty($this->getFieldStorageDefinitions()[$field_name])) {
-        throw new EntityStorageException(String::format('Table mapping contains invalid field %field.', array('%field' => $field_name)));
+        throw new EntityStorageException("Table mapping contains invalid field $field_name.");
       }
       $definition = $this->getFieldStorageDefinitions()[$field_name];
       $columns = $table_mapping->getColumnNames($field_name);
@@ -1086,7 +935,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         // properties from the first field item and assume that they will be
         // stored serialized.
         // @todo Give field types more control over this behavior in
-        //   https://drupal.org/node/2232427.
+        //   https://www.drupal.org/node/2232427.
         if (!$definition->getMainPropertyName() && count($columns) == 1) {
           $value = ($item = $entity->$field_name->first()) ? $item->getValue() : array();
         }
@@ -1156,22 +1005,20 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       $table_name = $this->dataTable;
     }
     $record = $this->mapToStorageRecord($entity, $table_name);
-    $record->{$this->langcodeKey} = $entity->language()->getId();
-    $record->default_langcode = intval($record->{$this->langcodeKey} == $entity->getUntranslated()->language()->getId());
     return $record;
   }
 
   /**
    * Saves an entity revision.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity object.
    *
    * @return int
    *   The revision id.
    */
-  protected function saveRevision(EntityInterface $entity) {
-    $record = $this->mapToStorageRecord($entity, $this->revisionTable);
+  protected function saveRevision(ContentEntityInterface $entity) {
+    $record = $this->mapToStorageRecord($entity->getUntranslated(), $this->revisionTable);
 
     $entity->preSaveRevision($this, $record);
 
@@ -1214,36 +1061,29 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Loads values of configurable fields for a group of entities.
+   * Loads values of fields stored in dedicated tables for a group of entities.
    *
-   * Loads all fields for each entity object in a group of a single entity type.
-   * The loaded field values are added directly to the entity objects.
-   *
-   * @param \Drupal\Core\Entity\ContentEntityInterface[] $entities
-   *   An array of entities keyed by entity ID.
+   * @param array &$values
+   *   An array of values keyed by entity ID.
+   * @param bool $load_from_revision
+   *   (optional) Flag to indicate whether revisions should be loaded or not,
+   *   defaults to FALSE.
    */
-  protected function loadFieldItems(array $entities) {
-    if (empty($entities)) {
+  protected function loadFromDedicatedTables(array &$values, $load_from_revision) {
+    if (empty($values)) {
       return;
     }
-
-    $age = static::FIELD_LOAD_CURRENT;
-    foreach ($entities as $entity) {
-      if (!$entity->isDefaultRevision()) {
-        $age = static::FIELD_LOAD_REVISION;
-        break;
-      }
-    }
-    $load_current = $age == static::FIELD_LOAD_CURRENT;
 
     // Collect entities ids, bundles and languages.
     $bundles = array();
     $ids = array();
     $default_langcodes = array();
-    foreach ($entities as $key => $entity) {
-      $bundles[$entity->bundle()] = TRUE;
-      $ids[] = $load_current ? $key : $entity->getRevisionId();
-      $default_langcodes[$key] = $entity->getUntranslated()->language()->getId();
+    foreach ($values as $key => $entity_values) {
+      $bundles[$this->bundleKey ? $entity_values[$this->bundleKey][LanguageInterface::LANGCODE_DEFAULT] : $this->entityTypeId] = TRUE;
+      $ids[] = !$load_from_revision ? $key : $entity_values[$this->revisionKey][LanguageInterface::LANGCODE_DEFAULT];
+      if ($this->langcodeKey && isset($entity_values[$this->langcodeKey][LanguageInterface::LANGCODE_DEFAULT])) {
+        $default_langcodes[$key] = $entity_values[$this->langcodeKey][LanguageInterface::LANGCODE_DEFAULT];
+      }
     }
 
     // Collect impacted fields.
@@ -1263,31 +1103,37 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     // Load field data.
     $langcodes = array_keys($this->languageManager->getLanguages(LanguageInterface::STATE_ALL));
     foreach ($storage_definitions as $field_name => $storage_definition) {
-      $table = $load_current ? $table_mapping->getDedicatedDataTableName($storage_definition) : $table_mapping->getDedicatedRevisionTableName($storage_definition);
+      $table = !$load_from_revision ? $table_mapping->getDedicatedDataTableName($storage_definition) : $table_mapping->getDedicatedRevisionTableName($storage_definition);
 
       // Ensure that only values having valid languages are retrieved. Since we
       // are loading values for multiple entities, we cannot limit the query to
       // the available translations.
       $results = $this->database->select($table, 't')
         ->fields('t')
-        ->condition($load_current ? 'entity_id' : 'revision_id', $ids, 'IN')
+        ->condition(!$load_from_revision ? 'entity_id' : 'revision_id', $ids, 'IN')
         ->condition('deleted', 0)
         ->condition('langcode', $langcodes, 'IN')
         ->orderBy('delta')
         ->execute();
 
-      $delta_count = array();
       foreach ($results as $row) {
-        $bundle = $entities[$row->entity_id]->bundle();
+        $bundle = $row->bundle;
+
+        // Field values in default language are stored with
+        // LanguageInterface::LANGCODE_DEFAULT as key.
+        $langcode = LanguageInterface::LANGCODE_DEFAULT;
+        if ($this->langcodeKey && isset($default_langcodes[$row->entity_id]) && $row->langcode != $default_langcodes[$row->entity_id]) {
+          $langcode = $row->langcode;
+        }
+
+        if (!isset($values[$row->entity_id][$field_name][$langcode])) {
+          $values[$row->entity_id][$field_name][$langcode] = array();
+        }
 
         // Ensure that records for non-translatable fields having invalid
         // languages are skipped.
-        if ($row->langcode == $default_langcodes[$row->entity_id] || $definitions[$bundle][$field_name]->isTranslatable()) {
-          if (!isset($delta_count[$row->entity_id][$row->langcode])) {
-            $delta_count[$row->entity_id][$row->langcode] = 0;
-          }
-
-          if ($storage_definition->getCardinality() == FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED || $delta_count[$row->entity_id][$row->langcode] < $storage_definition->getCardinality()) {
+        if ($langcode == LanguageInterface::LANGCODE_DEFAULT || $definitions[$bundle][$field_name]->isTranslatable()) {
+          if ($storage_definition->getCardinality() == FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED || count($values[$row->entity_id][$field_name][$langcode]) < $storage_definition->getCardinality()) {
             $item = array();
             // For each column declared by the field, populate the item from the
             // prefixed database column.
@@ -1298,8 +1144,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
             }
 
             // Add the item to the field values for the entity.
-            $entities[$row->entity_id]->getTranslation($row->langcode)->{$field_name}->appendItem($item);
-            $delta_count[$row->entity_id][$row->langcode]++;
+            $values[$row->entity_id][$field_name][$langcode][] = $item;
           }
         }
       }
@@ -1307,14 +1152,17 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Saves values of configurable fields for an entity.
+   * Saves values of fields that use dedicated tables.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity.
    * @param bool $update
    *   TRUE if the entity is being updated, FALSE if it is being inserted.
+   * @param string[] $names
+   *   (optional) The names of the fields to be stored. Defaults to all the
+   *   available fields.
    */
-  protected function saveFieldItems(EntityInterface $entity, $update = TRUE) {
+  protected function saveToDedicatedTables(ContentEntityInterface $entity, $update = TRUE, $names = array()) {
     $vid = $entity->getRevisionId();
     $id = $entity->id();
     $bundle = $entity->bundle();
@@ -1327,11 +1175,26 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       $vid = $id;
     }
 
-    foreach ($this->entityManager->getFieldDefinitions($entity_type, $bundle) as $field_name => $field_definition) {
+    $original = !empty($entity->original) ? $entity->original: NULL;
+
+    // Determine which fields should be actually stored.
+    $definitions = $this->entityManager->getFieldDefinitions($entity_type, $bundle);
+    if ($names) {
+      $definitions = array_intersect_key($definitions, array_flip($names));
+    }
+
+    foreach ($definitions as $field_name => $field_definition) {
       $storage_definition = $field_definition->getFieldStorageDefinition();
       if (!$table_mapping->requiresDedicatedTableStorage($storage_definition)) {
         continue;
       }
+
+      // When updating an existing revision, keep the existing records if the
+      // field values did not change.
+      if (!$entity->isNewRevision() && $original && !$this->hasFieldValueChanged($field_definition, $entity, $original)) {
+        continue;
+      }
+
       $table_name = $table_mapping->getDedicatedDataTableName($storage_definition);
       $revision_name = $table_mapping->getDedicatedRevisionTableName($storage_definition);
 
@@ -1409,12 +1272,12 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Deletes values of configurable fields for all revisions of an entity.
+   * Deletes values of fields in dedicated tables for all revisions.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity.
    */
-  protected function deleteFieldItems(EntityInterface $entity) {
+  protected function deleteFromDedicatedTables(ContentEntityInterface $entity) {
     $table_mapping = $this->getTableMapping();
     foreach ($this->entityManager->getFieldDefinitions($entity->getEntityTypeId(), $entity->bundle()) as $field_definition) {
       $storage_definition = $field_definition->getFieldStorageDefinition();
@@ -1435,12 +1298,12 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Deletes values of configurable fields for a single revision of an entity.
+   * Deletes values of fields in dedicated tables for all revisions.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
+   * @param \Drupal\Core\Entity\ContentEntityInterface $entity
    *   The entity. It must have a revision ID.
    */
-  protected function deleteFieldItemsRevision(EntityInterface $entity) {
+  protected function deleteRevisionFromDedicatedTables(ContentEntityInterface $entity) {
     $vid = $entity->getRevisionId();
     if (isset($vid)) {
       $table_mapping = $this->getTableMapping();
@@ -1490,7 +1353,9 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
    * {@inheritdoc}
    */
   public function onEntityTypeCreate(EntityTypeInterface $entity_type) {
-    $this->getStorageSchema()->onEntityTypeCreate($entity_type);
+    $this->wrapSchemaException(function () use ($entity_type) {
+      $this->getStorageSchema()->onEntityTypeCreate($entity_type);
+    });
   }
 
   /**
@@ -1503,14 +1368,18 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     // definition.
     $this->initTableLayout();
     // Let the schema handler adapt to possible table layout changes.
-    $this->getStorageSchema()->onEntityTypeUpdate($entity_type, $original);
+    $this->wrapSchemaException(function () use ($entity_type, $original) {
+      $this->getStorageSchema()->onEntityTypeUpdate($entity_type, $original);
+    });
   }
 
   /**
    * {@inheritdoc}
    */
   public function onEntityTypeDelete(EntityTypeInterface $entity_type) {
-    $this->getStorageSchema()->onEntityTypeDelete($entity_type);
+    $this->wrapSchemaException(function () use ($entity_type) {
+      $this->getStorageSchema()->onEntityTypeDelete($entity_type);
+    });
   }
 
   /**
@@ -1525,14 +1394,18 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     if ($this->getTableMapping()->allowsSharedTableStorage($storage_definition)) {
       $this->tableMapping = NULL;
     }
-    $this->getStorageSchema()->onFieldStorageDefinitionCreate($storage_definition);
+    $this->wrapSchemaException(function () use ($storage_definition) {
+      $this->getStorageSchema()->onFieldStorageDefinitionCreate($storage_definition);
+    });
   }
 
   /**
    * {@inheritdoc}
    */
   public function onFieldStorageDefinitionUpdate(FieldStorageDefinitionInterface $storage_definition, FieldStorageDefinitionInterface $original) {
-    $this->getStorageSchema()->onFieldStorageDefinitionUpdate($storage_definition, $original);
+    $this->wrapSchemaException(function () use ($storage_definition, $original) {
+      $this->getStorageSchema()->onFieldStorageDefinitionUpdate($storage_definition, $original);
+    });
   }
 
   /**
@@ -1560,7 +1433,31 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
     }
 
     // Update the field schema.
-    $this->getStorageSchema()->onFieldStorageDefinitionDelete($storage_definition);
+    $this->wrapSchemaException(function () use ($storage_definition) {
+      $this->getStorageSchema()->onFieldStorageDefinitionDelete($storage_definition);
+    });
+  }
+
+  /**
+   * Wraps a database schema exception into an entity storage exception.
+   *
+   * @param callable $callback
+   *   The callback to be executed.
+   *
+   * @throws \Drupal\Core\Entity\EntityStorageException
+   *   When a database schema exception is thrown.
+   */
+  protected function wrapSchemaException(callable $callback) {
+    $message = 'Exception thrown while performing a schema update.';
+    try {
+      $callback();
+    }
+    catch (SchemaException $e) {
+      throw new EntityStorageException($message, 0, $e);
+    }
+    catch (DatabaseExceptionWrapper $e) {
+      throw new EntityStorageException($message, 0, $e);
+    }
   }
 
   /**
@@ -1672,7 +1569,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
           // Create entity with the right revision id and entity id combination.
           $item_row['entity_type'] = $this->entityTypeId;
           // @todo: Replace this by an entity object created via an entity
-          // factory, see https://drupal.org/node/1867228.
+          // factory, see https://www.drupal.org/node/1867228.
           $entities[$item_row['revision_id']] = _field_create_entity_from_ids((object) $item_row);
         }
         $item = array();
@@ -1737,10 +1634,12 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       foreach ($storage_definition->getColumns() as $column_name => $data) {
         $or->isNotNull($table_mapping->getFieldColumnName($storage_definition, $column_name));
       }
-      $query
-        ->condition($or)
-        ->fields('t', array('entity_id'))
-        ->distinct(TRUE);
+      $query->condition($or);
+      if (!$as_bool) {
+        $query
+          ->fields('t', array('entity_id'))
+          ->distinct(TRUE);
+      }
     }
     elseif ($table_mapping->allowsSharedTableStorage($storage_definition)) {
       // Ascertain the table this field is mapped too.
@@ -1761,9 +1660,11 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
         $or->isNotNull($table_mapping->getFieldColumnName($storage_definition, $property_name));
       }
       $query->condition($or);
-      $query
-        ->fields('t', array($this->idKey))
-        ->distinct(TRUE);
+      if (!$as_bool) {
+        $query
+          ->fields('t', array($this->idKey))
+          ->distinct(TRUE);
+      }
     }
 
     // @todo Find a way to count field data also for fields having custom
@@ -1773,7 +1674,9 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
       // If we are performing the query just to check if the field has data
       // limit the number of rows.
       if ($as_bool) {
-        $query->range(0, 1);
+        $query
+          ->range(0, 1)
+          ->addExpression('1');
       }
       else {
         // Otherwise count the number of rows.
@@ -1785,7 +1688,7 @@ class SqlContentEntityStorage extends ContentEntityStorageBase implements SqlEnt
   }
 
   /**
-   * Returns whether the passed field has been already deleted.
+   * Determines whether the passed field has been already deleted.
    *
    * @param \Drupal\Core\Field\FieldStorageDefinitionInterface $storage_definition
    *   The field storage definition.

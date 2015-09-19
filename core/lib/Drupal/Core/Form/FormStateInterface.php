@@ -417,7 +417,8 @@ interface FormStateInterface {
    * indicate which element needs to be changed and provide an error message.
    * This causes the Form API to not execute the form submit handlers, and
    * instead to re-display the form to the user with the corresponding elements
-   * rendered with an 'error' CSS class (shown as red by default).
+   * rendered with an 'error' CSS class (shown as red by default) and the error
+   * message near the element.
    *
    * The standard behavior of this method can be changed if a button provides
    * the #limit_validation_errors property. Multistep forms not wanting to
@@ -561,6 +562,24 @@ interface FormStateInterface {
   public function isRebuilding();
 
   /**
+   * Flags the form state as having or not an invalid token.
+   *
+   * @param bool $invalid_token
+   *   Whether the form has an invalid token.
+   *
+   * @return $this
+   */
+  public function setInvalidToken($invalid_token);
+
+  /**
+   * Determines if the form has an invalid token.
+   *
+   * @return bool
+   *   TRUE if the form has an invalid token, FALSE otherwise.
+   */
+  public function hasInvalidToken();
+
+  /**
    * Converts support notations for a form callback to a valid callable.
    *
    * Specifically, supports methods on the form/callback object as strings when
@@ -639,6 +658,10 @@ interface FormStateInterface {
    *   TRUE if the form should be cached, FALSE otherwise.
    *
    * @return $this
+   *
+   * @throws \LogicException
+   *   If the current request is using an HTTP method that must not change
+   *   state (e.g., GET).
    */
   public function setCached($cache = TRUE);
 
@@ -730,16 +753,35 @@ interface FormStateInterface {
   public function getLimitValidationErrors();
 
   /**
-   * Sets the HTTP form method.
+   * Sets the HTTP method to use for the form's submission.
+   *
+   * This is what the form's "method" attribute should be, not necessarily what
+   * the current request's HTTP method is. For example, a form can have a
+   * method attribute of POST, but the request that initially builds it uses
+   * GET.
    *
    * @param string $method
-   *   The HTTP form method.
+   *   Either "GET" or "POST". Other HTTP methods are not valid form submission
+   *   methods.
    *
    * @see \Drupal\Core\Form\FormState::$method
+   * @see \Drupal\Core\Form\FormStateInterface::setRequestMethod()
    *
    * @return $this
    */
   public function setMethod($method);
+
+  /**
+   * Sets the HTTP method used by the request that is building the form.
+   *
+   * @param string $method
+   *   Can be any valid HTTP method, such as GET, POST, HEAD, etc.
+   *
+   * @return $this
+   *
+   * @see \Drupal\Core\Form\FormStateInterface::setMethod()
+   */
+  public function setRequestMethod($method);
 
   /**
    * Returns the HTTP form method.

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\Core\TypedData\Type\TimeSpan.
+ * Contains \Drupal\Core\TypedData\Plugin\DataType\TimeSpan.
  */
 
 namespace Drupal\Core\TypedData\Plugin\DataType;
@@ -25,7 +25,7 @@ use Drupal\Core\TypedData\Type\DurationInterface;
  *
  * @see \Drupal\Core\TypedData\Type\DurationIso8601
  */
-class TimeSpan extends Integer implements DurationInterface {
+class TimeSpan extends IntegerData implements DurationInterface {
 
   /**
    * {@inheritdoc}

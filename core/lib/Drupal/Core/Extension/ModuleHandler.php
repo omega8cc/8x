@@ -2,14 +2,13 @@
 
 /**
  * @file
- * Contains Drupal\Core\Extension\ModuleHandler.
+ * Contains \Drupal\Core\Extension\ModuleHandler.
  */
 
 namespace Drupal\Core\Extension;
 
 use Drupal\Component\Graph\Graph;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
 
@@ -581,7 +580,7 @@ class ModuleHandler implements ModuleHandlerInterface {
         }
         // If a new implementation was added, verify that the function exists.
         if (!function_exists($module . '_' . $hook)) {
-          throw new \RuntimeException(String::format('An invalid implementation @function was added by hook_module_implements_alter()', array('@function' => $module . '_' . $hook)));
+          throw new \RuntimeException("An invalid implementation {$module}_{$hook} was added by hook_module_implements_alter()");
         }
       }
     }
@@ -710,8 +709,8 @@ class ModuleHandler implements ModuleHandlerInterface {
    * {@inheritdoc}
    */
   public function getName($module) {
-    $module_data = system_rebuild_module_data();
-    return $module_data[$module]->info['name'];
+    $info = system_get_info('module', $module);
+    return isset($info['name']) ? $info['name'] : $module;
   }
 
 }

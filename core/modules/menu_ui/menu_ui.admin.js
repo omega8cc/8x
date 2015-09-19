@@ -1,18 +1,27 @@
+/**
+ * @file
+ * Menu UI admin behaviors.
+ */
+
 (function ($) {
 
   "use strict";
 
+  /**
+   *
+   * @type {Drupal~behavior}
+   */
   Drupal.behaviors.menuUiChangeParentItems = {
     attach: function (context, settings) {
-      var $menu = $('#edit-menu');
-      $menu.once('menu-parent', function () {
+      var $menu = $('#edit-menu').once('menu-parent');
+      if ($menu.length) {
         // Update the list of available parent menu items to match the initial
         // available menus.
         Drupal.menuUiUpdateParentList();
 
         // Update list of available parent menu items.
         $menu.on('change', 'input', Drupal.menuUiUpdateParentList);
-      });
+      }
     }
   };
 
@@ -37,7 +46,7 @@
         var $select = $('#edit-menu-parent');
         // Save key of last selected element.
         var selected = $select.val();
-        // Remove all exisiting options from dropdown.
+        // Remove all existing options from dropdown.
         $select.children().remove();
         // Add new options to dropdown. Keep a count of options for testing later.
         var totalOptions = 0;

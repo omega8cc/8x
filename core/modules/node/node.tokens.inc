@@ -5,8 +5,11 @@
  * Builds placeholder replacement tokens for node-related data.
  */
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Datetime\Entity\DateFormat;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\user\Entity\User;
 
 /**
  * Implements hook_token_info().
@@ -82,7 +85,7 @@ function node_token_info() {
 /**
  * Implements hook_tokens().
  */
-function node_tokens($type, $tokens, array $data = array(), array $options = array()) {
+function node_tokens($type, $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
   $token_service = \Drupal::token();
 
   $url_options = array('absolute' => TRUE);
@@ -113,16 +116,16 @@ function node_tokens($type, $tokens, array $data = array(), array $options = arr
           break;
 
         case 'type':
-          $replacements[$original] = $sanitize ? String::checkPlain($node->getType()) : $node->getType();
+          $replacements[$original] = $sanitize ? Html::escape($node->getType()) : $node->getType();
           break;
 
         case 'type-name':
           $type_name = node_get_type_label($node);
-          $replacements[$original] = $sanitize ? String::checkPlain($type_name) : $type_name;
+          $replacements[$original] = $sanitize ? Html::escape($type_name) : $type_name;
           break;
 
         case 'title':
-          $replacements[$original] = $sanitize ? String::checkPlain($node->getTitle()) : $node->getTitle();
+          $replacements[$original] = $sanitize ? Html::escape($node->getTitle()) : $node->getTitle();
           break;
 
         case 'body':
@@ -161,7 +164,7 @@ function node_tokens($type, $tokens, array $data = array(), array $options = arr
           break;
 
         case 'langcode':
-          $replacements[$original] = $sanitize ? String::checkPlain($node->language()->getId()) : $node->language()->getId();
+          $replacements[$original] = $sanitize ? Html::escape($node->language()->getId()) : $node->language()->getId();
           break;
 
         case 'url':
@@ -174,30 +177,35 @@ function node_tokens($type, $tokens, array $data = array(), array $options = arr
 
         // Default values for the chained tokens handled below.
         case 'author':
-          $account = $node->getOwner() ? $node->getOwner() : user_load(0);
-          $replacements[$original] = $sanitize ? String::checkPlain($account->label()) : $account->label();
+          $account = $node->getOwner() ? $node->getOwner() : User::load(0);
+          $bubbleable_metadata->addCacheableDependency($account);
+          $replacements[$original] = $sanitize ? Html::escape($account->label()) : $account->label();
           break;
 
         case 'created':
+          $date_format = DateFormat::load('medium');
+          $bubbleable_metadata->addCacheableDependency($date_format);
           $replacements[$original] = format_date($node->getCreatedTime(), 'medium', '', NULL, $langcode);
           break;
 
         case 'changed':
+          $date_format = DateFormat::load('medium');
+          $bubbleable_metadata->addCacheableDependency($date_format);
           $replacements[$original] = format_date($node->getChangedTime(), 'medium', '', NULL, $langcode);
           break;
       }
     }
 
     if ($author_tokens = $token_service->findWithPrefix($tokens, 'author')) {
-      $replacements += $token_service->generate('user', $author_tokens, array('user' => $node->getOwner()), $options);
+      $replacements += $token_service->generate('user', $author_tokens, array('user' => $node->getOwner()), $options, $bubbleable_metadata);
     }
 
     if ($created_tokens = $token_service->findWithPrefix($tokens, 'created')) {
-      $replacements += $token_service->generate('date', $created_tokens, array('date' => $node->getCreatedTime()), $options);
+      $replacements += $token_service->generate('date', $created_tokens, array('date' => $node->getCreatedTime()), $options, $bubbleable_metadata);
     }
 
     if ($changed_tokens = $token_service->findWithPrefix($tokens, 'changed')) {
-      $replacements += $token_service->generate('date', $changed_tokens, array('date' => $node->getChangedTime()), $options);
+      $replacements += $token_service->generate('date', $changed_tokens, array('date' => $node->getChangedTime()), $options, $bubbleable_metadata);
     }
   }
 

@@ -8,14 +8,41 @@
 namespace Drupal\simpletest\Form;
 
 use Drupal\Component\Utility\SortArray;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\RendererInterface;
+use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
  * List tests arranged in groups that can be selected and run.
  */
 class SimpletestTestForm extends FormBase {
+
+  /**
+   * The renderer.
+   *
+   * @var \Drupal\Core\Render\RendererInterface
+   */
+  protected $renderer;
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('renderer')
+    );
+  }
+
+  /**
+   * Constructs a new SimpletestTestForm.
+   *
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The renderer.
+   */
+  public function __construct(RendererInterface $renderer) {
+    $this->renderer = $renderer;
+  }
 
   /**
    * {@inheritdoc}
@@ -99,8 +126,8 @@ class SimpletestTestForm extends FormBase {
       '#suffix' => '<a href="#" class="simpletest-collapse">(' . $this->t('Collapse') . ')</a>',
     );
     $form['tests']['#attached']['drupalSettings']['simpleTest']['images'] = [
-      drupal_render($image_collapsed),
-      drupal_render($image_extended),
+      (string) $this->renderer->renderPlain($image_collapsed),
+      (string) $this->renderer->renderPlain($image_extended),
     ];
 
     // Generate the list of tests arranged by group.
@@ -144,14 +171,14 @@ class SimpletestTestForm extends FormBase {
         );
         $form['tests'][$class]['title'] = array(
           '#type' => 'label',
-          '#title' => $info['name'],
+          '#title' => '\\' . $info['name'],
           '#wrapper_attributes' => array(
             'class' => array('simpletest-test-label', 'table-filter-text-source'),
           ),
         );
         $form['tests'][$class]['description'] = array(
           '#prefix' => '<div class="description">',
-          '#markup' => String::checkPlain($info['description']),
+          '#plain_text' => $info['description'],
           '#suffix' => '</div>',
           '#wrapper_attributes' => array(
             'class' => array('simpletest-test-description', 'table-filter-text-source'),
@@ -179,6 +206,7 @@ class SimpletestTestForm extends FormBase {
    * {@inheritdoc}
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
+    global $base_url;
     // Test discovery does not run upon form submission.
     simpletest_classloader_register();
 
@@ -209,6 +237,7 @@ class SimpletestTestForm extends FormBase {
       }
     }
     if (!empty($tests_list)) {
+      putenv('SIMPLETEST_BASE_URL=' . $base_url);
       $test_id = simpletest_run_tests($tests_list, 'drupal');
       $form_state->setRedirect(
         'simpletest.result_form',

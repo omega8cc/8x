@@ -323,7 +323,7 @@ function views_field_default_views_data(FieldStorageConfigInterface $field_stora
 
   // Description of the field tables.
   // @todo Generalize this code to make it work with any table layout. See
-  //   https://drupal.org/node/2079019.
+  //   https://www.drupal.org/node/2079019.
   $table_mapping = $storage->getTableMapping();
   $field_tables = array(
     EntityStorageInterface::FIELD_LOAD_CURRENT => array(
@@ -462,7 +462,6 @@ function views_field_default_views_data(FieldStorageConfigInterface $field_stora
       // Provide a real field for group by.
       'real field' => $field_alias . '_' . $real_field,
       'additional fields' => $add_fields,
-      'entity_tables' => $entity_tables,
       // Default the element type to div, let the UI change it if necessary.
       'element type' => 'div',
       'is revision' => $type == EntityStorageInterface::FIELD_LOAD_REVISION,

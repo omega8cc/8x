@@ -7,7 +7,6 @@
 
 namespace Drupal\field_ui;
 
-use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Config\Entity\ConfigEntityListBuilder;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
@@ -85,12 +84,12 @@ class FieldStorageConfigListBuilder extends ConfigEntityListBuilder {
    * {@inheritdoc}
    */
   public function buildHeader() {
-    $header['id'] = t('Field name');
+    $header['id'] = $this->t('Field name');
     $header['type'] = array(
-      'data' => t('Field type'),
+      'data' => $this->t('Field type'),
       'class' => array(RESPONSIVE_PRIORITY_MEDIUM),
     );
-    $header['usage'] = t('Used in');
+    $header['usage'] = $this->t('Used in');
     return $header;
   }
 
@@ -100,14 +99,14 @@ class FieldStorageConfigListBuilder extends ConfigEntityListBuilder {
   public function buildRow(EntityInterface $field_storage) {
     if ($field_storage->isLocked()) {
       $row['class'] = array('menu-disabled');
-      $row['data']['id'] =  t('@field_name (Locked)', array('@field_name' => $field_storage->getName()));
+      $row['data']['id'] =  $this->t('@field_name (Locked)', array('@field_name' => $field_storage->getName()));
     }
     else {
       $row['data']['id'] = $field_storage->getName();
     }
 
     $field_type = $this->fieldTypes[$field_storage->getType()];
-    $row['data']['type'] = t('@type (module: @module)', array('@type' => $field_type['label'], '@module' => $field_type['provider']));
+    $row['data']['type'] = $this->t('@type (module: @module)', array('@type' => $field_type['label'], '@module' => $field_type['provider']));
 
     $usage = array();
     foreach ($field_storage->getBundles() as $bundle) {
@@ -119,13 +118,11 @@ class FieldStorageConfigListBuilder extends ConfigEntityListBuilder {
         $usage[] = $this->bundles[$entity_type_id][$bundle]['label'];
       }
     }
-    $usage_escaped = '';
-    $separator = '';
-    foreach ($usage as $usage_item) {
-      $usage_escaped .=  $separator . SafeMarkup::escape($usage_item);
-      $separator = ', ';
-    }
-    $row['data']['usage'] = SafeMarkup::set($usage_escaped);
+    $row['data']['usage']['data'] = [
+      '#theme' => 'item_list',
+      '#items' => $usage,
+      '#context' => ['list_style' => 'comma-list'],
+    ];
     return $row;
   }
 

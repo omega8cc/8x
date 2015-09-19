@@ -8,6 +8,7 @@
 namespace Drupal\taxonomy\Tests;
 use Drupal\Component\Utility\Unicode;
 
+use Drupal\Core\Url;
 use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
@@ -28,6 +29,7 @@ class VocabularyUiTest extends TaxonomyTestBase {
     parent::setUp();
     $this->drupalLogin($this->drupalCreateUser(['administer taxonomy']));
     $this->vocabulary = $this->createVocabulary();
+    $this->drupalPlaceBlock('local_actions_block');
   }
 
   /**
@@ -50,6 +52,7 @@ class VocabularyUiTest extends TaxonomyTestBase {
     // Edit the vocabulary.
     $this->drupalGet('admin/structure/taxonomy');
     $this->assertText($edit['name'], 'Vocabulary found in the vocabulary overview listing.');
+    $this->assertLinkByHref(Url::fromRoute('entity.taxonomy_term.add_form', ['taxonomy_vocabulary' => $edit['vid']])->toString());
     $this->clickLink(t('Edit vocabulary'));
     $edit = array();
     $edit['name'] = $this->randomMachineName();

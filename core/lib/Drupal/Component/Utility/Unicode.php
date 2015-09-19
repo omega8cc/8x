@@ -100,7 +100,7 @@ EOD;
   protected static $status = 0;
 
   /**
-   * Get the current status of unicode/multibyte support on this environment.
+   * Gets the current status of unicode/multibyte support on this environment.
    *
    * @return int
    *   The status of multibyte support. It can be one of:
@@ -181,6 +181,38 @@ EOD;
     mb_language('uni');
     static::$status = static::STATUS_MULTIBYTE;
     return '';
+  }
+
+  /**
+   * Decodes UTF byte-order mark (BOM) into the encoding's name.
+   *
+   * @param string $data
+   *   The data possibly containing a BOM. This can be the entire contents of
+   *   a file, or just a fragment containing at least the first five bytes.
+   *
+   * @return string|bool
+   *   The name of the encoding, or FALSE if no byte order mark was present.
+   */
+  public static function encodingFromBOM($data) {
+    static $bomMap = array(
+      "\xEF\xBB\xBF" => 'UTF-8',
+      "\xFE\xFF" => 'UTF-16BE',
+      "\xFF\xFE" => 'UTF-16LE',
+      "\x00\x00\xFE\xFF" => 'UTF-32BE',
+      "\xFF\xFE\x00\x00" => 'UTF-32LE',
+      "\x2B\x2F\x76\x38" => 'UTF-7',
+      "\x2B\x2F\x76\x39" => 'UTF-7',
+      "\x2B\x2F\x76\x2B" => 'UTF-7',
+      "\x2B\x2F\x76\x2F" => 'UTF-7',
+      "\x2B\x2F\x76\x38\x2D" => 'UTF-7',
+    );
+
+    foreach ($bomMap as $bom => $encoding) {
+      if (strpos($data, $bom) === 0) {
+        return $encoding;
+      }
+    }
+    return FALSE;
   }
 
   /**
@@ -476,7 +508,7 @@ EOD;
    * @param bool $add_ellipsis
    *   If TRUE, add '...' to the end of the truncated string (defaults to
    *   FALSE). The string length will still fall within $max_length.
-   * @param bool $min_wordsafe_length
+   * @param int $min_wordsafe_length
    *   If $wordsafe is TRUE, the minimum acceptable length for truncation (before
    *   adding an ellipsis, if $add_ellipsis is TRUE). Has no effect if $wordsafe
    *   is FALSE. This can be used to prevent having a very short resulting string
@@ -539,6 +571,22 @@ EOD;
     }
 
     return $string;
+  }
+
+  /**
+   * Compares UTF-8-encoded strings in a binary safe case-insensitive manner.
+   *
+   * @param string $str1
+   *   The first string.
+   * @param string $str2
+   *   The second string.
+   *
+   * @return int
+   *   Returns < 0 if $str1 is less than $str2; > 0 if $str1 is greater than
+   *   $str2, and 0 if they are equal.
+   */
+  public static function strcasecmp($str1 , $str2) {
+    return strcmp(static::strtoupper($str1), static::strtoupper($str2));
   }
 
   /**

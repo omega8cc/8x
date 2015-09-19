@@ -7,8 +7,11 @@
 
 namespace Drupal\Core\Extension;
 
+use Drupal\Component\FileCache\FileCacheFactory;
+use Drupal\Core\DrupalKernel;
 use Drupal\Core\Extension\Discovery\RecursiveExtensionFilterIterator;
 use Drupal\Core\Site\Settings;
+use Symfony\Component\HttpFoundation\Request;
 
 /**
  * Discovers available extensions in the filesystem.
@@ -81,6 +84,13 @@ class ExtensionDiscovery {
   protected $root;
 
   /**
+   * The file cache object.
+   *
+   * @var \Drupal\Component\FileCache\FileCacheInterface
+   */
+  protected $fileCache;
+
+  /**
    * Constructs a new ExtensionDiscovery object.
    *
    * @param string $root
@@ -88,6 +98,7 @@ class ExtensionDiscovery {
    */
   public function __construct($root) {
     $this->root = $root;
+    $this->fileCache = FileCacheFactory::get('extension_discovery');
   }
 
   /**
@@ -125,8 +136,9 @@ class ExtensionDiscovery {
    */
   public function scan($type, $include_tests = NULL) {
     // Determine the installation profile directories to scan for extensions,
-    // unless explicit profile directories have been set.
-    if (!isset($this->profileDirectories)) {
+    // unless explicit profile directories have been set. Exclude profiles as we
+    // cannot have profiles within profiles.
+    if (!isset($this->profileDirectories) && $type != 'profile') {
       $this->setProfileDirectoriesFromSettings();
     }
 
@@ -152,8 +164,16 @@ class ExtensionDiscovery {
       $searchdirs[static::ORIGIN_PARENT_SITE] = $parent_site;
     }
 
-    // Search the site-specific directory.
-    $searchdirs[static::ORIGIN_SITE] = conf_path();
+    // Find the site-specific directory to search. Since we are using this
+    // method to discover extensions including profiles, we might be doing this
+    // at install time. Therefore Kernel service is not always available, but is
+    // preferred.
+    if (\Drupal::hasService('kernel')) {
+      $searchdirs[static::ORIGIN_SITE] = \Drupal::service('site.path');
+    }
+    else {
+      $searchdirs[static::ORIGIN_SITE] = DrupalKernel::findSitePath(Request::createFromGlobals());
+    }
 
     // Unless an explicit value has been passed, manually check whether we are
     // in a test environment, in which case test extensions must be included.
@@ -406,6 +426,12 @@ class ExtensionDiscovery {
       if (!preg_match(static::PHP_FUNCTION_PATTERN, $fileinfo->getBasename('.info.yml'))) {
         continue;
       }
+
+      if ($cached_extension = $this->fileCache->get($fileinfo->getPathName())) {
+        $files[$cached_extension->getType()][$key] = $cached_extension;
+        continue;
+      }
+
       // Determine extension type from info file.
       $type = FALSE;
       $file = $fileinfo->openFile('r');
@@ -441,6 +467,7 @@ class ExtensionDiscovery {
       $extension->origin = $dir;
 
       $files[$type][$key] = $extension;
+      $this->fileCache->set($fileinfo->getPathName(), $extension);
     }
     return $files;
   }

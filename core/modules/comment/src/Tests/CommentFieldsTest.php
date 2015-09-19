@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\comment\Tests\CommentFieldsTest.
+ * Contains \Drupal\comment\Tests\CommentFieldsTest.
  */
 
 namespace Drupal\comment\Tests;
@@ -84,13 +84,13 @@ class CommentFieldsTest extends CommentTestBase {
     $this->drupalLogin($this->webUser);
 
     $this->drupalGet('node/' . $node->nid->value);
-    $elements = $this->cssSelect('.field-type-comment');
+    $elements = $this->cssSelect('.field--type-comment');
     $this->assertEqual(2, count($elements), 'There are two comment fields on the node.');
 
     // Delete the first comment field.
     FieldStorageConfig::loadByName('node', 'comment')->delete();
     $this->drupalGet('node/' . $node->nid->value);
-    $elements = $this->cssSelect('.field-type-comment');
+    $elements = $this->cssSelect('.field--type-comment');
     $this->assertEqual(1, count($elements), 'There is one comment field on the node.');
   }
 
@@ -129,7 +129,7 @@ class CommentFieldsTest extends CommentTestBase {
 
     // Select a comment type and try to save again.
     $edit = array(
-      'field_storage[settings][comment_type]' => 'user_comment_type',
+      'settings[comment_type]' => 'user_comment_type',
     );
     $this->drupalPostForm('admin/config/people/accounts/fields/user.user.field_user_comment/storage', $edit, t('Save field settings'));
     // We shouldn't get an error message.
@@ -165,12 +165,12 @@ class CommentFieldsTest extends CommentTestBase {
     // Install core content type module (book).
     $edit = array();
     $edit['modules[Core][book][enable]'] = 'book';
-    $this->drupalPostForm('admin/modules', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/modules', $edit, t('Install'));
 
     // Now install the comment module.
     $edit = array();
     $edit['modules[Core][comment][enable]'] = 'comment';
-    $this->drupalPostForm('admin/modules', $edit, t('Save configuration'));
+    $this->drupalPostForm('admin/modules', $edit, t('Install'));
     $this->rebuildContainer();
     $this->assertTrue($this->container->get('module_handler')->moduleExists('comment'), 'Comment module enabled.');
 

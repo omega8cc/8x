@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentFieldTest.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentFieldTest.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -51,6 +51,7 @@ class ContentFieldTest extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_field_test")->fields(array(
       'vid',
@@ -82,3 +83,4 @@ class ContentFieldTest extends DrupalDumpBase {
   }
 
 }
+#e7860a4b52cecdb1a6d2fed28665d5e4

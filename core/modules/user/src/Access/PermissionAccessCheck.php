@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\user\Access\PermissionAccessCheck.
+ * Contains \Drupal\user\Access\PermissionAccessCheck.
  */
 
 namespace Drupal\user\Access;
@@ -31,6 +31,11 @@ class PermissionAccessCheck implements AccessInterface {
    */
   public function access(Route $route, AccountInterface $account) {
     $permission = $route->getRequirement('_permission');
+
+    if ($permission === NULL) {
+      return AccessResult::neutral();
+    }
+
     // Allow to conjunct the permissions with OR ('+') or AND (',').
     $split = explode(',', $permission);
     if (count($split) > 1) {

@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies: {  }
 id: test_group_by_in_filters
@@ -15,7 +15,7 @@ display:
       access:
         type: none
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       fields:

@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\MenuLinks.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\MenuLinks.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -73,25 +73,25 @@ class MenuLinks extends DrupalDumpBase {
         'hidden' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'external' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'has_children' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'expanded' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'weight' => array(
@@ -103,13 +103,13 @@ class MenuLinks extends DrupalDumpBase {
         'depth' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'customized' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'p1' => array(
@@ -178,13 +178,14 @@ class MenuLinks extends DrupalDumpBase {
         'updated' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
       ),
       'primary key' => array(
         'mlid',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("menu_links")->fields(array(
       'menu_name',
@@ -399,7 +400,7 @@ class MenuLinks extends DrupalDumpBase {
       'menu_name' => 'secondary-links',
       'mlid' => '140',
       'plid' => '0',
-      'link_path' => 'http://drupal.org',
+      'link_path' => 'https://www.drupal.org',
       'router_path' => '',
       'link_title' => 'Drupal.org',
       'options' => 'a:1:{s:10:"attributes";a:1:{s:5:"title";s:0:"";}}',
@@ -5153,7 +5154,34 @@ class MenuLinks extends DrupalDumpBase {
       'p8' => '0',
       'p9' => '0',
       'updated' => '0',
+    ))->values(array(
+      'menu_name' => 'secondary-links',
+      'mlid' => '393',
+      'plid' => '0',
+      'link_path' => 'user/login',
+      'router_path' => 'user/login',
+      'link_title' => 'Test 3',
+      'options' => 'a:0:{}',
+      'module' => 'menu',
+      'hidden' => '0',
+      'external' => '0',
+      'has_children' => '1',
+      'expanded' => '0',
+      'weight' => '15',
+      'depth' => '1',
+      'customized' => '1',
+      'p1' => '138',
+      'p2' => '0',
+      'p3' => '0',
+      'p4' => '0',
+      'p5' => '0',
+      'p6' => '0',
+      'p7' => '0',
+      'p8' => '0',
+      'p9' => '0',
+      'updated' => '0',
     ))->execute();
   }
 
 }
+#8e902b6a6367838c553b463060befdd3

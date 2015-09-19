@@ -2,14 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugin\views\argument\Type.
+ * Contains \Drupal\node\Plugin\views\argument\Type.
  */
 
 namespace Drupal\node\Plugin\views\argument;
 
-use Drupal\Component\Utility\String as UtilityString;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Entity\EntityStorageInterface;
-use Drupal\views\Plugin\views\argument\String;
+use Drupal\views\Plugin\views\argument\StringArgument;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -17,7 +17,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsArgument("node_type")
  */
-class Type extends String {
+class Type extends StringArgument {
 
   /**
    * NodeType storage controller.
@@ -76,7 +76,7 @@ class Type extends String {
   function node_type($type_name) {
     $type = $this->nodeTypeStorage->load($type_name);
     $output = $type ? $type->label() : $this->t('Unknown content type');
-    return UtilityString::checkPlain($output);
+    return SafeMarkup::checkPlain($output);
   }
 
 }

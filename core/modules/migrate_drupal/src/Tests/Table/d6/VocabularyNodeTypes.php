@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\VocabularyNodeTypes.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\VocabularyNodeTypes.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -40,6 +40,7 @@ class VocabularyNodeTypes extends DrupalDumpBase {
           'default' => '',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("vocabulary_node_types")->fields(array(
       'vid',
@@ -64,3 +65,4 @@ class VocabularyNodeTypes extends DrupalDumpBase {
   }
 
 }
+#b62db0b4fcc3389a5da405b703632d5a

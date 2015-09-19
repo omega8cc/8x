@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\Tests\Common\Utility\NumberTest.
+ * Contains \Drupal\Tests\Component\Utility\NumberTest.
  *
  * @see \Drupal\Component\Utility\Number
  */
@@ -31,7 +31,7 @@ class NumberTest extends UnitTestCase {
    *   The value argument for Number::validStep().
    * @param numeric $step
    *   The step argument for Number::validStep().
-   * @param boolean $expected
+   * @param bool $expected
    *   Expected return value from Number::validStep().
    */
   public function testValidStep($value, $step, $expected) {
@@ -51,7 +51,7 @@ class NumberTest extends UnitTestCase {
    *   The step argument for Number::validStep().
    * @param numeric $offset
    *   The offset argument for Number::validStep().
-   * @param boolean $expected
+   * @param bool $expected
    *   Expected return value from Number::validStep().
    */
   public function testValidStepOffset($value, $step, $offset, $expected) {

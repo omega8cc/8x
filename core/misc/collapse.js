@@ -1,9 +1,18 @@
+/**
+ * @file
+ * Polyfill for HTML5 details elements.
+ */
+
 (function ($, Modernizr, Drupal) {
 
   "use strict";
 
   /**
-   * The collapsible details object represents a single collapsible details element.
+   * The collapsible details object represents a single details element.
+   *
+   * @constructor Drupal.CollapsibleDetails
+   *
+   * @param {HTMLElement} node
    */
   function CollapsibleDetails(node) {
     this.$node = $(node);
@@ -20,22 +29,24 @@
     this.setupLegend();
   }
 
-  /**
-   * Extend CollapsibleDetails function.
-   */
-  $.extend(CollapsibleDetails, {
+  $.extend(CollapsibleDetails, /** @lends Drupal.CollapsibleDetails */{
+
     /**
      * Holds references to instantiated CollapsibleDetails objects.
+     *
+     * @type {Array.<Drupal.CollapsibleDetails>}
      */
     instances: []
   });
 
-  /**
-   * Extend CollapsibleDetails prototype.
-   */
-  $.extend(CollapsibleDetails.prototype, {
+  $.extend(CollapsibleDetails.prototype, /** @lends Drupal.CollapsibleDetails# */{
+
     /**
      * Initialize and setup summary events and markup.
+     *
+     * @fires event:summaryUpdated
+     *
+     * @listens event:summaryUpdated
      */
     setupSummary: function () {
       this.$summary = $('<span class="summary"></span>');
@@ -43,6 +54,7 @@
         .on('summaryUpdated', $.proxy(this.onSummaryUpdated, this))
         .trigger('summaryUpdated');
     },
+
     /**
      * Initialize and setup legend markup.
      */
@@ -59,24 +71,31 @@
       $('<a class="details-title"></a>')
         .attr('href', '#' + this.$node.attr('id'))
         .prepend($legend.contents())
-        .appendTo($legend)
+        .appendTo($legend);
+
+      $legend
+        .append(this.$summary)
         .on('click', $.proxy(this.onLegendClick, this));
-      $legend.append(this.$summary);
     },
+
     /**
-     * Handle legend clicks
+     * Handle legend clicks.
+     *
+     * @param {jQuery.Event} e
      */
     onLegendClick: function (e) {
       this.toggle();
       e.preventDefault();
     },
+
     /**
-     * Update summary
+     * Update summary.
      */
     onSummaryUpdated: function () {
       var text = $.trim(this.$node.drupalGetSummary());
       this.$summary.html(text ? ' (' + text + ')' : '');
     },
+
     /**
      * Toggle the visibility of a details element using smooth animations.
      */
@@ -89,16 +108,25 @@
       else {
         $summaryPrefix.html(Drupal.t('Hide'));
       }
-      this.$node.attr('open', !isOpen);
+      // Delay setting the attribute to emulate chrome behavior and make
+      // details-aria.js work as expected with this polyfill.
+      setTimeout(function () {
+        this.$node.attr('open', !isOpen);
+      }.bind(this), 0);
     }
   });
 
+  /**
+   * Polyfill HTML5 details element.
+   *
+   * @type {Drupal~behavior}
+   */
   Drupal.behaviors.collapse = {
     attach: function (context) {
       if (Modernizr.details) {
         return;
       }
-      var $collapsibleDetails = $(context).find('details').once('collapse');
+      var $collapsibleDetails = $(context).find('details').once('collapse').addClass('collapse-processed');
       if ($collapsibleDetails.length) {
         for (var i = 0; i < $collapsibleDetails.length; i++) {
           CollapsibleDetails.instances.push(new CollapsibleDetails($collapsibleDetails[i]));

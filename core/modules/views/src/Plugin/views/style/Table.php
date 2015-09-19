@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\style\Table.
+ * Contains \Drupal\views\Plugin\views\style\Table.
  */
 
 namespace Drupal\views\Plugin\views\style;
@@ -10,6 +10,7 @@ namespace Drupal\views\Plugin\views\style;
 use Drupal\Component\Plugin\Discovery\DiscoveryInterface;
 use Drupal\Component\Utility\Html;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\Plugin\views\wizard\WizardInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,7 +28,7 @@ use Symfony\Component\HttpFoundation\Request;
  *   display_types = {"normal"}
  * )
  */
-class Table extends StylePluginBase {
+class Table extends StylePluginBase implements CacheablePluginInterface {
 
   /**
    * Does the style plugin for itself support to add fields to it's output.
@@ -231,7 +232,7 @@ class Table extends StylePluginBase {
     $form['caption'] = array(
       '#type' => 'textfield',
       '#title' => $this->t('Caption for the table'),
-      '#description' => $this->t('A title which is semantically associated to your table for increased accessibility.'),
+      '#description' => $this->t('A title semantically associated with your table for increased accessibility.'),
       '#default_value' => $this->options['caption'],
       '#maxlength' => 255,
     );
@@ -408,7 +409,7 @@ class Table extends StylePluginBase {
       '#type' => 'checkbox',
       '#title' => $this->t('Show the empty text in the table'),
       '#default_value' => $this->options['empty_table'],
-      '#description' => $this->t('Per default the table is hidden for an empty view. With this option it is posible to show an empty table with the text in it.'),
+      '#description' => $this->t('Per default the table is hidden for an empty view. With this option it is possible to show an empty table with the text in it.'),
     );
 
     $form['description_markup'] = array(
@@ -428,5 +429,29 @@ class Table extends StylePluginBase {
     }
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    $contexts = [];
+
+    foreach ($this->options['info'] as $field_id => $info) {
+      if (!empty($info['sortable'])) {
+        // The rendered link needs to play well with any other query parameter
+        // used on the page, like pager and exposed filter.
+        $contexts[] = 'url.query_args';
+        break;
+      }
+    }
+
+    return $contexts;
+  }
 
 }

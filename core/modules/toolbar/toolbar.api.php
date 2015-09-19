@@ -99,7 +99,6 @@ function hook_toolbar() {
       '#title' => t('Shopping cart'),
       '#url' => Url::fromRoute('cart'),
       '#options' => array(
-        'html' => FALSE,
         'attributes' => array(
           'title' => t('Shopping cart'),
         ),
@@ -115,7 +114,7 @@ function hook_toolbar() {
     '#weight' => 150,
   );
 
-  // The tray can be used to render arbritrary content.
+  // The tray can be used to render arbitrary content.
   //
   // A renderable array passed to the 'tray' property will be rendered outside
   // the administration bar but within the containing toolbar element.

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Database\Schema
+ * Contains \Drupal\Core\Database\Schema.
  */
 
 namespace Drupal\Core\Database;
@@ -12,159 +12,15 @@ use Drupal\Core\Database\Query\Condition;
 use Drupal\Core\Database\Query\PlaceholderInterface;
 
 /**
- * @defgroup schemaapi Schema API
- * @{
- * API to handle database schemas.
- *
- * A Drupal schema definition is an array structure representing one or
- * more tables and their related keys and indexes. A schema is defined by
- * hook_schema(), which usually lives in a modulename.install file.
- *
- * By implementing hook_schema() and specifying the tables your module
- * declares, you can easily create and drop these tables on all
- * supported database engines. You don't have to deal with the
- * different SQL dialects for table creation and alteration of the
- * supported database engines.
- *
- * hook_schema() should return an array with a key for each table that
- * the module defines.
- *
- * The following keys are defined:
- *   - 'description': A string in non-markup plain text describing this table
- *     and its purpose. References to other tables should be enclosed in
- *     curly-brackets. For example, the node_field_revision table
- *     description field might contain "Stores per-revision title and
- *     body data for each {node}."
- *   - 'fields': An associative array ('fieldname' => specification)
- *     that describes the table's database columns. The specification
- *     is also an array. The following specification parameters are defined:
- *     - 'description': A string in non-markup plain text describing this field
- *       and its purpose. References to other tables should be enclosed in
- *       curly-brackets. For example, the node table vid field
- *       description might contain "Always holds the largest (most
- *       recent) {node_field_revision}.vid value for this nid."
- *     - 'type': The generic datatype: 'char', 'varchar', 'text', 'blob', 'int',
- *       'float', 'numeric', or 'serial'. Most types just map to the according
- *       database engine specific datatypes. Use 'serial' for auto incrementing
- *       fields. This will expand to 'INT auto_increment' on MySQL.
- *     - 'mysql_type', 'pgsql_type', 'sqlite_type', etc.: If you need to
- *       use a record type not included in the officially supported list
- *       of types above, you can specify a type for each database
- *       backend. In this case, you can leave out the type parameter,
- *       but be advised that your schema will fail to load on backends that
- *       do not have a type specified. A possible solution can be to
- *       use the "text" type as a fallback.
- *     - 'serialize': A boolean indicating whether the field will be stored as
- *       a serialized string.
- *     - 'size': The data size: 'tiny', 'small', 'medium', 'normal',
- *       'big'. This is a hint about the largest value the field will
- *       store and determines which of the database engine specific
- *       datatypes will be used (e.g. on MySQL, TINYINT vs. INT vs. BIGINT).
- *       'normal', the default, selects the base type (e.g. on MySQL,
- *       INT, VARCHAR, BLOB, etc.).
- *       Not all sizes are available for all data types. See
- *       DatabaseSchema::getFieldTypeMap() for possible combinations.
- *     - 'not null': If true, no NULL values will be allowed in this
- *       database column. Defaults to false.
- *     - 'default': The field's default value. The PHP type of the
- *       value matters: '', '0', and 0 are all different. If you
- *       specify '0' as the default value for a type 'int' field it
- *       will not work because '0' is a string containing the
- *       character "zero", not an integer.
- *     - 'length': The maximal length of a type 'char', 'varchar' or 'text'
- *       field. Ignored for other field types.
- *     - 'unsigned': A boolean indicating whether a type 'int', 'float'
- *       and 'numeric' only is signed or unsigned. Defaults to
- *       FALSE. Ignored for other field types.
- *     - 'precision', 'scale': For type 'numeric' fields, indicates
- *       the precision (total number of significant digits) and scale
- *       (decimal digits right of the decimal point). Both values are
- *       mandatory. Ignored for other field types.
- *     - 'binary': A boolean indicating that MySQL should force 'char',
- *       'varchar' or 'text' fields to use case-sensitive binary collation.
- *       This has no effect on other database types for which case sensitivity
- *       is already the default behavior.
- *     All parameters apart from 'type' are optional except that type
- *     'numeric' columns must specify 'precision' and 'scale', and type
- *     'varchar' must specify the 'length' parameter.
- *  - 'primary key': An array of one or more key column specifiers (see below)
- *    that form the primary key.
- *  - 'unique keys': An associative array of unique keys ('keyname' =>
- *    specification). Each specification is an array of one or more
- *    key column specifiers (see below) that form a unique key on the table.
- *  - 'foreign keys': An associative array of relations ('my_relation' =>
- *    specification). Each specification is an array containing the name of
- *    the referenced table ('table'), and an array of column mappings
- *    ('columns'). Column mappings are defined by key pairs ('source_column' =>
- *    'referenced_column').
- *  - 'indexes':  An associative array of indexes ('indexname' =>
- *    specification). Each specification is an array of one or more
- *    key column specifiers (see below) that form an index on the
- *    table.
- *
- * A key column specifier is either a string naming a column or an
- * array of two elements, column name and length, specifying a prefix
- * of the named column.
- *
- * As an example, here is a SUBSET of the schema definition for
- * Drupal's 'node' table. It show four fields (nid, vid, type, and
- * title), the primary key on field 'nid', a unique key named 'vid' on
- * field 'vid', and two indexes, one named 'nid' on field 'nid' and
- * one named 'node_title_type' on the field 'title' and the first four
- * bytes of the field 'type':
- *
- * @code
- * $schema['node'] = array(
- *   'description' => 'The base table for nodes.',
- *   'fields' => array(
- *     'nid'       => array('type' => 'serial', 'unsigned' => TRUE, 'not null' => TRUE),
- *     'vid'       => array('type' => 'int', 'unsigned' => TRUE, 'not null' => TRUE,'default' => 0),
- *     'type'      => array('type' => 'varchar','length' => 32,'not null' => TRUE, 'default' => ''),
- *     'language'  => array('type' => 'varchar','length' => 12,'not null' => TRUE,'default' => ''),
- *     'title'     => array('type' => 'varchar','length' => 255,'not null' => TRUE, 'default' => ''),
- *     'uid'       => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'status'    => array('type' => 'int', 'not null' => TRUE, 'default' => 1),
- *     'created'   => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'changed'   => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'comment'   => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'promote'   => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'moderate'  => array('type' => 'int', 'not null' => TRUE,'default' => 0),
- *     'sticky'    => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *     'translate' => array('type' => 'int', 'not null' => TRUE, 'default' => 0),
- *   ),
- *   'indexes' => array(
- *     'node_changed'        => array('changed'),
- *     'node_created'        => array('created'),
- *     'node_moderate'       => array('moderate'),
- *     'node_frontpage'      => array('promote', 'status', 'sticky', 'created'),
- *     'node_status_type'    => array('status', 'type', 'nid'),
- *     'node_title_type'     => array('title', array('type', 4)),
- *     'node_type'           => array(array('type', 4)),
- *     'uid'                 => array('uid'),
- *     'translate'           => array('translate'),
- *   ),
- *   'unique keys' => array(
- *     'vid' => array('vid'),
- *   ),
- *   'foreign keys' => array(
- *     'node_revision' => array(
- *       'table' => 'node_field_revision',
- *       'columns' => array('vid' => 'vid'),
- *      ),
- *     'node_author' => array(
- *       'table' => 'users',
- *       'columns' => array('uid' => 'uid'),
- *      ),
- *    ),
- *   'primary key' => array('nid'),
- * );
- * @endcode
- *
- * @see drupal_install_schema()
+ * Provides a base implementation for Database Schema.
  */
-
 abstract class Schema implements PlaceholderInterface {
 
+  /**
+   * The database connection.
+   *
+   * @var \Drupal\Core\Database\Connection
+   */
   protected $connection;
 
   /**
@@ -322,25 +178,62 @@ abstract class Schema implements PlaceholderInterface {
   }
 
   /**
-   * Find all tables that are like the specified base table name.
+   * Finds all tables that are like the specified base table name.
    *
-   * @param $table_expression
-   *   An SQL expression, for example "simpletest%" (without the quotes).
-   *   BEWARE: this is not prefixed, the caller should take care of that.
+   * @param string $table_expression
+   *   An SQL expression, for example "cache_%" (without the quotes).
    *
-   * @return
-   *   Array, both the keys and the values are the matching tables.
+   * @return array
+   *   Both the keys and the values are the matching tables.
    */
   public function findTables($table_expression) {
-    $condition = $this->buildTableNameCondition($table_expression, 'LIKE', FALSE);
-
+    // Load all the tables up front in order to take into account per-table
+    // prefixes. The actual matching is done at the bottom of the method.
+    $condition = $this->buildTableNameCondition('%', 'LIKE');
     $condition->compile($this->connection, $this);
+
+    $individually_prefixed_tables = $this->connection->getUnprefixedTablesMap();
+    $default_prefix = $this->connection->tablePrefix();
+    $default_prefix_length = strlen($default_prefix);
+    $tables = [];
     // Normally, we would heartily discourage the use of string
     // concatenation for conditionals like this however, we
     // couldn't use db_select() here because it would prefix
     // information_schema.tables and the query would fail.
     // Don't use {} around information_schema.tables table.
-    return $this->connection->query("SELECT table_name FROM information_schema.tables WHERE " . (string) $condition, $condition->arguments())->fetchAllKeyed(0, 0);
+    $results = $this->connection->query("SELECT table_name FROM information_schema.tables WHERE " . (string) $condition, $condition->arguments());
+    foreach ($results as $table) {
+      // Take into account tables that have an individual prefix.
+      if (isset($individually_prefixed_tables[$table->table_name])) {
+        $prefix_length = strlen($this->connection->tablePrefix($individually_prefixed_tables[$table->table_name]));
+      }
+      elseif ($default_prefix && substr($table->table_name, 0, $default_prefix_length) !== $default_prefix) {
+        // This table name does not start the default prefix, which means that
+        // it is not managed by Drupal so it should be excluded from the result.
+        continue;
+      }
+      else {
+        $prefix_length = $default_prefix_length;
+      }
+
+      // Remove the prefix from the returned tables.
+      $unprefixed_table_name = substr($table->table_name, $prefix_length);
+
+      // The pattern can match a table which is the same as the prefix. That
+      // will become an empty string when we remove the prefix, which will
+      // probably surprise the caller, besides not being a prefixed table. So
+      // remove it.
+      if (!empty($unprefixed_table_name)) {
+        $tables[$unprefixed_table_name] = $unprefixed_table_name;
+      }
+    }
+
+    // Convert the table expression from its SQL LIKE syntax to a regular
+    // expression and escape the delimiter that will be used for matching.
+    $table_expression = str_replace(array('%', '_'), array('.*?', '.'), preg_quote($table_expression, '/'));
+    $tables = preg_grep('/^' . $table_expression . '$/i', $tables);
+
+    return $tables;
   }
 
   /**
@@ -554,14 +447,59 @@ abstract class Schema implements PlaceholderInterface {
    * @param $name
    *   The name of the index.
    * @param $fields
-   *   An array of field names.
+   *   An array of field names or field information; if field information is
+   *   passed, it's an array whose first element is the field name and whose
+   *   second is the maximum length in the index. For example, the following
+   *   will use the full length of the `foo` field, but limit the `bar` field to
+   *   4 characters:
+   *   @code
+   *     $fields = ['foo', ['bar', 4]];
+   *   @endcode
+   * @param array $spec
+   *   The table specification for the table to be altered. This is used in
+   *   order to be able to ensure that the index length is not too long.
+   *   This schema definition can usually be obtained through hook_schema(), or
+   *   in case the table was created by the Entity API, through the schema
+   *   handler listed in the entity class definition. For reference, see
+   *   SqlContentEntityStorageSchema::getDedicatedTableSchema() and
+   *   SqlContentEntityStorageSchema::getSharedTableFieldSchema().
+   *
+   *   In order to prevent human error, it is recommended to pass in the
+   *   complete table specification. However, in the edge case of the complete
+   *   table specification not being available, we can pass in a partial table
+   *   definition containing only the fields that apply to the index:
+   *   @code
+   *   $spec = [
+   *     // Example partial specification for a table:
+   *     'fields' => [
+   *       'example_field' => [
+   *         'description' => 'An example field',
+   *         'type' => 'varchar',
+   *         'length' => 32,
+   *         'not null' => TRUE,
+   *         'default' => '',
+   *       ],
+   *     ],
+   *     'indexes' => [
+   *       'table_example_field' => ['example_field'],
+   *     ],
+   *   ];
+   *   @endcode
+   *   Note that the above is a partial table definition and that we would
+   *   usually pass a complete table definition as obtained through
+   *   hook_schema() instead.
+   *
+   * @see schemaapi
+   * @see hook_schema()
    *
    * @throws \Drupal\Core\Database\SchemaObjectDoesNotExistException
    *   If the specified table doesn't exist.
    * @throws \Drupal\Core\Database\SchemaObjectExistsException
    *   If the specified table already has an index by that name.
+   *
+   * @todo remove the $spec argument whenever schema introspection is added.
    */
-  abstract public function addIndex($table, $name, $fields);
+  abstract public function addIndex($table, $name, $fields, array $spec);
 
   /**
    * Drop an index.

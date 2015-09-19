@@ -9,6 +9,7 @@ namespace Drupal\user;
 
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\ContentEntityForm;
+use Drupal\Core\Entity\EntityConstraintViolationListInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Form\FormStateInterface;
@@ -46,7 +47,7 @@ abstract class AccountForm extends ContentEntityForm {
    *   The entity manager.
    * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
    *   The language manager.
-   * @param \Drupal\Core\Entity\Query\QueryFactory
+   * @param \Drupal\Core\Entity\Query\QueryFactory $entity_query
    *   The entity query factory.
    */
   public function __construct(EntityManagerInterface $entity_manager, LanguageManagerInterface $language_manager, QueryFactory $entity_query) {
@@ -154,11 +155,6 @@ abstract class AccountForm extends ContentEntityForm {
 
       // The user must enter their current password to change to a new one.
       if ($user->id() == $account->id()) {
-        $form['account']['current_pass_required_values'] = array(
-          '#type' => 'value',
-          '#value' => $protected_values,
-        );
-
         $form['account']['current_pass'] = array(
           '#type' => 'password',
           '#title' => $this->t('Current password'),
@@ -173,7 +169,6 @@ abstract class AccountForm extends ContentEntityForm {
         );
 
         $form_state->set('user', $account);
-        $form['#validate'][] = 'user_validate_current_pass';
       }
     }
     elseif (!$config->get('verify_mail') || $admin) {
@@ -210,7 +205,7 @@ abstract class AccountForm extends ContentEntityForm {
       '#access' => $admin,
     );
 
-    $roles = array_map(array('\Drupal\Component\Utility\String', 'checkPlain'), user_role_names(TRUE));
+    $roles = array_map(array('\Drupal\Component\Utility\SafeMarkup', 'checkPlain'), user_role_names(TRUE));
 
     $form['account']['roles'] = array(
       '#type' => 'checkboxes',
@@ -221,7 +216,7 @@ abstract class AccountForm extends ContentEntityForm {
     );
 
     // Special handling for the inevitable "Authenticated user" role.
-    $form['account']['roles'][DRUPAL_AUTHENTICATED_RID] = array(
+    $form['account']['roles'][RoleInterface::AUTHENTICATED_ID] = array(
       '#default_value' => TRUE,
       '#disabled' => TRUE,
     );
@@ -231,29 +226,6 @@ abstract class AccountForm extends ContentEntityForm {
       '#title' => $this->t('Notify user of new account'),
       '#access' => $register && $admin,
     );
-
-    // Signature.
-    $form['signature_settings'] = array(
-      '#type' => 'details',
-      '#title' => $this->t('Signature settings'),
-      '#open' => TRUE,
-      '#weight' => 1,
-      '#access' => (!$register && $config->get('signatures')),
-    );
-    // While the details group will simply not be rendered if empty, the actual
-    // signature element cannot use #access, since #type 'text_format' is not
-    // available when Filter module is not installed. If the user account has an
-    // existing signature value and format, then the existing field values will
-    // just be re-saved to the database in case of an entity update.
-    if ($this->moduleHandler->moduleExists('filter')) {
-      $form['signature_settings']['signature'] = array(
-        '#type' => 'text_format',
-        '#title' => $this->t('Signature'),
-        '#default_value' => $account->getSignature(),
-        '#description' => $this->t('Your signature will be publicly displayed at the end of your comments.'),
-        '#format' => $account->getSignatureFormat(),
-      );
-    }
 
     $user_preferred_langcode = $register ? $language_interface->getId() : $account->getPreferredLangcode();
 
@@ -345,7 +317,7 @@ abstract class AccountForm extends ContentEntityForm {
    *   The current state of the form.
    */
   public function syncUserLangcode($entity_type_id, UserInterface $user, array &$form, FormStateInterface &$form_state) {
-    $user->langcode = $user->preferred_langcode;
+    $user->getUntranslated()->langcode = $user->preferred_langcode;
   }
 
   /**
@@ -365,49 +337,61 @@ abstract class AccountForm extends ContentEntityForm {
     /** @var \Drupal\user\UserInterface $account */
     $account = parent::buildEntity($form, $form_state);
 
-    // Take care of mapping signature form element values as their structure
-    // does not directly match the field structure.
-    $signature = $form_state->getValue('signature');
-    $account->setSignature($signature['value']);
-    $account->setSignatureFormat($signature['format']);
-
     // Translate the empty value '' of language selects to an unset field.
     foreach (array('preferred_langcode', 'preferred_admin_langcode') as $field_name) {
       if ($form_state->getValue($field_name) === '') {
         $account->$field_name = NULL;
       }
     }
+
+    // Set existing password if set in the form state.
+    if ($current_pass = $form_state->getValue('current_pass')) {
+      $account->setExistingPassword($current_pass);
+    }
+
+    // Skip the protected user field constraint if the user came from the
+    // password recovery page.
+    $account->_skipProtectedUserFieldConstraint = $form_state->get('user_pass_reset');
+
     return $account;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, FormStateInterface $form_state) {
-    /** @var \Drupal\user\UserInterface $account */
-    $account = parent::validate($form, $form_state);
+  protected function getEditedFieldNames(FormStateInterface $form_state) {
+    return array_merge(array(
+      'name',
+      'pass',
+      'mail',
+      'timezone',
+      'langcode',
+      'preferred_langcode',
+      'preferred_admin_langcode'
+    ), parent::getEditedFieldNames($form_state));
+  }
 
-    // Customly trigger validation of manually added fields and add in
-    // violations. This is necessary as entity form displays only invoke entity
-    // validation for fields contained in the display.
+  /**
+   * {@inheritdoc}
+   */
+  protected function flagViolations(EntityConstraintViolationListInterface $violations, array $form, FormStateInterface $form_state) {
+    // Manually flag violations of fields not handled by the form display. This
+    // is necessary as entity form displays only flag violations for fields
+    // contained in the display.
     $field_names = array(
       'name',
+      'pass',
       'mail',
-      'signature',
-      'signature_format',
       'timezone',
       'langcode',
       'preferred_langcode',
       'preferred_admin_langcode'
     );
-    foreach ($field_names as $field_name) {
-      $violations = $account->$field_name->validate();
-      foreach ($violations as $violation) {
-        $form_state->setErrorByName($field_name, $violation->getMessage());
-      }
+    foreach ($violations->getByFields($field_names) as $violation) {
+      list($field_name) = explode('.', $violation->getPropertyPath(), 2);
+      $form_state->setErrorByName($field_name, $violation->getMessage());
     }
-
-    return $account;
+    parent::flagViolations($violations, $form, $form_state);
   }
 
   /**

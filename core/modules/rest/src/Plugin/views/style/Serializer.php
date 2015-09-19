@@ -8,6 +8,7 @@
 namespace Drupal\rest\Plugin\views\style;
 
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\style\StylePluginBase;
@@ -26,7 +27,7 @@ use Symfony\Component\Serializer\SerializerInterface;
  *   display_types = {"data"}
  * )
  */
-class Serializer extends StylePluginBase {
+class Serializer extends StylePluginBase implements CacheablePluginInterface {
 
   /**
    * Overrides \Drupal\views\Plugin\views\style\StylePluginBase::$usesRowPlugin.
@@ -121,15 +122,20 @@ class Serializer extends StylePluginBase {
     // which will transform it to arrays/scalars. If the Data field row plugin
     // is used, $rows will not contain objects and will pass directly to the
     // Encoder.
-    foreach ($this->view->result as $row) {
+    foreach ($this->view->result as $row_index => $row) {
+      $this->view->row_index = $row_index;
       $rows[] = $this->view->rowPlugin->render($row);
     }
+    unset($this->view->row_index);
 
-    $content_type = $this->displayHandler->getContentType();
-    if (!empty($this->view->live_preview)) {
-      $content_type = $this->options['formats'] ? reset($this->options['formats']) : 'json';
+    // Get the content type configured in the display or fallback to the
+    // default.
+    if ((empty($this->view->live_preview))) {
+      $content_type = $this->displayHandler->getContentType();
     }
-
+    else {
+      $content_type = !empty($this->options['formats']) ? reset($this->options['formats']) : 'json';
+    }
     return $this->serializer->serialize($rows, $content_type);
   }
 
@@ -143,11 +149,21 @@ class Serializer extends StylePluginBase {
    *   An array of formats.
    */
   public function getFormats() {
-    if (!empty($this->options['formats'])) {
-      return $this->options['formats'];
-    }
+    return $this->options['formats'];
+  }
 
-    return $this->formats;
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return ['request_format'];
   }
 
 }

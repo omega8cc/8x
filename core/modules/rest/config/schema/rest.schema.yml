@@ -1,15 +1,18 @@
 # Schema for the configuration files of the REST module.
 
 rest.settings:
-  type: mapping
+  type: config_object
   label: 'REST settings'
   mapping:
     resources:
       type: sequence
       label: 'Resources'
       sequence:
-        - type: rest_resource
-          label: 'Resource'
+        type: rest_resource
+        label: 'Resource'
+    link_domain:
+      type: string
+      label: 'Domain of the relation'
 
 rest_resource:
   type: mapping
@@ -34,11 +37,11 @@ rest_request:
       type: sequence
       label: 'Supported format'
       sequence:
-        - type: string
-          label: 'Format'
+        type: string
+        label: 'Format'
     supported_auth:
       type: sequence
       label: 'Supported authentication'
       sequence:
-        - type: string
-          label: 'Authentication'
+        type: string
+        label: 'Authentication'

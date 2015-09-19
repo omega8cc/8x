@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\File\ScanDirectoryTest.
+ * Contains \Drupal\system\Tests\File\ScanDirectoryTest.
  */
 
 namespace Drupal\system\Tests\File;
@@ -28,14 +28,18 @@ class ScanDirectoryTest extends FileTestBase {
 
   protected function setUp() {
     parent::setUp();
-    $this->path = drupal_get_path('module', 'simpletest') . '/files';
+    // Hardcode the location of the simpletest files as it is already known
+    // and shouldn't change, and we don't yet have a way to retrieve their
+    // location from drupal_get_filename() in a cached way.
+    // @todo Remove as part of https://www.drupal.org/node/2186491
+    $this->path = 'core/modules/simpletest/files';
   }
 
   /**
    * Check the format of the returned values.
    */
   function testReturn() {
-    // Grab a listing of all the JavaSscript files and check that they're
+    // Grab a listing of all the JavaScript files and check that they're
     // passed to the callback.
     $all_files = file_scan_directory($this->path, '/^javascript-/');
     ksort($all_files);
@@ -68,7 +72,7 @@ class ScanDirectoryTest extends FileTestBase {
     file_test_file_scan_callback_reset();
     $this->assertEqual(0, count($results), 'No files were passed to the callback.');
 
-    // Grab a listing of all the JavaSscript files and check that they're
+    // Grab a listing of all the JavaScript files and check that they're
     // passed to the callback.
     $all_files = file_scan_directory($this->path, '/^javascript-/', array('callback' => 'file_test_file_scan_callback'));
     $this->assertEqual(2, count($all_files), 'Found two, expected javascript files.');
@@ -81,11 +85,11 @@ class ScanDirectoryTest extends FileTestBase {
    * Check that the no-mask parameter is honored.
    */
   function testOptionNoMask() {
-    // Grab a listing of all the JavaSscript files.
+    // Grab a listing of all the JavaScript files.
     $all_files = file_scan_directory($this->path, '/^javascript-/');
     $this->assertEqual(2, count($all_files), 'Found two, expected javascript files.');
 
-    // Now use the nomast parameter to filter out the .script file.
+    // Now use the nomask parameter to filter out the .script file.
     $filtered_files = file_scan_directory($this->path, '/^javascript-/', array('nomask' => '/.script$/'));
     $this->assertEqual(1, count($filtered_files), 'Filtered correctly.');
   }
@@ -120,13 +124,13 @@ class ScanDirectoryTest extends FileTestBase {
   }
 
   /**
-   * Check that the recurse option decends into subdirectories.
+   * Check that the recurse option descends into subdirectories.
    */
   function testOptionRecurse() {
-    $files = file_scan_directory(drupal_get_path('module', 'simpletest'), '/^javascript-/', array('recurse' => FALSE));
+    $files = file_scan_directory($this->path . '/..', '/^javascript-/', array('recurse' => FALSE));
     $this->assertTrue(empty($files), "Without recursion couldn't find javascript files.");
 
-    $files = file_scan_directory(drupal_get_path('module', 'simpletest'), '/^javascript-/', array('recurse' => TRUE));
+    $files = file_scan_directory($this->path . '/..', '/^javascript-/', array('recurse' => TRUE));
     $this->assertEqual(2, count($files), 'With recursion we found the expected javascript files.');
   }
 

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\filter\Tests\FilterFormatAccessTest.
+ * Contains \Drupal\filter\Tests\FilterFormatAccessTest.
  */
 
 namespace Drupal\filter\Tests;
@@ -24,7 +24,7 @@ class FilterFormatAccessTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('filter', 'node');
+  public static $modules = ['block', 'filter', 'node'];
 
   /**
    * A user with administrative permissions.
@@ -114,6 +114,7 @@ class FilterFormatAccessTest extends WebTestBase {
       $this->secondAllowedFormat->getPermissionName(),
       $this->disallowedFormat->getPermissionName(),
     ));
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -124,9 +125,9 @@ class FilterFormatAccessTest extends WebTestBase {
     // which they were granted access.
     $fallback_format = entity_load('filter_format', filter_fallback_format());
     $this->assertTrue($this->allowedFormat->access('use', $this->webUser), 'A regular user has access to use a text format they were granted access to.');
-    $this->assertEqual(AccessResult::allowed()->cachePerRole(), $this->allowedFormat->access('use', $this->webUser, TRUE), 'A regular user has access to use a text format they were granted access to.');
+    $this->assertEqual(AccessResult::allowed()->addCacheContexts(['user.permissions']), $this->allowedFormat->access('use', $this->webUser, TRUE), 'A regular user has access to use a text format they were granted access to.');
     $this->assertFalse($this->disallowedFormat->access('use', $this->webUser), 'A regular user does not have access to use a text format they were not granted access to.');
-    $this->assertEqual(AccessResult::neutral(), $this->disallowedFormat->access('use', $this->webUser, TRUE)); //, 'A regular user does not have access to use a text format they were not granted access to.');
+    $this->assertEqual(AccessResult::neutral()->cachePerPermissions(), $this->disallowedFormat->access('use', $this->webUser, TRUE), 'A regular user does not have access to use a text format they were not granted access to.');
     $this->assertTrue($fallback_format->access('use', $this->webUser), 'A regular user has access to use the fallback format.');
     $this->assertEqual(AccessResult::allowed(), $fallback_format->access('use', $this->webUser, TRUE), 'A regular user has access to use the fallback format.');
 

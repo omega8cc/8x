@@ -143,19 +143,25 @@ class HtmlTest extends UnitTestCase {
    *   The expected result.
    * @param string $source
    *   The string being transformed to an ID.
-   * @param bool $reset
-   *   (optional) If TRUE, reset the list of seen IDs. Defaults to FALSE.
    *
    * @dataProvider providerTestHtmlGetUniqueIdWithAjaxIds
    *
    * @covers ::getUniqueId
    */
-  public function testHtmlGetUniqueIdWithAjaxIds($expected, $source, $reset = FALSE) {
-    if ($reset) {
-      Html::resetSeenIds();
+  public function testHtmlGetUniqueIdWithAjaxIds($expected, $source) {
+    Html::setIsAjax(TRUE);
+    $id = Html::getUniqueId($source);
+
+    // Note, we truncate two hyphens at the end.
+    // @see \Drupal\Component\Utility\Html::getId()
+    if (strpos($source, '--') !== FALSE) {
+      $random_suffix = substr($id, strlen($source) + 1);
     }
-    Html::setAjaxHtmlIds('test-unique-id1 test-unique-id2--3');
-    $this->assertSame($expected, Html::getUniqueId($source));
+    else {
+      $random_suffix = substr($id, strlen($source) + 2);
+    }
+    $expected = $expected . $random_suffix;
+    $this->assertSame($expected, $id);
   }
 
   /**
@@ -166,10 +172,11 @@ class HtmlTest extends UnitTestCase {
    */
   public function providerTestHtmlGetUniqueIdWithAjaxIds() {
     return array(
-      array('test-unique-id1--2', 'test-unique-id1', TRUE),
-      array('test-unique-id1--3', 'test-unique-id1'),
-      array('test-unique-id2--4', 'test-unique-id2', TRUE),
-      array('test-unique-id2--5', 'test-unique-id2'),
+      array('test-unique-id1--', 'test-unique-id1'),
+      // Note, we truncate two hyphens at the end.
+      // @see \Drupal\Component\Utility\Html::getId()
+      array('test-unique-id1---', 'test-unique-id1--'),
+      array('test-unique-id2--', 'test-unique-id2'),
     );
   }
 
@@ -186,6 +193,7 @@ class HtmlTest extends UnitTestCase {
    * @covers ::getId
    */
   public function testHtmlGetId($expected, $source) {
+    Html::setIsAjax(FALSE);
     $this->assertSame($expected, Html::getId($source));
   }
 
@@ -208,6 +216,98 @@ class HtmlTest extends UnitTestCase {
       array('test-unique-id', 'test-unique-id'),
       array('test-unique-id', 'test-unique-id'),
     );
+  }
+
+  /**
+   * Tests Html::decodeEntities().
+   *
+   * @dataProvider providerDecodeEntities
+   * @covers ::decodeEntities
+   */
+  public function testDecodeEntities($text, $expected) {
+    $this->assertEquals($expected, Html::decodeEntities($text));
+  }
+
+  /**
+   * Data provider for testDecodeEntities().
+   *
+   * @see testCheckPlain()
+   */
+  public function providerDecodeEntities() {
+    return array(
+      array('Drupal', 'Drupal'),
+      array('<script>', '<script>'),
+      array('&lt;script&gt;', '<script>'),
+      array('&#60;script&#62;', '<script>'),
+      array('&amp;lt;script&amp;gt;', '&lt;script&gt;'),
+      array('"', '"'),
+      array('&#34;', '"'),
+      array('&amp;#34;', '&#34;'),
+      array('&quot;', '"'),
+      array('&amp;quot;', '&quot;'),
+      array("'", "'"),
+      array('&#39;', "'"),
+      array('&amp;#39;', '&#39;'),
+      array('©', '©'),
+      array('&copy;', '©'),
+      array('&#169;', '©'),
+      array('→', '→'),
+      array('&#8594;', '→'),
+      array('➼', '➼'),
+      array('&#10172;', '➼'),
+      array('&euro;', '€'),
+    );
+  }
+
+  /**
+   * Tests Html::escape().
+   *
+   * @dataProvider providerEscape
+   * @covers ::escape
+   */
+  public function testEscape($expected, $text) {
+    $this->assertEquals($expected, Html::escape($text));
+  }
+
+  /**
+   * Data provider for testEscape().
+   *
+   * @see testCheckPlain()
+   */
+  public function providerEscape() {
+    return array(
+      array('Drupal', 'Drupal'),
+      array('&lt;script&gt;', '<script>'),
+      array('&amp;lt;script&amp;gt;', '&lt;script&gt;'),
+      array('&amp;#34;', '&#34;'),
+      array('&quot;', '"'),
+      array('&amp;quot;', '&quot;'),
+      array('&#039;', "'"),
+      array('&amp;#039;', '&#039;'),
+      array('©', '©'),
+      array('→', '→'),
+      array('➼', '➼'),
+      array('€', '€'),
+      array('Drup�al', "Drup\x80al"),
+    );
+  }
+
+  /**
+   * Tests relationship between escaping and decoding HTML entities.
+   *
+   * @covers ::decodeEntities
+   * @covers ::escape
+   */
+  public function testDecodeEntitiesAndEscape() {
+    $string = "<em>répét&eacute;</em>";
+    $escaped = Html::escape($string);
+    $this->assertSame('&lt;em&gt;répét&amp;eacute;&lt;/em&gt;', $escaped);
+    $decoded = Html::decodeEntities($escaped);
+    $this->assertSame('<em>répét&eacute;</em>', $decoded);
+    $decoded = Html::decodeEntities($decoded);
+    $this->assertSame('<em>répété</em>', $decoded);
+    $escaped = Html::escape($decoded);
+    $this->assertSame('&lt;em&gt;répété&lt;/em&gt;', $escaped);
   }
 
 }

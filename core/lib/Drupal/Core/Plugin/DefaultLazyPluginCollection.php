@@ -110,7 +110,6 @@ class DefaultLazyPluginCollection extends LazyPluginCollection {
    */
   public function getConfiguration() {
     $instances = array();
-    $this->rewind();
     // Store the current order of the instances.
     $current_order = $this->instanceIDs;
     // Reorder the instances to match the original order, adding new instances
@@ -134,8 +133,18 @@ class DefaultLazyPluginCollection extends LazyPluginCollection {
    * {@inheritdoc}
    */
   public function setConfiguration($configuration) {
+    // Track each instance ID as it is updated.
+    $unprocessed_instance_ids = $this->getInstanceIds();
+
     foreach ($configuration as $instance_id => $instance_configuration) {
       $this->setInstanceConfiguration($instance_id, $instance_configuration);
+      // Remove this instance ID from the list being updated.
+      unset($unprocessed_instance_ids[$instance_id]);
+    }
+
+    // Remove remaining instances that had no configuration specified for them.
+    foreach ($unprocessed_instance_ids as $unprocessed_instance_id) {
+      $this->removeInstanceId($unprocessed_instance_id);
     }
     return $this;
   }

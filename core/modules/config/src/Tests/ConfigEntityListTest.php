@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\config\Tests\ConfigEntityListTest.
+ * Contains \Drupal\config\Tests\ConfigEntityListTest.
  */
 
 namespace Drupal\config\Tests;
@@ -23,7 +23,18 @@ class ConfigEntityListTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('config_test');
+  public static $modules = ['block', 'config_test'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+    // Delete the override config_test entity since it is not required by this
+    // test.
+    \Drupal::entityManager()->getStorage('config_test')->load('override')->delete();
+    $this->drupalPlaceBlock('local_actions_block');
+  }
 
   /**
    * Tests entity list builder methods.
@@ -143,7 +154,7 @@ class ConfigEntityListTest extends WebTestBase {
    */
   function testListUI() {
     // Log in as an administrative user to access the full menu trail.
-    $this->drupalLogin($this->drupalCreateUser(array('access administration pages')));
+    $this->drupalLogin($this->drupalCreateUser(array('access administration pages', 'administer site configuration')));
 
     // Get the list callback page.
     $this->drupalGet('admin/structure/config_test');
@@ -241,6 +252,8 @@ class ConfigEntityListTest extends WebTestBase {
    * Test paging.
    */
   public function testPager() {
+    $this->drupalLogin($this->drupalCreateUser(['administer site configuration']));
+
     $storage = \Drupal::entityManager()->getListBuilder('config_test')->getStorage();
 
     // Create 51 test entities.

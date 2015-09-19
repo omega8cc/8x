@@ -15,7 +15,7 @@ form_test.route2:
 form_test.route3:
   path: '/form-test/object-service-builder'
   defaults:
-    _form: 'form_test.form.serviceForm'
+    _form: 'form_test.form.serviceform'
   requirements:
     _access: 'TRUE'
 
@@ -169,6 +169,14 @@ form_test.storage:
   defaults:
     _form: '\Drupal\form_test\Form\FormTestStorageForm'
     _title: 'Form storage test'
+  requirements:
+    _access: 'TRUE'
+
+form_test.vertical_tabs_access:
+  path: '/form_test/vertical-tabs-access'
+  defaults:
+    _form: '\Drupal\form_test\Form\FormTestVerticalTabsAccessForm'
+    _title: 'Vertical tabs tests'
   requirements:
     _access: 'TRUE'
 
@@ -423,14 +431,6 @@ form_test.group_vertical_tabs:
   defaults:
     _form: '\Drupal\form_test\Form\FormTestGroupVerticalTabsForm'
     _title: 'Group vertical tabs testing'
-  requirements:
-    _access: 'TRUE'
-
-form_test.form_state_database:
-  path: '/form-test/form_state-database'
-  defaults:
-    _form: '\Drupal\form_test\Form\FormTestFormStateDatabaseForm'
-    _title: 'Form state with a database connection'
   requirements:
     _access: 'TRUE'
 

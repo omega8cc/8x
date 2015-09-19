@@ -15,6 +15,8 @@ use Drupal\Tests\UnitTestCase;
 /**
  * @coversDefaultClass \Drupal\Core\Form\FormCache
  * @group Form
+ * @runTestsInSeparateProcesses
+ * @preserveGlobalState disabled
  */
 class FormCacheTest extends UnitTestCase {
 
@@ -75,13 +77,6 @@ class FormCacheTest extends UnitTestCase {
   protected $logger;
 
   /**
-   * The config factory.
-   *
-   * @var \Drupal\Core\Config\ConfigFactoryInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $configFactory;
-
-  /**
    * The request stack.
    *
    * @var \Symfony\Component\HttpFoundation\RequestStack|\PHPUnit_Framework_MockObject_MockObject
@@ -101,8 +96,6 @@ class FormCacheTest extends UnitTestCase {
   protected function setUp() {
     parent::setUp();
 
-    $this->resetSafeMarkup();
-
     $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
 
     $this->formCacheStore = $this->getMock('Drupal\Core\KeyValueStore\KeyValueStoreExpirableInterface');
@@ -121,19 +114,10 @@ class FormCacheTest extends UnitTestCase {
     $this->account = $this->getMock('Drupal\Core\Session\AccountInterface');
 
     $this->logger = $this->getMock('Psr\Log\LoggerInterface');
-    $this->configFactory = $this->getConfigFactoryStub(['system.performance' => ['cache.page.use_internal' => FALSE]]);
     $this->requestStack = $this->getMock('\Symfony\Component\HttpFoundation\RequestStack');
     $this->requestPolicy = $this->getMock('\Drupal\Core\PageCache\RequestPolicyInterface');
 
-    $this->formCache = new FormCache($this->root, $this->keyValueExpirableFactory, $this->moduleHandler, $this->account, $this->csrfToken, $this->logger, $this->configFactory, $this->requestStack, $this->requestPolicy);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function tearDown() {
-    parent::tearDown();
-    $this->resetSafeMarkup();
+    $this->formCache = new FormCache($this->root, $this->keyValueExpirableFactory, $this->moduleHandler, $this->account, $this->csrfToken, $this->logger, $this->requestStack, $this->requestPolicy);
   }
 
   /**
@@ -443,7 +427,9 @@ class FormCacheTest extends UnitTestCase {
    * @covers ::setCache
    */
   public function testSetCacheWithSafeStrings() {
-    SafeMarkup::set('a_safe_string');
+    // A call to SafeMarkup::format() is appropriate in this test as a way to
+    // add a string to the safe list in the simplest way possible.
+    SafeMarkup::format('@value', ['@value' => 'a_safe_string']);
     $form_build_id = 'the_form_build_id';
     $form = [
       '#form_id' => 'the_form_id'
@@ -486,50 +472,20 @@ class FormCacheTest extends UnitTestCase {
     $this->formCache->setCache($form_build_id, $form, $form_state);
   }
 
+
   /**
-   * @covers ::setCache
+   * @covers ::deleteCache
    */
-  public function testSetCacheImmutableForm() {
+  public function testDeleteCache() {
     $form_build_id = 'the_form_build_id';
-    $form = [
-      '#form_id' => 'the_form_id',
-    ];
-    $form_state = new FormState();
 
     $this->formCacheStore->expects($this->once())
-      ->method('setWithExpire')
-      ->with($form_build_id, $form, $this->isType('int'));
-    $form_state_data = $form_state->getCacheableArray();
-    $form_state_data['build_info']['safe_strings'] = [];
-    // Ensure that the form is marked immutable.
-    $form_state_data['build_info']['immutable'] = TRUE;
+      ->method('delete')
+      ->with($form_build_id);
     $this->formStateCacheStore->expects($this->once())
-      ->method('setWithExpire')
-      ->with($form_build_id, $form_state_data, $this->isType('int'));
-
-    // Rebuild the FormCache with a config factory that will return a config
-    // object with the internal page cache enabled.
-    $this->configFactory = $this->getConfigFactoryStub(['system.performance' => ['cache.page.use_internal' => TRUE]]);
-    $root = dirname(dirname(substr(__DIR__, 0, -strlen(__NAMESPACE__))));
-    $this->formCache = $this->getMockBuilder('Drupal\Core\Form\FormCache')
-      ->setConstructorArgs([$root, $this->keyValueExpirableFactory, $this->moduleHandler, $this->account, $this->csrfToken, $this->logger, $this->configFactory, $this->requestStack, $this->requestPolicy])
-      ->setMethods(['isPageCacheable'])
-      ->getMock();
-
-    $this->formCache->expects($this->once())
-      ->method('isPageCacheable')
-      ->willReturn(TRUE);
-
-    $this->formCache->setCache($form_build_id, $form, $form_state);
-  }
-
-  /**
-   * Ensures SafeMarkup does not bleed from one test to another.
-   */
-  protected function resetSafeMarkup() {
-    $property = (new \ReflectionClass('Drupal\Component\Utility\SafeMarkup'))->getProperty('safeStrings');
-    $property->setAccessible(TRUE);
-    $property->setValue(array());
+      ->method('delete')
+      ->with($form_build_id);
+    $this->formCache->deleteCache($form_build_id);
   }
 
 }

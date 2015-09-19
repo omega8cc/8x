@@ -8,7 +8,6 @@
 namespace Drupal\comment;
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Entity\EntityInterface;
@@ -22,6 +21,7 @@ use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\user\RoleInterface;
 
 /**
  * Comment manager contains common functions to manage comment fields.
@@ -45,7 +45,7 @@ class CommentManager implements CommentManagerInterface {
   protected $queryFactory;
 
   /**
-   * Whether the DRUPAL_AUTHENTICATED_RID can post comments.
+   * Whether the \Drupal\user\RoleInterface::AUTHENTICATED_ID can post comments.
    *
    * @var bool
    */
@@ -154,12 +154,12 @@ class CommentManager implements CommentManagerInterface {
       // permission to post comments by logging in.
       $this->authenticatedCanPostComments = $this->entityManager
         ->getStorage('user_role')
-        ->load(DRUPAL_AUTHENTICATED_RID)
+        ->load(RoleInterface::AUTHENTICATED_ID)
         ->hasPermission('post comments');
     }
 
     if ($this->authenticatedCanPostComments) {
-      // We cannot use drupal_get_destination() because these links
+      // We cannot use the redirect.destination service here because these links
       // sometimes appear on /node and taxonomy listing pages.
       if ($entity->get($field_name)->getFieldDefinition()->getSetting('form_location') == CommentItemInterface::FORM_SEPARATE_PAGE) {
         $comment_reply_parameters = [
@@ -195,7 +195,7 @@ class CommentManager implements CommentManagerInterface {
    */
   public function getCountNewComments(EntityInterface $entity, $field_name = NULL, $timestamp = 0) {
     // @todo Replace module handler with optional history service injection
-    //   after http://drupal.org/node/2081585
+    //   after https://www.drupal.org/node/2081585.
     if ($this->currentUser->isAuthenticated() && $this->moduleHandler->moduleExists('history')) {
       // Retrieve the timestamp at which the current user last viewed this entity.
       if (!$timestamp) {
@@ -209,7 +209,7 @@ class CommentManager implements CommentManagerInterface {
           }
           else {
             // Default to 30 days ago.
-            // @todo Remove once http://drupal.org/node/1029708 lands.
+            // @todo Remove once https://www.drupal.org/node/1029708 lands.
             $timestamp = COMMENT_NEW_LIMIT;
           }
         }

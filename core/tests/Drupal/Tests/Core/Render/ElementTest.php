@@ -7,6 +7,7 @@
 
 namespace Drupal\Tests\Core\Render;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Tests\UnitTestCase;
 use Drupal\Core\Render\Element;
 
@@ -89,6 +90,18 @@ class ElementTest extends UnitTestCase {
 
     $expected = array('child2', 'child1', 'child3');
     $this->assertSame($expected, Element::children($element_no_weight, TRUE));
+
+    // The order of children with same weight should be preserved.
+    $element_mixed_weight = array(
+      'child5' => array('#weight' => 10),
+      'child3' => array('#weight' => -10),
+      'child1' => array(),
+      'child4' => array('#weight' => 10),
+      'child2' => array(),
+    );
+
+    $expected = array('child3', 'child1', 'child2', 'child5', 'child4');
+    $this->assertSame($expected, Element::children($element_mixed_weight, TRUE));
   }
 
   /**
@@ -139,6 +152,8 @@ class ElementTest extends UnitTestCase {
       array(array('#property1' => '', 'child1' => array()), array('child1')),
       array(array('#property1' => '', 'child1' => array(), 'child2' => array('#access' => TRUE)), array('child1', 'child2')),
       array(array('#property1' => '', 'child1' => array(), 'child2' => array('#access' => FALSE)), array('child1')),
+      'access_result_object_allowed' => array(array('#property1' => '', 'child1' => array(), 'child2' => array('#access' => AccessResult::allowed())), array('child1', 'child2')),
+      'access_result_object_forbidden' => array(array('#property1' => '', 'child1' => array(), 'child2' => array('#access' => AccessResult::forbidden())), array('child1')),
       array(array('#property1' => '', 'child1' => array(), 'child2' => array('#type' => 'textfield')), array('child1', 'child2')),
       array(array('#property1' => '', 'child1' => array(), 'child2' => array('#type' => 'value')), array('child1')),
       array(array('#property1' => '', 'child1' => array(), 'child2' => array('#type' => 'hidden')), array('child1')),
@@ -165,6 +180,30 @@ class ElementTest extends UnitTestCase {
       array($base, array('id', 'class'), $base + array('#attributes' => array('id' => 'id', 'class' => array()))),
       array($base + array('#attributes' => array('id' => 'id-not-overwritten')), array('id', 'class'), $base + array('#attributes' => array('id' => 'id-not-overwritten', 'class' => array()))),
     );
+  }
+
+  /**
+   * @covers ::isEmpty
+   *
+   * @dataProvider providerTestIsEmpty
+   */
+  public function testIsEmpty(array $element, $expected) {
+    $this->assertSame(Element::isEmpty($element), $expected);
+  }
+
+  public function providerTestIsEmpty() {
+    return [
+      [[], TRUE],
+      [['#cache' => []], TRUE],
+      [['#cache' => ['tags' => ['foo']]], TRUE],
+      [['#cache' => ['contexts' => ['bar']]], TRUE],
+
+      [['#cache' => [], '#markup' => 'llamas are awesome'], FALSE],
+      [['#markup' => 'llamas are the most awesome ever'], FALSE],
+
+      [['#cache' => [], '#any_other_property' => TRUE], FALSE],
+      [['#any_other_property' => TRUE], FALSE],
+    ];
   }
 
 }

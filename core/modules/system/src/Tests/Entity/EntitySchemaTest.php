@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Tests\Entity;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 
 /**
  * Tests adding a custom bundle field.
@@ -22,13 +22,6 @@ class EntitySchemaTest extends EntityUnitTestBase  {
    * @var \Drupal\Core\Database\Connection
    */
   protected $database;
-
-  /**
-   * Modules to enable.
-   *
-   * @var array
-   */
-  public static $modules = array('menu_link');
 
   /**
    * {@inheritdoc}
@@ -99,27 +92,27 @@ class EntitySchemaTest extends EntityUnitTestBase  {
     // Initially only the base table and the dedicated field data table should
     // exist.
     foreach ($tables as $index => $table) {
-      $this->assertEqual($schema_handler->tableExists($table), !$index, String::format('Entity schema correct for the @table table.', array('@table' => $table)));
+      $this->assertEqual($schema_handler->tableExists($table), !$index, SafeMarkup::format('Entity schema correct for the @table table.', array('@table' => $table)));
     }
-    $this->assertTrue($schema_handler->tableExists($dedicated_tables[0]), String::format('Field schema correct for the @table table.', array('@table' => $table)));
+    $this->assertTrue($schema_handler->tableExists($dedicated_tables[0]), SafeMarkup::format('Field schema correct for the @table table.', array('@table' => $table)));
 
     // Update the entity type definition and check that the entity schema now
     // supports translations and revisions.
     $this->updateEntityType(TRUE);
     foreach ($tables as $table) {
-      $this->assertTrue($schema_handler->tableExists($table), String::format('Entity schema correct for the @table table.', array('@table' => $table)));
+      $this->assertTrue($schema_handler->tableExists($table), SafeMarkup::format('Entity schema correct for the @table table.', array('@table' => $table)));
     }
     foreach ($dedicated_tables as $table) {
-      $this->assertTrue($schema_handler->tableExists($table), String::format('Field schema correct for the @table table.', array('@table' => $table)));
+      $this->assertTrue($schema_handler->tableExists($table), SafeMarkup::format('Field schema correct for the @table table.', array('@table' => $table)));
     }
 
     // Revert changes and check that the entity schema now does not support
     // neither translations nor revisions.
     $this->updateEntityType(FALSE);
     foreach ($tables as $index => $table) {
-      $this->assertEqual($schema_handler->tableExists($table), !$index, String::format('Entity schema correct for the @table table.', array('@table' => $table)));
+      $this->assertEqual($schema_handler->tableExists($table), !$index, SafeMarkup::format('Entity schema correct for the @table table.', array('@table' => $table)));
     }
-    $this->assertTrue($schema_handler->tableExists($dedicated_tables[0]), String::format('Field schema correct for the @table table.', array('@table' => $table)));
+    $this->assertTrue($schema_handler->tableExists($dedicated_tables[0]), SafeMarkup::format('Field schema correct for the @table table.', array('@table' => $table)));
   }
 
   /**

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\filter\Combine.
+ * Contains \Drupal\views\Plugin\views\filter\Combine.
  */
 
 namespace Drupal\views\Plugin\views\filter;
@@ -16,7 +16,7 @@ use Drupal\Core\Form\FormStateInterface;
  *
  * @ViewsFilter("combine")
  */
-class Combine extends String {
+class Combine extends StringFilter {
 
   /**
    * @var views_plugin_query_default

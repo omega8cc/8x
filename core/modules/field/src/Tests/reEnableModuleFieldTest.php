@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\field\reEnableModuleFieldTest.
+ * Contains \Drupal\field\Tests\reEnableModuleFieldTest.
  */
 
 namespace Drupal\field\Tests;
@@ -33,8 +33,10 @@ class reEnableModuleFieldTest extends WebTestBase {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'article'));
-    $this->article_creator = $this->drupalCreateUser(array('create article content', 'edit own article content'));
-    $this->drupalLogin($this->article_creator);
+    $this->drupalLogin($this->drupalCreateUser(array(
+      'create article content',
+      'edit own article content',
+    )));
   }
 
   /**
@@ -90,10 +92,10 @@ class reEnableModuleFieldTest extends WebTestBase {
     // for it's fields.
     $admin_user = $this->drupalCreateUser(array('access administration pages', 'administer modules'));
     $this->drupalLogin($admin_user);
-    $this->drupalGet('admin/modules');
+    $this->drupalGet('admin/modules/uninstall');
     $this->assertText('Fields type(s) in use');
     $field_storage->delete();
-    $this->drupalGet('admin/modules');
+    $this->drupalGet('admin/modules/uninstall');
     $this->assertText('Fields pending deletion');
     $this->cronRun();
     $this->assertNoText('Fields type(s) in use');

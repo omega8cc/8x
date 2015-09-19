@@ -9,7 +9,6 @@ namespace Drupal\node;
 
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
@@ -55,7 +54,7 @@ class NodeTypeForm extends EntityForm {
 
     $type = $this->entity;
     if ($this->operation == 'add') {
-      $form['#title'] = String::checkPlain($this->t('Add content type'));
+      $form['#title'] = $this->t('Add content type');
       $fields = $this->entityManager->getBaseFieldDefinitions('node');
       // Create a node with a fake bundle using the type's UUID so that we can
       // get the default values for workflow settings.
@@ -204,8 +203,8 @@ class NodeTypeForm extends EntityForm {
   /**
    * {@inheritdoc}
    */
-  public function validate(array $form, FormStateInterface $form_state) {
-    parent::validate($form, $form_state);
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    parent::validateForm($form, $form_state);
 
     $id = trim($form_state->getValue('type'));
     // '0' is invalid, since elsewhere we check it using empty().

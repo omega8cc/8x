@@ -8,11 +8,13 @@
 namespace Drupal\config_translation\Tests;
 
 use Drupal\Component\Serialization\Json;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Config\FileStorage;
 use Drupal\Core\Language\Language;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\field\Entity\FieldConfig;
+use Drupal\field\Entity\FieldStorageConfig;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\simpletest\WebTestBase;
 
@@ -28,7 +30,22 @@ class ConfigTranslationUiTest extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('node', 'contact', 'contact_test', 'config_translation', 'config_translation_test', 'views', 'views_ui', 'contextual', 'filter', 'filter_test');
+  public static $modules = [
+    'block',
+    'config_translation',
+    'config_translation_test',
+    'contact',
+    'contact_test',
+    'contextual',
+    'entity_test',
+    'field_test',
+    'field_ui',
+    'filter',
+    'filter_test',
+    'node',
+    'views',
+    'views_ui',
+  ];
 
   /**
    * Languages to enable.
@@ -89,6 +106,7 @@ class ConfigTranslationUiTest extends WebTestBase {
         'administer themes',
         'bypass node access',
         'administer content types',
+        'translate interface',
       ]
     );
     // Create and login user.
@@ -100,6 +118,7 @@ class ConfigTranslationUiTest extends WebTestBase {
       ConfigurableLanguage::createFromLangcode($langcode)->save();
     }
     $this->localeStorage = $this->container->get('locale.storage');
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -446,6 +465,9 @@ class ConfigTranslationUiTest extends WebTestBase {
       $this->drupalGet($translation_page_url);
       $this->assertText($label);
 
+      // Make sure that the date library is added.
+      $this->assertRaw('core/modules/system/js/system.date.js');
+
       // Update translatable fields.
       $edit = array(
         'translation[config_names][core.date_format.' . $id . '][label]' => $id . ' - FR',
@@ -465,7 +487,7 @@ class ConfigTranslationUiTest extends WebTestBase {
 
       // Formatting the date 8 / 27 / 1985 @ 13:37 EST with pattern D should
       // display "Tue".
-      $formatted_date = format_date(494015820, $id, NULL, NULL, 'fr');
+      $formatted_date = format_date(494015820, $id, NULL, 'America/New_York', 'fr');
       $this->assertEqual($formatted_date, 'Tue', 'Got the right formatted date using the date format translation pattern.');
     }
   }
@@ -565,7 +587,7 @@ class ConfigTranslationUiTest extends WebTestBase {
     $response = $this->renderContextualLinks($ids, 'node');
     $this->assertResponse(200);
     $json = Json::decode($response);
-    $this->assertTrue(strpos($json[$ids[0]], t('Translate view')), 'Translate view contextual link added.');
+    $this->assertTrue(strpos($json[$ids[0]], 'Translate view'), 'Translate view contextual link added.');
 
     $description = 'All content promoted to the front page.';
     $human_readable_name = 'Frontpage';
@@ -604,6 +626,136 @@ class ConfigTranslationUiTest extends WebTestBase {
     $this->assertFieldByName('translation[config_names][views.view.frontpage][label]', $human_readable_name . " FR");
     $this->assertFieldByName('translation[config_names][views.view.frontpage][display][default][display_title]', $display_settings_master . " FR");
     $this->assertFieldByName('translation[config_names][views.view.frontpage][display][default][display_options][title]', $display_options_master . " FR");
+  }
+
+  /**
+   * Test the number of source elements for plural strings in config translation forms.
+   */
+  public function testPluralConfigStringsSourceElements() {
+    $this->drupalLogin($this->adminUser);
+
+    // Languages to test, with various number of plural forms.
+    $languages = array(
+      'vi' => array('plurals' => 1, 'expected' => array(TRUE, FALSE, FALSE, FALSE)),
+      'fr' => array('plurals' => 2, 'expected' => array(TRUE, TRUE, FALSE, FALSE)),
+      'sl' => array('plurals' => 4, 'expected' => array(TRUE, TRUE, TRUE, TRUE)),
+    );
+
+    foreach ($languages as $langcode => $data) {
+      // Import a .po file to add a new language with a given number of plural forms
+      $name = tempnam('temporary://', $langcode . '_') . '.po';
+      file_put_contents($name, $this->getPoFile($data['plurals']));
+      $this->drupalPostForm('admin/config/regional/translate/import', array(
+        'langcode' => $langcode,
+        'files[file]' => $name,
+      ), t('Import'));
+
+      // Change the config langcode of the 'files' view.
+      $config = \Drupal::service('config.factory')->getEditable('views.view.files');
+      $config->set('langcode', $langcode);
+      $config->save();
+
+      // Go to the translation page of the 'files' view.
+      $translation_url = 'admin/structure/views/view/files/translate/' . $langcode . '/add';
+      $this->drupalGet($translation_url);
+
+      // Check if the expected number of source elements are present.
+      foreach ($data['expected'] as $index => $expected) {
+        if ($expected) {
+          $this->assertRaw('edit-source-config-names-viewsviewfiles-display-default-display-options-fields-count-format-plural-string-' . $index);
+        }
+        else {
+          $this->assertNoRaw('edit-source-config-names-viewsviewfiles-display-default-display-options-fields-count-format-plural-string-' . $index);
+        }
+      }
+    }
+  }
+
+  /**
+   * Test translation of plural strings with multiple plural forms in config.
+   */
+  public function testPluralConfigStrings() {
+    $this->drupalLogin($this->adminUser);
+
+    // First import a .po file with multiple plural forms.
+    // This will also automatically add the 'sl' language.
+    $name = tempnam('temporary://', "sl_") . '.po';
+    file_put_contents($name, $this->getPoFile(4));
+    $this->drupalPostForm('admin/config/regional/translate/import', array(
+      'langcode' => 'sl',
+      'files[file]' => $name,
+    ), t('Import'));
+
+    // Translate the files view, as this one uses numeric formatters.
+    $description = 'Singular form';
+    $field_value = '1 place';
+    $field_value_plural = '@count places';
+    $translation_url = 'admin/structure/views/view/files/translate/sl/add';
+    $this->drupalGet($translation_url);
+
+    // Make sure original text is present on this page, in addition to 2 new
+    // empty fields.
+    $this->assertRaw($description);
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][0]', $field_value);
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][1]', $field_value_plural);
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][2]', '');
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][3]', '');
+
+    // Then make sure it also works.
+    $edit = [
+      'translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][0]' => $field_value . ' SL',
+      'translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][1]' => $field_value_plural . ' 1 SL',
+      'translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][2]' => $field_value_plural . ' 2 SL',
+      'translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][3]' => $field_value_plural . ' 3 SL',
+    ];
+    $this->drupalPostForm($translation_url, $edit, t('Save translation'));
+
+    // Make sure the values have changed.
+    $this->drupalGet($translation_url);
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][0]', "$field_value SL");
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][1]', "$field_value_plural 1 SL");
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][2]', "$field_value_plural 2 SL");
+    $this->assertFieldByName('translation[config_names][views.view.files][display][default][display_options][fields][count][format_plural_string][3]', "$field_value_plural 3 SL");
+  }
+
+  /**
+   * Tests the translation of field and field storage configuration.
+   */
+  public function testFieldConfigTranslation() {
+    // Add a test field which has a translatable field setting and a
+    // translatable field storage setting.
+    $field_name = strtolower($this->randomMachineName());
+    $field_storage = FieldStorageConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'entity_test',
+      'type' => 'test_field',
+    ]);
+
+    $translatable_storage_setting = $this->randomString();
+    $field_storage->setSetting('translatable_storage_setting', $translatable_storage_setting);
+    $field_storage->save();
+
+    $bundle = strtolower($this->randomMachineName());
+    entity_test_create_bundle($bundle);
+    $field = FieldConfig::create([
+      'field_name' => $field_name,
+      'entity_type' => 'entity_test',
+      'bundle' => $bundle,
+    ]);
+
+    $translatable_field_setting = $this->randomString();
+    $field->setSetting('translatable_field_setting', $translatable_field_setting);
+    $field->save();
+
+    $this->drupalLogin($this->translatorUser);
+
+    $this->drupalGet("/entity_test/structure/$bundle/fields/entity_test.$bundle.$field_name/translate");
+    $this->clickLink('Add');
+
+    $this->assertText('Translatable field setting');
+    $this->assertEscaped($translatable_field_setting);
+    $this->assertText('Translatable storage setting');
+    $this->assertEscaped($translatable_storage_setting);
   }
 
   /**
@@ -901,7 +1053,7 @@ class ConfigTranslationUiTest extends WebTestBase {
     for ($i = 0; $i < count($ids); $i++) {
       $post['ids[' . $i . ']'] = $ids[$i];
     }
-    return $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => $current_path)));
+    return $this->drupalPostWithFormat('contextual/render', 'json', $post, array('query' => array('destination' => $current_path)));
   }
 
   /**
@@ -918,19 +1070,58 @@ class ConfigTranslationUiTest extends WebTestBase {
       ':id' => $id,
     ));
     $textarea = reset($textarea);
-    $passed = $this->assertTrue($textarea instanceof \SimpleXMLElement, String::format('Disabled field @id exists.', array(
+    $passed = $this->assertTrue($textarea instanceof \SimpleXMLElement, SafeMarkup::format('Disabled field @id exists.', array(
       '@id' => $id,
     )));
     $expected = 'This field has been disabled because you do not have sufficient permissions to edit it.';
-    $passed = $passed && $this->assertEqual((string) $textarea, $expected, String::format('Disabled textarea @id hides text in an inaccessible text format.', array(
+    $passed = $passed && $this->assertEqual((string) $textarea, $expected, SafeMarkup::format('Disabled textarea @id hides text in an inaccessible text format.', array(
       '@id' => $id,
     )));
     // Make sure the text format select is not shown.
     $select_id = str_replace('value', 'format--2', $id);
     $select = $this->xpath('//select[@id=:id]', array(':id' => $select_id));
-    return $passed && $this->assertFalse($select, String::format('Field @id does not exist.', array(
+    return $passed && $this->assertFalse($select, SafeMarkup::format('Field @id does not exist.', array(
       '@id' => $id,
     )));
+  }
+
+  /**
+   * Helper function that returns a .po file with a given number of plural forms.
+   */
+  public function getPoFile($plurals) {
+    $po_file = array();
+
+    $po_file[1] = <<< EOF
+msgid ""
+msgstr ""
+"Project-Id-Version: Drupal 8\\n"
+"MIME-Version: 1.0\\n"
+"Content-Type: text/plain; charset=UTF-8\\n"
+"Content-Transfer-Encoding: 8bit\\n"
+"Plural-Forms: nplurals=1; plural=0;\\n"
+EOF;
+
+    $po_file[2] = <<< EOF
+msgid ""
+msgstr ""
+"Project-Id-Version: Drupal 8\\n"
+"MIME-Version: 1.0\\n"
+"Content-Type: text/plain; charset=UTF-8\\n"
+"Content-Transfer-Encoding: 8bit\\n"
+"Plural-Forms: nplurals=2; plural=(n>1);\\n"
+EOF;
+
+    $po_file[4] = <<< EOF
+msgid ""
+msgstr ""
+"Project-Id-Version: Drupal 8\\n"
+"MIME-Version: 1.0\\n"
+"Content-Type: text/plain; charset=UTF-8\\n"
+"Content-Transfer-Encoding: 8bit\\n"
+"Plural-Forms: nplurals=4; plural=(((n%100)==1)?(0):(((n%100)==2)?(1):((((n%100)==3)||((n%100)==4))?(2):3)));\\n"
+EOF;
+
+    return $po_file[$plurals];
   }
 
 }

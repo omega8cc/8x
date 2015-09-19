@@ -28,35 +28,14 @@ class UserSession implements AccountInterface {
    *
    * @var array
    */
-  protected $roles = array('anonymous');
+  protected $roles = array(AccountInterface::ANONYMOUS_ROLE);
 
   /**
-   * Session ID.
+   * The Unix timestamp when the user last accessed the site.
    *
    * @var string.
    */
-  public $sid;
-
-  /**
-   * Secure session ID.
-   *
-   * @var string.
-   */
-  public $ssid;
-
-  /**
-   * Session data.
-   *
-   * @var array.
-   */
-  public $session;
-
-  /**
-   * The Unix timestamp when this session last requested a page.
-   *
-   * @var string.
-   */
-  protected $timestamp;
+  protected $access;
 
   /**
    * The name of this account.
@@ -94,13 +73,6 @@ class UserSession implements AccountInterface {
   protected $timezone;
 
   /**
-   * The hostname for this user session.
-   *
-   * @var string
-   */
-  protected $hostname = '';
-
-  /**
    * Constructs a new user session.
    *
    * @param array $values
@@ -126,7 +98,7 @@ class UserSession implements AccountInterface {
     $roles = $this->roles;
 
     if ($exclude_locked_roles) {
-      $roles = array_values(array_diff($roles, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID)));
+      $roles = array_values(array_diff($roles, array(AccountInterface::ANONYMOUS_ROLE, AccountInterface::AUTHENTICATED_ROLE)));
     }
 
     return $roles;
@@ -142,27 +114,6 @@ class UserSession implements AccountInterface {
     }
 
     return $this->getRoleStorage()->isPermissionInRoles($permission, $this->getRoles());
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSecureSessionId() {
-    return $this->ssid;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSessionData() {
-    return $this->session;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSessionId() {
-    return $this->sid;
   }
 
   /**
@@ -232,14 +183,7 @@ class UserSession implements AccountInterface {
    * {@inheritdoc}
    */
   public function getLastAccessedTime() {
-    return $this->timestamp;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getHostname() {
-    return $this->hostname;
+    return $this->access;
   }
 
   /**

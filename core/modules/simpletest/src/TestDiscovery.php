@@ -7,7 +7,6 @@
 
 namespace Drupal\simpletest;
 
-use Composer\Autoload\ClassLoader;
 use Doctrine\Common\Annotations\SimpleAnnotationReader;
 use Doctrine\Common\Reflection\StaticReflectionParser;
 use Drupal\Component\Annotation\Reflection\MockFileFinder;
@@ -15,7 +14,6 @@ use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ExtensionDiscovery;
 use Drupal\simpletest\Exception\MissingGroupException;
-use Drupal\simpletest\Exception\MissingSummaryLineException;
 use PHPUnit_Util_Test;
 
 /**
@@ -54,12 +52,14 @@ class TestDiscovery {
   /**
    * Constructs a new test discovery.
    *
-   * @param \Composer\Autoload\ClassLoader $class_loader
-   *   The class loader.
+   * @param $class_loader
+   *   The class loader. Normally Composer's ClassLoader, as included by the
+   *   front controller, but may also be decorated; e.g.,
+   *   \Symfony\Component\ClassLoader\ApcClassLoader.
    * @param \Drupal\Core\Cache\CacheBackendInterface $cache_backend
    *   (optional) Backend for caching discovery results.
    */
-  public function __construct(ClassLoader $class_loader, CacheBackendInterface $cache_backend = NULL) {
+  public function __construct($class_loader, CacheBackendInterface $cache_backend = NULL) {
     $this->classLoader = $class_loader;
     $this->cacheBackend = $cache_backend;
   }
@@ -79,8 +79,10 @@ class TestDiscovery {
 
     $existing = $this->classLoader->getPrefixesPsr4();
 
-    // Add PHPUnit test namespace of Drupal core.
+    // Add PHPUnit test namespaces of Drupal core.
     $this->testNamespaces['Drupal\\Tests\\'] = [DRUPAL_ROOT . '/core/tests/Drupal/Tests'];
+    $this->testNamespaces['Drupal\\KernelTests\\'] = [DRUPAL_ROOT . '/core/tests/Drupal/KernelTests'];
+    $this->testNamespaces['Drupal\\FunctionalTests\\'] = [DRUPAL_ROOT . '/core/tests/Drupal/FunctionalTests'];
 
     $this->availableExtensions = array();
     foreach ($this->getExtensions() as $name => $extension) {
@@ -95,8 +97,10 @@ class TestDiscovery {
       // Add Simpletest test namespace.
       $this->testNamespaces["Drupal\\$name\\Tests\\"][] = "$base_path/src/Tests";
 
-      // Add PHPUnit test namespace.
-      $this->testNamespaces["Drupal\\Tests\\$name\\"][] = "$base_path/tests/src";
+      // Add PHPUnit test namespaces.
+      $this->testNamespaces["Drupal\\Tests\\$name\\Unit\\"][] = "$base_path/tests/src/Unit";
+      $this->testNamespaces["Drupal\\Tests\\$name\\Kernel\\"][] = "$base_path/tests/src/Kernel";
+      $this->testNamespaces["Drupal\\Tests\\$name\\Functional\\"][] = "$base_path/tests/src/Functional";
     }
 
     foreach ($this->testNamespaces as $prefix => $paths) {
@@ -157,9 +161,13 @@ class TestDiscovery {
       try {
         $info = static::getTestInfo($classname, $parser->getDocComment());
       }
-      catch (\LogicException $e) {
-        // If the class is missing a summary line or an @group annotation just
-        // skip it. Most likely it is an abstract class, trait or test fixture.
+      catch (MissingGroupException $e) {
+        // If the class name ends in Test and is not a migrate table dump.
+        if (preg_match('/Test$/', $classname) && strpos($classname, 'migrate_drupal\Tests\Table') === FALSE) {
+          throw $e;
+        }
+        // If the class is @group annotation just skip it. Most likely it is an
+        // abstract class, trait or test fixture.
         continue;
       }
       // Skip this test class if it requires unavailable modules.
@@ -290,9 +298,6 @@ class TestDiscovery {
    *     PHPDoc annotations:
    *     - module: List of Drupal module extension names the test depends on.
    *
-   * @throws \Drupal\simpletest\Exception\MissingSummaryLineException
-   *   If the class does not have a PHPDoc summary line or @coversDefaultClass
-   *   annotation.
    * @throws \Drupal\simpletest\Exception\MissingGroupException
    *   If the class does not have a @group annotation.
    */
@@ -305,7 +310,9 @@ class TestDiscovery {
       'name' => $classname,
     );
     $annotations = array();
-    preg_match_all('/^ \* \@([^\s]*) (.*$)/m', $doc_comment, $matches);
+    // Look for annotations, allow an arbitrary amount of spaces before the
+    // * but nothing else.
+    preg_match_all('/^[ ]*\* \@([^\s]*) (.*$)/m', $doc_comment, $matches);
     if (isset($matches[1])) {
       foreach ($matches[1] as $key => $annotation) {
         if (!empty($annotations[$annotation])) {
@@ -322,7 +329,7 @@ class TestDiscovery {
       throw new MissingGroupException(sprintf('Missing @group annotation in %s', $classname));
     }
     // Force all PHPUnit tests into the same group.
-    if (strpos($classname, 'Drupal\\Tests\\') === 0) {
+    if (static::isUnitTest($classname)) {
       $info['group'] = 'PHPUnit';
     }
     else {
@@ -334,9 +341,6 @@ class TestDiscovery {
     }
     else {
       $info['description'] = static::parseTestClassSummary($doc_comment);
-      if (empty($info['description'])) {
-        throw new MissingSummaryLineException(sprintf('Missing PHPDoc summary line in %s', $classname));
-      }
     }
     if (isset($annotations['dependencies'])) {
       $info['requires']['module'] = array_map('trim', explode(',', $annotations['dependencies']));
@@ -362,8 +366,10 @@ class TestDiscovery {
 
     $lines = explode("\n", $doc_comment);
     $summary = [];
+    // Add every line to the summary until the first empty line or annotation
+    // is found.
     foreach ($lines as $line) {
-      if ($line == ' *' || preg_match('/^ \* \@/', $line)) {
+      if (preg_match('/^[ ]*\*$/', $line) || preg_match('/^[ ]*\* \@/', $line)) {
         break;
       }
       $summary[] = trim($line, ' *');
@@ -405,6 +411,31 @@ class TestDiscovery {
       }
     }
     return $annotations;
+  }
+
+  /**
+   * Determines if the provided classname is a unit test.
+   *
+   * @param $classname
+   *   The test classname.
+   *
+   * @return bool
+   *   TRUE if the class is a unit test. FALSE if not.
+   */
+  public static function isUnitTest($classname) {
+    if (strpos($classname, 'Drupal\\Tests\\') === 0) {
+      $namespace = explode('\\', $classname);
+      $first_letter = Unicode::substr($namespace[2], 0, 1);
+      if (Unicode::strtoupper($first_letter) === $first_letter) {
+        // A core unit test.
+        return TRUE;
+      }
+      elseif ($namespace[3] == 'Unit') {
+        // A module unit test.
+        return TRUE;
+      }
+    }
+    return FALSE;
   }
 
   /**

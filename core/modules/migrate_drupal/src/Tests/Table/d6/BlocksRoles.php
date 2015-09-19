@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\BlocksRoles.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\BlocksRoles.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -44,6 +44,7 @@ class BlocksRoles extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("blocks_roles")->fields(array(
       'module',
@@ -62,3 +63,4 @@ class BlocksRoles extends DrupalDumpBase {
   }
 
 }
+#41ed39f4e800ee584535def863835a80

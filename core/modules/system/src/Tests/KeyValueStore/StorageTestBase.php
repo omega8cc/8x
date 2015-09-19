@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\system\Tests\KeyValueStore\StorageTestBase.
+ * Contains \Drupal\system\Tests\KeyValueStore\StorageTestBase.
  */
 
 namespace Drupal\system\Tests\KeyValueStore;
@@ -31,7 +31,7 @@ abstract class StorageTestBase extends KernelTestBase {
   /**
    * Whether we are using an expirable key/value store.
    *
-   * @var boolean
+   * @var bool
    */
   protected $factory = 'keyvalue';
 

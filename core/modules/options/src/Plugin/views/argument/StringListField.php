@@ -8,12 +8,13 @@
 namespace Drupal\options\Plugin\views\argument;
 
 use Drupal\Core\Field\AllowedTagsXssTrait;
+use Drupal\Core\Field\FieldFilteredString;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\field\Views\FieldAPIHandlerTrait;
+use Drupal\views\FieldAPIHandlerTrait;
 use Drupal\views\ViewExecutable;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
-use Drupal\views\Plugin\views\argument\String;
-use Drupal\Component\Utility\String as StringUtility;
+use Drupal\views\Plugin\views\argument\StringArgument;
+use Drupal\Component\Utility\SafeMarkup;
 
 /**
  * Argument handler for list field to show the human readable name in summary.
@@ -22,7 +23,7 @@ use Drupal\Component\Utility\String as StringUtility;
  *
  * @ViewsArgument("string_list_field")
  */
-class StringListField extends String {
+class StringListField extends StringArgument {
 
   use AllowedTagsXssTrait;
   use FieldAPIHandlerTrait;
@@ -80,12 +81,9 @@ class StringListField extends String {
     $value = $data->{$this->name_alias};
     // If the list element has a human readable name show it.
     if (isset($this->allowedValues[$value]) && !empty($this->options['summary']['human'])) {
-      return $this->caseTransform($this->fieldFilterXss($this->allowedValues[$value]), $this->options['case']);
+      $value = $this->allowedValues[$value];
     }
-    // Else, fallback to the key.
-    else {
-      return $this->caseTransform(StringUtility::checkPlain($value), $this->options['case']);
-    }
+    return FieldFilteredString::create($this->caseTransform($value, $this->options['case']));
   }
 
 }

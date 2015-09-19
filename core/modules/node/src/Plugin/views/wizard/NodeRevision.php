@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugin\views\wizard\NodeRevision.
+ * Contains \Drupal\node\Plugin\views\wizard\NodeRevision.
  */
 
 namespace Drupal\node\Plugin\views\wizard;
@@ -84,7 +84,11 @@ class NodeRevision extends WizardPluginBase {
     $display_options['fields']['changed']['alter']['html'] = FALSE;
     $display_options['fields']['changed']['hide_empty'] = FALSE;
     $display_options['fields']['changed']['empty_zero'] = FALSE;
-    $display_options['fields']['changed']['plugin_id'] = 'date';
+    $display_options['fields']['changed']['plugin_id'] = 'field';
+    $display_options['fields']['changed']['type'] = 'timestamp';
+    $display_options['fields']['changed']['settings']['date_format'] = 'medium';
+    $display_options['fields']['changed']['settings']['custom_date_format'] = '';
+    $display_options['fields']['changed']['settings']['timezone'] = '';
 
     /* Field: Content revision: Title */
     $display_options['fields']['title']['id'] = 'title';
@@ -103,10 +107,8 @@ class NodeRevision extends WizardPluginBase {
     $display_options['fields']['title']['alter']['html'] = 0;
     $display_options['fields']['title']['hide_empty'] = 0;
     $display_options['fields']['title']['empty_zero'] = 0;
-    $display_options['fields']['title']['link_to_node'] = 0;
-    $display_options['fields']['title']['link_to_node_revision'] = 1;
-    $display_options['fields']['title']['plugin_id'] = 'node_revision';
-
+    $display_options['fields']['title']['settings']['link_to_entity'] = 0;
+    $display_options['fields']['title']['plugin_id'] = 'field';
     return $display_options;
   }
 

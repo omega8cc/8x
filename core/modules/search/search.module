@@ -5,9 +5,9 @@
  * Enables site-wide keyword searching.
  */
 
-use Drupal\Component\Utility\SafeMarkup;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 
@@ -74,7 +74,7 @@ function search_help($route_name, RouteMatchInterface $route_match) {
     case 'help.page.search':
       $output = '';
       $output .= '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Search module provides the ability to set up search pages based on plugins provided by other modules. In Drupal core, there are two page-type plugins: the Content page type provides keyword searching for content managed by the Node module, and the Users page type provides keyword searching for registered users. Contributed modules may provide other page-type plugins. For more information, see <a href="!search-module">the online documentation for the Search module</a>.', array('!search-module' => 'https://drupal.org/documentation/modules/search')) . '</p>';
+      $output .= '<p>' . t('The Search module provides the ability to set up search pages based on plugins provided by other modules. In Drupal core, there are two page-type plugins: the Content page type provides keyword searching for content managed by the Node module, and the Users page type provides keyword searching for registered users. Contributed modules may provide other page-type plugins. For more information, see <a href="!search-module">the online documentation for the Search module</a>.', array('!search-module' => 'https://www.drupal.org/documentation/modules/search')) . '</p>';
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Configuring search pages') . '</dt>';
@@ -87,7 +87,7 @@ function search_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<dt>' . t('Searching your site') . '</dt>';
       $output .= '<dd>' . t('Users with <a href="!search_permission">Use search</a> permission can use the Search block and <a href="!search">Search page</a>. Users with the <a href="!node_permission">View published content</a> permission can use configured search pages of type <em>Content</em> to search for content containing exact keywords; in addition, users with <a href="!search_permission">Use advanced search</a> permission can use more complex search filtering. Users with the <a href="!user_permission">View user information</a> permission can use configured search pages of type <em>Users</em> to search for active users containing the keyword anywhere in the username, and users with the <a href="!user_permission">Administer users</a> permission can search for active and blocked users, by email address or username keyword.', array('!search' => \Drupal::url('search.view'), '!search_permission' => \Drupal::url('user.admin_permissions', array(), array('fragment' => 'module-search')), '!node_permission' => \Drupal::url('user.admin_permissions', array(), array('fragment' => 'module-node')), '!user_permission' => \Drupal::url('user.admin_permissions', array(), array('fragment' => 'module-user')))) . '</dd>';
       $output .= '<dt>' . t('Extending the Search module') . '</dt>';
-      $output .= '<dd>' . t('By default, the Search module only supports exact keyword matching in content searches. You can modify this behavior by installing a language-specific stemming module for your language (such as <a href="!porterstemmer_url">Porter Stemmer</a> for American English), which allows words such as walk, walking, and walked to be matched in the Search module. Another approach is to use a third-party search technology with stemming or partial word matching features built in, such as <a href="!solr_url">Apache Solr</a> or <a href="!sphinx_url">Sphinx</a>. There are also contributed modules that provide additional search pages. These and other <a href="!contrib-search">search-related contributed modules</a> can be downloaded by visiting Drupal.org.', array('!contrib-search' => 'https://drupal.org/project/project_module?f[2]=im_vid_3%3A105', '!porterstemmer_url' => 'https://drupal.org/project/porterstemmer', '!solr_url' => 'https://drupal.org/project/apachesolr', '!sphinx_url' => 'https://drupal.org/project/sphinx')) . '</dd>';
+      $output .= '<dd>' . t('By default, the Search module only supports exact keyword matching in content searches. You can modify this behavior by installing a language-specific stemming module for your language (such as <a href="!porterstemmer_url">Porter Stemmer</a> for American English), which allows words such as walk, walking, and walked to be matched in the Search module. Another approach is to use a third-party search technology with stemming or partial word matching features built in, such as <a href="!solr_url">Apache Solr</a> or <a href="!sphinx_url">Sphinx</a>. There are also contributed modules that provide additional search pages. These and other <a href="!contrib-search">search-related contributed modules</a> can be downloaded by visiting Drupal.org.', array('!contrib-search' => 'https://www.drupal.org/project/project_module?f[2]=im_vid_3%3A105', '!porterstemmer_url' => 'https://www.drupal.org/project/porterstemmer', '!solr_url' => 'https://www.drupal.org/project/apachesolr', '!sphinx_url' => 'https://www.drupal.org/project/sphinx')) . '</dd>';
       $output .= '</dl>';
       return $output;
 
@@ -123,14 +123,14 @@ function search_preprocess_block(&$variables) {
  * This function is meant for use by search page plugins, or for building a
  * user interface that lets users clear all or parts of the search index.
  *
- * @param $type
+ * @param string|null $type
  *   (optional) The plugin ID or other machine-readable type for the items to
  *   remove from the search index. If omitted, $sid and $langcode are ignored
  *   and the entire search index is cleared.
- * @param $sid
+ * @param string|null $sid
  *   (optional) The ID of the items to remove from the search index. If
  *   omitted, all items matching $type are cleared, and $langcode is ignored.
- * @param $langcode
+ * @param string|null $langcode
  *   (optional) Language code of the item to remove from the search index. If
  *   omitted, all items matching $sid and $type are cleared.
  */
@@ -152,6 +152,15 @@ function search_index_clear($type = NULL, $sid = NULL, $langcode = NULL) {
 
   $query_index->execute();
   $query_dataset->execute();
+
+  if ($type) {
+    // Invalidate all render cache items that contain data from this index.
+    Cache::invalidateTags(['search_index:' . $type]);
+  }
+  else {
+    // Invalidate all render cache items that contain data from any index.
+    Cache::invalidateTags(['search_index']);
+  }
 }
 
 /**
@@ -224,22 +233,37 @@ function search_update_totals() {
 }
 
 /**
- * Simplifies a string according to indexing rules.
+ * Simplifies and preprocesses text for searching.
  *
- * @param $text
+ * Processing steps:
+ * - Entities are decoded.
+ * - Text is lower-cased and diacritics (accents) are removed.
+ * - hook_search_preprocess() is invoked.
+ * - CJK (Chinese, Japanese, Korean) characters are processed, depending on
+ *   the search settings.
+ * - Punctuation is processed (removed or replaced with spaces, depending on
+ *   where it is; see code for details).
+ * - Words are truncated to 50 characters maximum.
+ *
+ * @param string $text
  *   Text to simplify.
+ * @param string|null $langcode
+ *   Language code for the language of $text, if known.
  *
- * @return
- *   Simplified text.
+ * @return string
+ *   Simplified and processed text.
  *
  * @see hook_search_preprocess()
  */
 function search_simplify($text, $langcode = NULL) {
   // Decode entities to UTF-8
-  $text = String::decodeEntities($text);
+  $text = Html::decodeEntities($text);
 
   // Lowercase
   $text = Unicode::strtolower($text);
+
+  // Remove diacitics.
+  $text = \Drupal::service('transliteration')->removeDiacritics($text);
 
   // Call an external processor for word handling.
   search_invoke_preprocess($text, $langcode);
@@ -258,7 +282,7 @@ function search_simplify($text, $langcode = NULL) {
   $text = preg_replace('/([' . PREG_CLASS_NUMBERS . ']+)[' . PREG_CLASS_PUNCTUATION . ']+(?=[' . PREG_CLASS_NUMBERS . '])/u', '\1', $text);
 
   // Multiple dot and dash groups are word boundaries and replaced with space.
-  // No need to use the unicode modifer here because 0-127 ASCII characters
+  // No need to use the unicode modifier here because 0-127 ASCII characters
   // can't match higher UTF-8 characters as the leftmost bit of those are 1.
   $text = preg_replace('/[.-]{2,}/', ' ', $text);
 
@@ -289,13 +313,13 @@ function search_simplify($text, $langcode = NULL) {
  * is equal to the 'minimum_word_size' variable. This tokenizing is only done
  * if the 'overlap_cjk' variable is TRUE.
  *
- * @param $matches
+ * @param array $matches
  *   This function is a callback for preg_replace_callback(), which is called
  *   from search_simplify(). So, $matches is an array of regular expression
  *   matches, which means that $matches[0] contains the matched text -- a
  *   string of CJK characters to tokenize.
  *
- * @return
+ * @return string
  *   Tokenized text, starting and ending with a space character.
  */
 function search_expand_cjk($matches) {
@@ -325,7 +349,17 @@ function search_expand_cjk($matches) {
 }
 
 /**
- * Simplifies and splits a string into tokens for indexing.
+ * Simplifies and splits a string into words for indexing.
+ *
+ * @param string $text
+ *   Text to process.
+ * @param string|null $langcode
+ *   Language code for the language of $text, if known.
+ *
+ * @return array
+ *   Array of words in the simplified, preprocessed text.
+ *
+ * @see search_simplify()
  */
 function search_index_split($text, $langcode = NULL) {
   $last = &drupal_static(__FUNCTION__);
@@ -356,7 +390,12 @@ function _search_index_truncate(&$text) {
 }
 
 /**
- * Invokes hook_search_preprocess() in modules.
+ * Invokes hook_search_preprocess() to simplify text.
+ *
+ * @param string $text
+ *   Text to preprocess, passed by reference and altered in place.
+ * @param string|null $langcode
+ *   Language code for the language of $text, if known.
  */
 function search_invoke_preprocess(&$text, $langcode = NULL) {
   foreach (\Drupal::moduleHandler()->getImplementations('search_preprocess') as $module) {
@@ -367,14 +406,14 @@ function search_invoke_preprocess(&$text, $langcode = NULL) {
 /**
  * Updates the full-text search index for a particular item.
  *
- * @param $type
+ * @param string $type
  *   The plugin ID or other machine-readable type of this item,
  *   which should be less than 64 bytes.
- * @param $sid
+ * @param int $sid
  *   An ID number identifying this particular item (e.g., node ID).
- * @param $langcode
- *   Language code for text being indexed.
- * @param $text
+ * @param string $langcode
+ *   Language code for the language of the text being indexed.
+ * @param string $text
  *   The content of this item. Must be a piece of HTML or plain text.
  *
  * @ingroup search
@@ -469,6 +508,8 @@ function search_index($type, $sid, $langcode, $text) {
     $tag = !$tag;
   }
 
+  // Remove the item $sid from the search index, and invalidate the relevant
+  // cache tags.
   search_index_clear($type, $sid, $langcode);
 
   // Insert cleaned up data into dataset
@@ -576,15 +617,18 @@ function search_mark_for_reindex($type = NULL, $sid = NULL, $langcode = NULL) {
 /**
  * Returns snippets from a piece of text, with search keywords highlighted.
  *
- * Used for formatting search results.
+ * Used for formatting search results. All HTML tags will be stripped from
+ * $text.
  *
  * @param string $keys
  *   A string containing a search query.
  * @param string $text
  *   The text to extract fragments from.
+ * @param string|null $langcode
+ *   Language code for the language of $text, if known.
  *
- * @return string
- *   A string containing HTML for the excerpt.
+ * @return array
+ *   A render array containing HTML for the excerpt.
  */
 function search_excerpt($keys, $text, $langcode = NULL) {
   // We highlight around non-indexable or CJK characters.
@@ -596,7 +640,7 @@ function search_excerpt($keys, $text, $langcode = NULL) {
 
   // Prepare text by stripping HTML tags and decoding HTML entities.
   $text = strip_tags(str_replace(array('<', '>'), array(' <', '> '), $text));
-  $text = String::decodeEntities($text);
+  $text = Html::decodeEntities($text);
   $text_length = strlen($text);
 
   // Make a list of unique keywords that are actually found in the text,
@@ -677,7 +721,9 @@ function search_excerpt($keys, $text, $langcode = NULL) {
     // We didn't find any keyword matches, so just return the first part of the
     // text. We also need to re-encode any HTML special characters that we
     // entity-decoded above.
-    return String::checkPlain(Unicode::truncate($text, 256, TRUE, TRUE));
+    return [
+      '#plain_text' => Unicode::truncate($text, 256, TRUE, TRUE),
+    ];
   }
 
   // Sort the text ranges by starting position.
@@ -718,12 +764,15 @@ function search_excerpt($keys, $text, $langcode = NULL) {
   // translated. Let translators have the … separator text as one chunk.
   $ellipses = explode('!excerpt', t('… !excerpt … !excerpt …'));
   $text = (isset($new_ranges[0]) ? '' : $ellipses[0]) . implode($ellipses[1], $out) . (($max_end < strlen($text) - 1) ? $ellipses[2] : '');
-  $text = String::checkPlain($text);
+  $text = Html::escape($text);
 
   // Highlight keywords. Must be done at once to prevent conflicts ('strong'
   // and '<strong>').
   $text = trim(preg_replace('/' . $boundary . '(?:' . implode('|', $keys) . ')' . $boundary . '/iu', '<strong>\0</strong>', ' ' . $text . ' '));
-  return SafeMarkup::set($text);
+  return [
+    '#markup' => $text,
+    '#allowed_tags' => ['strong']
+  ];
 }
 
 /**
@@ -733,14 +782,14 @@ function search_excerpt($keys, $text, $langcode = NULL) {
 /**
  * Finds an appropriate keyword in text.
  *
- * @param $key
+ * @param string $key
  *   The keyword to find.
- * @param $text
+ * @param string $text
  *   The text to search for the keyword.
- * @param $boundary
+ * @param string $boundary
  *   Regular expression for boundary characters between words.
- * @param $langcode
- *   Language code.
+ * @param string|null $langcode
+ *   Language code for the language of $text, if known.
  *
  * @return
  *   A segment of $text that is between word boundary characters that either
@@ -764,7 +813,7 @@ function _search_find_match_with_simplify($key, $text, $boundary, $langcode = NU
   $simplified_key = trim(search_simplify($key, $langcode));
   $simplified_text = trim(search_simplify($text, $langcode));
   if ($simplified_key == '' || $simplified_text == '' || strpos($simplified_text, $simplified_key) === FALSE) {
-    // The simplfied keyword and text do not match at all, or are empty.
+    // The simplified keyword and text do not match at all, or are empty.
     return NULL;
   }
 

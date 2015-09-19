@@ -2,13 +2,16 @@
 
 /**
  * @file
- * Definition of Drupal\node\Tests\PagePreviewTest.
+ * Contains \Drupal\node\Tests\PagePreviewTest.
  */
 
 namespace Drupal\node\Tests;
 
+use Drupal\comment\Tests\CommentTestTrait;
+use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\entity_reference\Tests\EntityReferenceTestTrait;
 use Drupal\node\Entity\NodeType;
 
 /**
@@ -18,22 +21,26 @@ use Drupal\node\Entity\NodeType;
  */
 class PagePreviewTest extends NodeTestBase {
 
+  use EntityReferenceTestTrait;
+  use CommentTestTrait;
+
   /**
-   * Enable the node and taxonomy modules to test both on the preview.
+   * Enable the comment, node and taxonomy modules to test on the preview.
    *
    * @var array
    */
-  public static $modules = array('node', 'taxonomy');
+  public static $modules = array('node', 'taxonomy', 'comment');
 
   /**
    * The name of the created field.
    *
    * @var string
    */
-  protected $field_name;
+  protected $fieldName;
 
   protected function setUp() {
     parent::setUp();
+    $this->addDefaultCommentField('node', 'page');
 
     $web_user = $this->drupalCreateUser(array('edit own page content', 'create page content'));
     $this->drupalLogin($web_user);
@@ -62,42 +69,30 @@ class PagePreviewTest extends NodeTestBase {
     $this->term = $term;
 
     // Create a field.
-    $this->field_name = Unicode::strtolower($this->randomMachineName());
-    entity_create('field_storage_config', array(
-      'field_name' => $this->field_name,
-      'entity_type' => 'node',
-      'type' => 'taxonomy_term_reference',
-      'settings' => array(
-        'allowed_values' => array(
-          array(
-            'vocabulary' => $this->vocabulary->id(),
-            'parent' => '0',
-          ),
-        ),
+    $this->fieldName = Unicode::strtolower($this->randomMachineName());
+    $handler_settings = array(
+      'target_bundles' => array(
+        $this->vocabulary->id() => $this->vocabulary->id(),
       ),
-      'cardinality' => '-1',
-    ))->save();
-    entity_create('field_config', array(
-      'field_name' => $this->field_name,
-      'entity_type' => 'node',
-      'bundle' => 'page',
-    ))->save();
+      'auto_create' => TRUE,
+    );
+    $this->createEntityReferenceField('node', 'page', $this->fieldName, 'Tags', 'taxonomy_term', 'default', $handler_settings, FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED);
 
     entity_get_form_display('node', 'page', 'default')
-      ->setComponent($this->field_name, array(
-        'type' => 'taxonomy_autocomplete',
+      ->setComponent($this->fieldName, array(
+        'type' => 'entity_reference_autocomplete_tags',
       ))
       ->save();
 
     // Show on default display and teaser.
     entity_get_display('node', 'page', 'default')
-      ->setComponent($this->field_name, array(
-        'type' => 'taxonomy_term_reference_link',
+      ->setComponent($this->fieldName, array(
+        'type' => 'entity_reference_label',
       ))
       ->save();
     entity_get_display('node', 'page', 'teaser')
-      ->setComponent($this->field_name, array(
-        'type' => 'taxonomy_term_reference_link',
+      ->setComponent($this->fieldName, array(
+        'type' => 'entity_reference_label',
       ))
       ->save();
   }
@@ -108,7 +103,7 @@ class PagePreviewTest extends NodeTestBase {
   function testPagePreview() {
     $title_key = 'title[0][value]';
     $body_key = 'body[0][value]';
-    $term_key = $this->field_name;
+    $term_key = $this->fieldName . '[target_id]';
 
     // Fill in node creation form and preview node.
     $edit = array();
@@ -145,13 +140,21 @@ class PagePreviewTest extends NodeTestBase {
     $this->clickLink(t('Back to content editing'));
     $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
     $this->assertFieldByName($body_key, $edit[$body_key], 'Body field displayed.');
-    $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
+    $this->assertFieldByName($term_key, $edit[$term_key] . ' (' . $this->term->id() . ')', 'Term field displayed.');
+
+    // Return to page preview to check everything is as expected.
+    $this->drupalPostForm(NULL, array(), t('Preview'));
+    $this->assertTitle(t('@title | Drupal', array('@title' => $edit[$title_key])), 'Basic page title is preview.');
+    $this->assertText($edit[$title_key], 'Title displayed.');
+    $this->assertText($edit[$body_key], 'Body displayed.');
+    $this->assertText($edit[$term_key], 'Term displayed.');
+    $this->assertLink(t('Back to content editing'));
 
     // Assert the content is kept when reloading the page.
     $this->drupalGet('node/add/page', array('query' => array('uuid' => $uuid)));
     $this->assertFieldByName($title_key, $edit[$title_key], 'Title field displayed.');
     $this->assertFieldByName($body_key, $edit[$body_key], 'Body field displayed.');
-    $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
+    $this->assertFieldByName($term_key, $edit[$term_key] . ' (' . $this->term->id() . ')', 'Term field displayed.');
 
     // Save the node.
     $this->drupalPostForm('node/add/page', $edit, t('Save'));
@@ -163,7 +166,7 @@ class PagePreviewTest extends NodeTestBase {
 
     // Check the term appears again on the edit form.
     $this->drupalGet('node/' . $node->id() . '/edit');
-    $this->assertFieldByName($term_key, $edit[$term_key], 'Term field displayed.');
+    $this->assertFieldByName($term_key, $edit[$term_key] . ' (' . $this->term->id() . ')', 'Term field displayed.');
 
     // Check with two new terms on the edit form, additionally to the existing
     // one.
@@ -227,7 +230,7 @@ class PagePreviewTest extends NodeTestBase {
   function testPagePreviewWithRevisions() {
     $title_key = 'title[0][value]';
     $body_key = 'body[0][value]';
-    $term_key = $this->field_name;
+    $term_key = $this->fieldName . '[target_id]';
     // Force revision on "Basic page" content.
     $node_type = NodeType::load('page');
     $node_type->setNewRevision(TRUE);

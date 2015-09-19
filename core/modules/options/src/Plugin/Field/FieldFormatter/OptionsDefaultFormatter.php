@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Contains \Drupal\options\Plugin\field\formatter\OptionsDefaultFormatter.
+ * Contains \Drupal\options\Plugin\Field\FieldFormatter\OptionsDefaultFormatter.
  */
 
 namespace Drupal\options\Plugin\Field\FieldFormatter;
 
 use Drupal\Core\Field\AllowedTagsXssTrait;
+use Drupal\Core\Field\FieldFilteredString;
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\OptGroup;
@@ -48,7 +49,10 @@ class OptionsDefaultFormatter extends FormatterBase {
         // If the stored value is in the current set of allowed values, display
         // the associated label, otherwise just display the raw value.
         $output = isset($options[$value]) ? $options[$value] : $value;
-        $elements[$delta] = array('#markup' => $this->fieldFilterXss($output));
+        $elements[$delta] = array(
+          '#markup' => $output,
+          '#allowed_tags' => FieldFilteredString::allowedTags(),
+        );
       }
     }
 

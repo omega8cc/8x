@@ -7,6 +7,8 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Core\Entity\Plugin\Validation\Constraint\CompositeConstraintBase;
+
 /**
  * Tests the Entity Validation API.
  *
@@ -24,17 +26,17 @@ class EntityValidationTest extends EntityUnitTestBase {
   /**
    * @var string
    */
-  protected $entity_name;
+  protected $entityName;
 
   /**
    * @var \Drupal\user\Entity\User
    */
-  protected $entity_user;
+  protected $entityUser;
 
   /**
    * @var string
    */
-  protected $entity_field_text;
+  protected $entityFieldText;
 
   /**
    * {@inheritdoc}
@@ -43,6 +45,7 @@ class EntityValidationTest extends EntityUnitTestBase {
     parent::setUp();
 
     // Create the test field.
+    module_load_install('entity_test');
     entity_test_install();
 
     // Install required default configuration for filter module.
@@ -59,18 +62,20 @@ class EntityValidationTest extends EntityUnitTestBase {
    *   The created test entity.
    */
   protected function createTestEntity($entity_type) {
-    $this->entity_name = $this->randomMachineName();
-    $this->entity_user = $this->createUser();
-    $this->entity_field_text = $this->randomMachineName();
+    $this->entityName = $this->randomMachineName();
+    $this->entityUser = $this->createUser();
 
     // Pass in the value of the name field when creating. With the user
     // field we test setting a field after creation.
     $entity = entity_create($entity_type);
-    $entity->user_id->target_id = $this->entity_user->id();
-    $entity->name->value = $this->entity_name;
+    $entity->user_id->target_id = $this->entityUser->id();
+    $entity->name->value = $this->entityName;
 
     // Set a value for the test field.
-    $entity->field_test_text->value = $this->entity_field_text;
+    if ($entity->hasField('field_test_text')) {
+      $this->entityFieldText = $this->randomMachineName();
+      $entity->field_test_text->value = $this->entityFieldText;
+    }
 
     return $entity;
   }
@@ -80,7 +85,14 @@ class EntityValidationTest extends EntityUnitTestBase {
    */
   public function testValidation() {
     // Ensure that the constraint manager is marked as cached cleared.
-    $plugin_cache_clearer = \Drupal::service('plugin.cache_clearer');
+
+    // Use the protected property on the cache_clearer first to check whether
+    // the constraint manager is added there.
+
+    // Ensure that the proxy class is initialized, which has the necessary
+    // method calls attached.
+    \Drupal::service('plugin.cache_clearer');
+    $plugin_cache_clearer = \Drupal::service('drupal.proxy_original_service.plugin.cache_clearer');
     $get_cached_discoveries = function () {
       return $this->cachedDiscoveries;
     };
@@ -166,6 +178,29 @@ class EntityValidationTest extends EntityUnitTestBase {
     $this->assertEqual($violation->getRoot()->getValue(), $test_entity, 'Violation root is entity.');
     $this->assertEqual($violation->getPropertyPath(), 'field_test_text.0.format', 'Violation property path is correct.');
     $this->assertEqual($violation->getInvalidValue(), $test_entity->field_test_text->format, 'Violation contains invalid value.');
+  }
+
+  /**
+   * Tests composite constraints.
+   */
+  public function testCompositeConstraintValidation() {
+    $entity = $this->createTestEntity('entity_test_composite_constraint');
+    $violations = $entity->validate();
+    $this->assertEqual($violations->count(), 0);
+
+    // Trigger violation condition.
+    $entity->name->value = 'test';
+    $entity->type->value = 'test2';
+    $violations = $entity->validate();
+    $this->assertEqual($violations->count(), 1);
+
+    // Make sure we can determine this is composite constraint.
+    $constraint = $violations[0]->getConstraint();
+    $this->assertTrue($constraint instanceof CompositeConstraintBase, 'Constraint is composite constraint.');
+    $this->assertEqual('type', $violations[0]->getPropertyPath());
+
+    /** @var CompositeConstraintBase $constraint */
+    $this->assertEqual($constraint->coversFields(), ['name', 'type'], 'Information about covered fields can be retrieved.');
   }
 
 }

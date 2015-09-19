@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -19,7 +19,7 @@ display:
         options:
           perm: 'views_test_data test permission'
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       pager:

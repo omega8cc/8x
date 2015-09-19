@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Contains Drupal\search\Controller\SearchController
+ * Contains \Drupal\search\Controller\SearchController.
  */
 
 namespace Drupal\search\Controller;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Config\ConfigFactory;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\search\SearchPageInterface;
@@ -116,22 +117,25 @@ class SearchController extends ControllerBase {
         '#markup' => '<h3>' . $this->t('Your search yielded no results.') . '</h3>',
       ),
       '#list_type' => 'ol',
-      '#attributes' => array(
-        'class' => array(
-          'search-results',
-          $plugin->getPluginId() . '-results',
-        ),
-      ),
       '#cache' => array(
         'tags' => $entity->getCacheTags(),
       ),
+      '#context' => array(
+        'plugin' => $plugin->getPluginId(),
+      ),
     );
+
+    // If this plugin uses a search index, then also add the cache tag tracking
+    // that search index, so that cached search result pages are invalidated
+    // when necessary.
+    if ($plugin->getType()) {
+      $build['search_results']['#cache']['tags'][] = 'search_index';
+      $build['search_results']['#cache']['tags'][] = 'search_index:' . $plugin->getType();
+    }
 
     $build['pager'] = array(
-      '#theme' => 'pager',
+      '#type' => 'pager',
     );
-
-    $build['#attached']['library'][] = 'search/drupal.search.results';
 
     return $build;
   }

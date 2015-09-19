@@ -7,8 +7,6 @@
 
 namespace Drupal\system\Plugin\ImageToolkit\Operation\gd;
 
-use Drupal\Component\Utility\String;
-
 /**
  * Defines GD2 Crop operation.
  *
@@ -67,10 +65,10 @@ class Crop extends GDImageToolkitOperationBase {
 
     // Fail when width or height are 0 or negative.
     if ($arguments['width'] <= 0) {
-      throw new \InvalidArgumentException(String::format("Invalid width (@value) specified for the image 'crop' operation", array('@value' => $arguments['width'])));
+      throw new \InvalidArgumentException("Invalid width ('{$arguments['width']}') specified for the image 'crop' operation");
     }
     if ($arguments['height'] <= 0) {
-      throw new \InvalidArgumentException(String::format("Invalid height (@value) specified for the image 'crop' operation", array('@value' => $arguments['height'])));
+      throw new \InvalidArgumentException("Invalid height ('{$arguments['height']}') specified for the image 'crop' operation");
     }
 
     return $arguments;

@@ -7,7 +7,6 @@
 
 namespace Drupal\system\Tests\Form;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormInterface;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Form\FormStateInterface;
@@ -20,7 +19,19 @@ use Drupal\simpletest\KernelTestBase;
  */
 class TriggeringElementProgrammedUnitTest extends KernelTestBase implements FormInterface {
 
+  /**
+   * {@inheritdoc}
+   */
   public static $modules = array('system');
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+    $this->installSchema('system', ['router']);
+    \Drupal::service('router.builder')->rebuild();
+  }
 
   /**
    * {@inheritdoc}

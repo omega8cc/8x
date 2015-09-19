@@ -10,6 +10,7 @@ namespace Drupal\Tests\Core\Controller;
 use Drupal\Core\Render\MainContent\AjaxRenderer;
 use Drupal\Tests\UnitTestCase;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * @coversDefaultClass \Drupal\Core\Render\MainContent\AjaxRenderer
@@ -25,6 +26,13 @@ class AjaxRendererTest extends UnitTestCase {
   protected $ajaxRenderer;
 
   /**
+   * The renderer.
+   *
+   * @var \Drupal\Core\Render\RendererInterface|\PHPUnit_Framework_MockObject_MockObject
+   */
+  protected $renderer;
+
+  /**
    * {@inheritdoc}
    */
   protected function setUp() {
@@ -38,6 +46,14 @@ class AjaxRendererTest extends UnitTestCase {
         '#error' => NULL,
       ]);
     $this->ajaxRenderer = new TestAjaxRenderer($element_info_manager);
+
+    $this->renderer = $this->getMockBuilder('Drupal\Core\Render\Renderer')
+      ->disableOriginalConstructor()
+      ->setMethods(NULL)
+      ->getMock();
+    $container = new ContainerBuilder();
+    $container->set('renderer', $this->renderer);
+    \Drupal::setContainer($container);
   }
 
   /**
@@ -74,8 +90,8 @@ class TestAjaxRenderer extends AjaxRenderer {
     if (isset($elements['#markup'])) {
       return $elements['#markup'];
     }
-    elseif (isset($elements['#theme'])) {
-      return $elements['#theme'];
+    elseif (isset($elements['#type'])) {
+      return $elements['#type'];
     }
     else {
       return 'Markup';

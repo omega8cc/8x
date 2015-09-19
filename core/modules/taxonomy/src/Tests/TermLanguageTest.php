@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\taxonomy\Tests\TermLanguageTest.
+ * Contains \Drupal\taxonomy\Tests\TermLanguageTest.
  */
 
 namespace Drupal\taxonomy\Tests;
@@ -102,7 +102,7 @@ class TermLanguageTest extends TaxonomyTestBase {
 
     // Change the default language of the site and check if the default terms
     // language is still correctly selected.
-    $this->config('system.site')->set('langcode', 'cc')->save();
+    $this->config('system.site')->set('default_langcode', 'cc')->save();
     $edit = array(
       'default_language[langcode]' => LanguageInterface::LANGCODE_SITE_DEFAULT,
       'default_language[language_alterable]' => TRUE,

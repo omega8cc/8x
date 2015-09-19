@@ -9,10 +9,12 @@ namespace Drupal\Core\Utility;
 
 use Drupal\Component\Serialization\Json;
 use Drupal\Component\Utility\SafeMarkup;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeStringInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\GeneratedLink;
 use Drupal\Core\Link;
 use Drupal\Core\Path\AliasManagerInterface;
+use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Routing\UrlGeneratorInterface;
 use Drupal\Core\Template\Attribute;
 use Drupal\Core\Url;
@@ -37,23 +39,33 @@ class LinkGenerator implements LinkGeneratorInterface {
   protected $moduleHandler;
 
   /**
+   * The renderer service.
+   *
+   * @var \Drupal\Core\Render\RendererInterface
+   */
+  protected $renderer;
+
+  /**
    * Constructs a LinkGenerator instance.
    *
    * @param \Drupal\Core\Routing\UrlGeneratorInterface $url_generator
    *   The url generator.
    * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
+   * @param \Drupal\Core\Render\RendererInterface $renderer
+   *   The renderer service.
    */
-  public function __construct(UrlGeneratorInterface $url_generator, ModuleHandlerInterface $module_handler) {
+  public function __construct(UrlGeneratorInterface $url_generator, ModuleHandlerInterface $module_handler, RendererInterface $renderer) {
     $this->urlGenerator = $url_generator;
     $this->moduleHandler = $module_handler;
+    $this->renderer = $renderer;
   }
 
   /**
    * {@inheritdoc}
    */
-  public function generateFromLink(Link $link) {
-    return $this->generate($link->getText(), $link->getUrl());
+  public function generateFromLink(Link $link, $collect_bubbleable_metadata = FALSE) {
+    return $this->generate($link->getText(), $link->getUrl(), $collect_bubbleable_metadata);
   }
 
   /**
@@ -68,15 +80,14 @@ class LinkGenerator implements LinkGeneratorInterface {
    *
    * @see system_page_attachments()
    */
-  public function generate($text, Url $url) {
+  public function generate($text, Url $url, $collect_bubbleable_metadata = FALSE) {
     // Performance: avoid Url::toString() needing to retrieve the URL generator
     // service from the container.
     $url->setUrlGenerator($this->urlGenerator);
 
     // Start building a structured representation of our link to be altered later.
     $variables = array(
-      // @todo Inject the service when drupal_render() is converted to one.
-      'text' => is_array($text) ? drupal_render($text) : $text,
+      'text' => is_array($text) ? $this->renderer->render($text) : $text,
       'url' => $url,
       'options' => $url->getOptions(),
     );
@@ -85,7 +96,6 @@ class LinkGenerator implements LinkGeneratorInterface {
     $variables['options'] += array(
       'attributes' => array(),
       'query' => array(),
-      'html' => FALSE,
       'language' => NULL,
       'set_active_class' => FALSE,
       'absolute' => FALSE,
@@ -96,6 +106,13 @@ class LinkGenerator implements LinkGeneratorInterface {
     if (!empty($variables['options']['language']) && !isset($variables['options']['attributes']['hreflang'])) {
       $variables['options']['attributes']['hreflang'] = $variables['options']['language']->getId();
     }
+
+    // Ensure that query values are strings.
+    array_walk($variables['options']['query'], function(&$value) {
+      if ($value instanceof SafeStringInterface) {
+        $value = (string) $value;
+      }
+    });
 
     // Set the "active" class if the 'set_active_class' option is not empty.
     if (!empty($variables['options']['set_active_class']) && !$url->isExternal()) {
@@ -126,18 +143,27 @@ class LinkGenerator implements LinkGeneratorInterface {
     // Allow other modules to modify the structure of the link.
     $this->moduleHandler->alter('link', $variables);
 
-    // Move attributes out of options. generateFromRoute(() doesn't need them.
-    $attributes = new Attribute($variables['options']['attributes']);
+    // Move attributes out of options since generateFromRoute() doesn't need
+    // them. Include a placeholder for the href.
+    $attributes = array('href' => '') + $variables['options']['attributes'];
     unset($variables['options']['attributes']);
     $url->setOptions($variables['options']);
 
-    // The result of the url generator is a plain-text URL. Because we are using
-    // it here in an HTML argument context, we need to encode it properly.
-    $url = String::checkPlain($url->toString());
+    if (!$collect_bubbleable_metadata) {
+      $url_string = $url->toString($collect_bubbleable_metadata);
+    }
+    else {
+      $generated_url = $url->toString($collect_bubbleable_metadata);
+      $url_string = $generated_url->getGeneratedUrl();
+      $generated_link = GeneratedLink::createFromObject($generated_url);
+    }
+    // The result of the URL generator is a plain-text URL to use as the href
+    // attribute, and it is escaped by \Drupal\Core\Template\Attribute.
+    $attributes['href'] = $url_string;
 
-    // Sanitize the link text if necessary.
-    $text = $variables['options']['html'] ? $variables['text'] : String::checkPlain($variables['text']);
-    return SafeMarkup::set('<a href="' . $url . '"' . $attributes . '>' . $text . '</a>');
+    $result = SafeMarkup::format('<a@attributes>@text</a>', array('@attributes' => new Attribute($attributes), '@text' => $variables['text']));
+
+    return $collect_bubbleable_metadata ? $generated_link->setGeneratedLink($result) : $result;
   }
 
 }

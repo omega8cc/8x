@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\Core\Entity\Annotation\FieldType.
+ * Contains \Drupal\Core\Field\Annotation\FieldType.
  */
 
 namespace Drupal\Core\Field\Annotation;
@@ -87,7 +87,7 @@ class FieldType extends DataType {
   /**
    * A boolean stating that fields of this type cannot be created through the UI.
    *
-   * @var boolean
+   * @var bool
    */
   public $no_ui = FALSE;
 

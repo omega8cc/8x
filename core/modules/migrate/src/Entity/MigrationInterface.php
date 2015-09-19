@@ -122,10 +122,13 @@ interface MigrationInterface extends ConfigEntityInterface {
   /**
    * Returns the initialized destination plugin.
    *
+   * @param bool $stub_being_requested
+   *  TRUE to indicate that this destination will be asked to construct a stub.
+   *
    * @return \Drupal\migrate\Plugin\MigrateDestinationInterface
    *   The destination plugin.
    */
-  public function getDestinationPlugin($stub = FALSE);
+  public function getDestinationPlugin($stub_being_requested = FALSE);
 
   /**
    * Returns the initialized id_map plugin.
@@ -164,6 +167,30 @@ interface MigrationInterface extends ConfigEntityInterface {
   public function isComplete();
 
   /**
+   * Set the current migration status.
+   *
+   * @param int $result
+   *   One of the STATUS_* constants.
+   */
+  public function setStatus($status);
+
+  /**
+   * Get the current migration status.
+   *
+   * @return int
+   *   The current migration status. Defaults to STATUS_IDLE.
+   */
+  public function getStatus();
+
+  /**
+   * Retrieve a label for the current status.
+   *
+   * @return string
+   *   User-friendly string corresponding to a STATUS_ constant.
+   */
+  public function getStatusLabel();
+
+  /**
    * Set the migration result.
    *
    * @param int $result
@@ -178,6 +205,15 @@ interface MigrationInterface extends ConfigEntityInterface {
    *   The current migration result. Defaults to RESULT_INCOMPLETE.
    */
   public function getMigrationResult();
+
+  /**
+   * Signal that the migration should be interrupted with the specified result
+   * code.
+   *
+   * @param int $result
+   *   One of the MigrationInterface::RESULT_* constants.
+   */
+  public function interruptMigration($result);
 
   /**
    * Get the normalized process pipeline configuration describing the process
@@ -216,8 +252,6 @@ interface MigrationInterface extends ConfigEntityInterface {
    *
    * @return $this
    *   The migration entity.
-   *
-   * @see Drupal\migrate_drupal\Plugin\migrate\load\LoadEntity::processLinkField().
    */
   public function setProcessOfProperty($property, $process_of_property);
 

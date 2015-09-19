@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Role.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Role.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -38,6 +38,7 @@ class Role extends DrupalDumpBase {
           'default' => '',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("role")->fields(array(
       'rid',
@@ -62,3 +63,4 @@ class Role extends DrupalDumpBase {
   }
 
 }
+#de28ef60b89f3517fe56e03c4d2c1f95

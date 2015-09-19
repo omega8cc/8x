@@ -47,6 +47,14 @@ use Drupal\search\SearchPageInterface;
  *     "label" = "label",
  *     "weight" = "weight",
  *     "status" = "status"
+ *   },
+ *   config_export = {
+ *     "id",
+ *     "label",
+ *     "path",
+ *     "weight",
+ *     "plugin",
+ *     "configuration",
  *   }
  * )
  */
@@ -172,8 +180,8 @@ class SearchPage extends ConfigEntityBase implements SearchPageInterface, Entity
   public function postCreate(EntityStorageInterface $storage) {
     parent::postCreate($storage);
 
-    // @todo Use self::applyDefaultValue() once https://drupal.org/node/2004756
-    //   is in.
+    // @todo Use self::applyDefaultValue() once
+    //   https://www.drupal.org/node/2004756 is in.
     if (!isset($this->weight)) {
       $this->weight = $this->isDefaultSearch() ? -10 : 0;
     }
@@ -184,7 +192,7 @@ class SearchPage extends ConfigEntityBase implements SearchPageInterface, Entity
    */
   public function postSave(EntityStorageInterface $storage, $update = TRUE) {
     parent::postSave($storage, $update);
-    $this->routeBuilderIndicator()->setRebuildNeeded();
+    $this->routeBuilder()->setRebuildNeeded();
   }
 
   /**
@@ -216,11 +224,11 @@ class SearchPage extends ConfigEntityBase implements SearchPageInterface, Entity
   /**
    * Wraps the route builder.
    *
-   * @return \Drupal\Core\Routing\RouteBuilderIndicatorInterface
+   * @return \Drupal\Core\Routing\RouteBuilderInterface
    *   An object for state storage.
    */
-  protected function routeBuilderIndicator() {
-    return \Drupal::service('router.builder_indicator');
+  protected function routeBuilder() {
+    return \Drupal::service('router.builder');
   }
 
   /**

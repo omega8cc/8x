@@ -8,8 +8,8 @@
 namespace Drupal\config_translation;
 
 use Drupal\Core\Config\ConfigFactoryInterface;
+use Drupal\Core\Config\Entity\ConfigEntityInterface;
 use Drupal\Core\Config\TypedConfigManagerInterface;
-use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Routing\RouteMatch;
@@ -43,7 +43,7 @@ class ConfigEntityMapper extends ConfigNamesMapper {
   /**
    * Loaded entity instance to help produce the translation interface.
    *
-   * @var \Drupal\Core\Entity\EntityInterface
+   * @var \Drupal\Core\Config\Entity\ConfigEntityInterface
    */
   protected $entity;
 
@@ -98,7 +98,7 @@ class ConfigEntityMapper extends ConfigNamesMapper {
       $plugin_definition,
       $container->get('config.factory'),
       $container->get('config.typed'),
-      $container->get('locale.config.typed'),
+      $container->get('locale.config_manager'),
       $container->get('plugin.manager.config_translation.mapper'),
       $container->get('router.route_provider'),
       $container->get('string_translation'),
@@ -125,13 +125,13 @@ class ConfigEntityMapper extends ConfigNamesMapper {
    * configuration names to use to check permissions or display a translation
    * screen.
    *
-   * @param \Drupal\Core\Entity\EntityInterface $entity
-   *   The entity to set.
+   * @param \Drupal\Core\Config\Entity\ConfigEntityInterface $entity
+   *   The configuration entity to set.
    *
    * @return bool
    *   TRUE, if the entity was set successfully; FALSE otherwise.
    */
-  public function setEntity(EntityInterface $entity) {
+  public function setEntity(ConfigEntityInterface $entity) {
     if (isset($this->entity)) {
       return FALSE;
     }
@@ -143,6 +143,7 @@ class ConfigEntityMapper extends ConfigNamesMapper {
     // page with more names if form altering added more configuration to an
     // entity. This is not a Drupal 8 best practice (ideally the configuration
     // would have pluggable components), but this may happen as well.
+    /** @var \Drupal\Core\Config\Entity\ConfigEntityTypeInterface $entity_type_info */
     $entity_type_info = $this->entityManager->getDefinition($this->entityType);
     $this->addConfigName($entity_type_info->getConfigPrefix() . '.' . $entity->id());
 
@@ -234,7 +235,7 @@ class ConfigEntityMapper extends ConfigNamesMapper {
    */
   public function getContextualLinkGroup() {
     // @todo Contextual groups do not map to entity types in a predictable
-    //   way. See https://drupal.org/node/2134841 to make them predictable.
+    //   way. See https://www.drupal.org/node/2134841 to make them predictable.
     switch ($this->entityType) {
       case 'menu':
       case 'block':

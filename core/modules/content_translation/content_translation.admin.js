@@ -1,15 +1,26 @@
+/**
+ * @file
+ * Content Translation admin behaviors.
+ */
+
 (function ($, Drupal, drupalSettings) {
 
   "use strict";
 
   /**
    * Forces applicable options to be checked as translatable.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches content translation dependent options to the UI.
    */
   Drupal.behaviors.contentTranslationDependentOptions = {
     attach: function (context) {
       var $context = $(context);
       var options = drupalSettings.contentTranslationDependentOptions;
-      var $fields, dependent_columns;
+      var $fields;
+      var dependent_columns;
 
       function fieldsChangeHandler($fields, dependent_columns) {
         return function (e) {
@@ -65,12 +76,17 @@
 
   /**
    * Makes field translatability inherit bundle translatability.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches content translation behavior.
    */
   Drupal.behaviors.contentTranslation = {
     attach: function (context) {
-      // Initially hide all field rows for non translatable bundles and all column
-      // rows for non translatable fields.
-      $(context).find('table .bundle-settings .translatable :input').once('translation-entity-admin-hide', function () {
+      // Initially hide all field rows for non translatable bundles and all
+      // column rows for non translatable fields.
+      $(context).find('table .bundle-settings .translatable :input').once('translation-entity-admin-hide').each(function () {
         var $input = $(this);
         var $bundleSettings = $input.closest('.bundle-settings');
         if (!$input.is(':checked')) {

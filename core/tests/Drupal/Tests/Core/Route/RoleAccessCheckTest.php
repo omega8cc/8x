@@ -8,6 +8,8 @@
 namespace Drupal\Tests\Core\Route;
 
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Cache\Context\CacheContextsManager;
+use Drupal\Core\DependencyInjection\Container;
 use Drupal\Core\Session\UserSession;
 use Drupal\Tests\UnitTestCase;
 use Drupal\user\Access\RoleAccessCheck;
@@ -143,19 +145,24 @@ class RoleAccessCheckTest extends UnitTestCase {
    * @dataProvider roleAccessProvider
    */
   public function testRoleAccess($path, $grant_accounts, $deny_accounts) {
+    $cache_contexts_manager = $this->prophesize(CacheContextsManager::class)->reveal();
+    $container = new Container();
+    $container->set('cache_contexts_manager', $cache_contexts_manager);
+    \Drupal::setContainer($container);
+
     $role_access_check = new RoleAccessCheck();
     $collection = $this->getTestRouteCollection();
 
     foreach ($grant_accounts as $account) {
       $message = sprintf('Access granted for user with the roles %s on path: %s', implode(', ', $account->getRoles()), $path);
-      $this->assertEquals(AccessResult::allowed()->cachePerRole(), $role_access_check->access($collection->get($path), $account), $message);
+      $this->assertEquals(AccessResult::allowed()->addCacheContexts(['user.roles']), $role_access_check->access($collection->get($path), $account), $message);
     }
 
     // Check all users which don't have access.
     foreach ($deny_accounts as $account) {
       $message = sprintf('Access denied for user %s with the roles %s on path: %s', $account->id(), implode(', ', $account->getRoles()), $path);
       $has_access = $role_access_check->access($collection->get($path), $account);
-      $this->assertEquals(AccessResult::neutral()->cachePerRole(), $has_access, $message);
+      $this->assertEquals(AccessResult::neutral()->addCacheContexts(['user.roles']), $has_access, $message);
     }
   }
 

@@ -24,18 +24,17 @@ class NumberFieldTest extends WebTestBase {
    */
   public static $modules = array('node', 'entity_test', 'field_ui');
 
-  /**
-   * A user with permission to view and manage entities and content types.
-   *
-   * @var \Drupal\user\UserInterface
-   */
-  protected $web_user;
-
   protected function setUp() {
     parent::setUp();
-
-    $this->web_user = $this->drupalCreateUser(array('view test entity', 'administer entity_test content', 'administer content types', 'administer node fields', 'administer node display', 'bypass node access', 'administer entity_test fields'));
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->drupalCreateUser(array(
+      'view test entity',
+      'administer entity_test content',
+      'administer content types',
+      'administer node fields',
+      'administer node display',
+      'bypass node access',
+      'administer entity_test fields',
+    )));
   }
 
   /**
@@ -285,7 +284,11 @@ class NumberFieldTest extends WebTestBase {
     preg_match('|entity_test/manage/(\d+)|', $this->url, $match);
     $id = $match[1];
     $this->assertText(t('entity_test @id has been created.', array('@id' => $id)), 'Entity was created');
-    $this->assertRaw(round($value, 2), 'Value is displayed.');
+
+    // Ensure that the 'number_decimal' formatter displays the number with the
+    // expected rounding.
+    $this->drupalGet('entity_test/' . $id);
+    $this->assertRaw(round($value, 2));
 
     // Try to create entries with more than one decimal separator; assert fail.
     $wrong_entries = array(
@@ -517,7 +520,7 @@ class NumberFieldTest extends WebTestBase {
 
     // Set the minimum value.
     $edit = array(
-      'field[settings][min]' => $minimum_value,
+      'settings[min]' => $minimum_value,
     );
     $this->drupalPostForm($field_configuration_url, $edit, t('Save settings'));
     // Check if an error message is shown.
@@ -526,6 +529,6 @@ class NumberFieldTest extends WebTestBase {
     $this->assertRaw(t('Saved %label configuration.', array('%label' => $field->getLabel())));
     // Check if the minimum value was actually set.
     $this->drupalGet($field_configuration_url);
-    $this->assertFieldById('edit-field-settings-min', $minimum_value, 'Minimal ' . gettype($minimum_value) .'  value was set on a ' . $field->getType() . ' field.');
+    $this->assertFieldById('edit-settings-min', $minimum_value, 'Minimal ' . gettype($minimum_value) .'  value was set on a ' . $field->getType() . ' field.');
   }
 }

@@ -7,9 +7,11 @@
 
 namespace Drupal\Core\Field\Plugin\Field\FieldFormatter;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\EntityManagerInterface;
+use Drupal\Core\Entity\RevisionableInterface;
 use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldItemInterface;
 use Drupal\Core\Field\FormatterBase;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -24,6 +26,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *   label = @Translation("Plain text"),
  *   field_types = {
  *     "string",
+ *     "uri",
  *   },
  *   quickedit = {
  *     "editor" = "plain_text"
@@ -91,6 +94,7 @@ class StringFormatter extends FormatterBase implements ContainerFactoryPluginInt
     $form = parent::settingsForm($form, $form_state);
 
     $entity_type = $this->entityManager->getDefinition($this->fieldDefinition->getTargetEntityTypeId());
+
     $form['link_to_entity'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Link to the @entity_label', ['@entity_label' => $entity_type->getLabel()]),
@@ -104,12 +108,12 @@ class StringFormatter extends FormatterBase implements ContainerFactoryPluginInt
    * {@inheritdoc}
    */
   public function settingsSummary() {
-    $build = [];
+    $summary = [];
     if ($this->getSetting('link_to_entity')) {
       $entity_type = $this->entityManager->getDefinition($this->fieldDefinition->getTargetEntityTypeId());
-      $build['#markup'] = $this->t('Linked to the @entity_label', ['@entity_label' => $entity_type->getLabel()]);
+      $summary[] = $this->t('Linked to the @entity_label', ['@entity_label' => $entity_type->getLabel()]);
     }
-    return $build;
+    return $summary;
   }
 
   /**
@@ -117,31 +121,43 @@ class StringFormatter extends FormatterBase implements ContainerFactoryPluginInt
    */
   public function viewElements(FieldItemListInterface $items) {
     $elements = array();
-
     $url = NULL;
-    // Add support to link to the entity itself.
-    if ($this->getSetting('link_to_entity') && ($entity = $items->getEntity()) && $entity->hasLinkTemplate('canonical')) {
-      $url = $entity->urlInfo();
+    if ($this->getSetting('link_to_entity')) {
+      // For the default revision this falls back to 'canonical'
+      $url = $items->getEntity()->urlInfo('revision');
     }
 
     foreach ($items as $delta => $item) {
-      // The text value has no text format assigned to it, so the user input
-      // should equal the output, including newlines.
-      $string = nl2br(String::checkPlain($item->value));
-
+      $view_value = $this->viewValue($item);
       if ($url) {
         $elements[$delta] = [
           '#type' => 'link',
-          '#title' => $string,
+          '#title' => $view_value,
           '#url' => $url,
         ];
       }
       else {
-        $elements[$delta] = ['#markup' => $string];
+        $elements[$delta] = is_array($view_value) ? $view_value : ['#markup' => $view_value];
       }
     }
-
     return $elements;
+  }
+
+  /**
+   * Generate the output appropriate for one field item.
+   *
+   * @param \Drupal\Core\Field\FieldItemInterface $item
+   *   One field item.
+   *
+   * @return array
+   *   The textual output generated as a render array.
+   */
+  protected function viewValue(FieldItemInterface $item) {
+    // The text value has no text format assigned to it, so the user input
+    // should equal the output, including newlines.
+    return [
+      '#markup' => nl2br(Html::escape($item->value))
+    ];
   }
 
 }

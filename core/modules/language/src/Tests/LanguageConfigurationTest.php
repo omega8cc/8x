@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\language\Tests\LanguageConfigurationTest.
+ * Contains \Drupal\language\Tests\LanguageConfigurationTest.
  */
 
 namespace Drupal\language\Tests;
@@ -41,11 +41,15 @@ class LanguageConfigurationTest extends WebTestBase {
     $this->drupalGet('admin/config/regional/language/detection/url');
     $this->assertFieldByXPath('//input[@name="prefix[en]"]', '', 'Default English has no path prefix.');
 
+    // Check that Add language is a primary button.
+    $this->drupalGet('admin/config/regional/language/add');
+    $this->assertFieldByXPath('//input[contains(@class, "button--primary")]', 'Add language', 'Add language is a primary button');
+
     // Add predefined language.
     $edit = array(
       'predefined_langcode' => 'fr',
     );
-    $this->drupalPostForm('admin/config/regional/language/add', $edit, 'Add language');
+    $this->drupalPostForm(NULL, $edit, 'Add language');
     $this->assertText('French');
     $this->assertUrl(\Drupal::url('entity.configurable_language.collection', [], ['absolute' => TRUE]), [], 'Correct page redirection.');
     // Langcode for Languages is always 'en'.
@@ -87,6 +91,12 @@ class LanguageConfigurationTest extends WebTestBase {
     $this->drupalPostForm(NULL, $edit, t('Save configuration'));
     $this->assertFieldByXPath('//input[@name="prefix[fr]"]', 'french', 'French path prefix has changed.');
 
+    // Check that the prefix can be removed.
+    $edit = array(
+      'prefix[fr]' => '',
+    );
+    $this->drupalPostForm(NULL, $edit, t('Save configuration'));
+    $this->assertNoText(t('The prefix may only be left blank for the selected detection fallback language.'), 'The path prefix can be removed for the default language');
 
     // Change default negotiation language.
     $this->config('language.negotiation')->set('selected_langcode', 'fr')->save();
@@ -132,7 +142,7 @@ class LanguageConfigurationTest extends WebTestBase {
     );
     $this->drupalPostForm('admin/config/regional/language/add', $edit, 'Add language');
     $language = $this->config('language.entity.de')->get();
-    $this->assertEqual($language['langcode'], 'en');
+    $this->assertEqual($language['langcode'], 'fr');
 
     // Ensure that German language has a weight of 5 after being created through
     // the UI.

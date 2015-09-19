@@ -10,14 +10,18 @@ namespace Drupal\Core\Form;
 use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\UrlHelper;
+use Drupal\Core\Access\AccessResultInterface;
 use Drupal\Core\Access\CsrfTokenGenerator;
 use Drupal\Core\DependencyInjection\ClassResolverInterface;
+use Drupal\Core\EventSubscriber\MainContentViewSubscriber;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Form\Exception\BrokenPostRequestException;
 use Drupal\Core\Render\Element;
+use Drupal\Core\Render\ElementInfoManagerInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Component\HttpFoundation\FileBag;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -48,6 +52,13 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
    * @var \Symfony\Component\HttpFoundation\RequestStack
    */
   protected $requestStack;
+
+  /**
+   * The element info manager.
+   *
+   * @var \Drupal\Core\Render\ElementInfoManagerInterface
+   */
+  protected $elementInfo;
 
   /**
    * The CSRF token generator to validate the form token.
@@ -95,6 +106,45 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
   protected $formCache;
 
   /**
+   * Defines element value callables which are safe to run even when the form
+   * state has an invalid CSRF token.
+   *
+   * Excluded from this list on purpose:
+   *  - Drupal\file\Element\ManagedFile::valueCallback
+   *  - Drupal\Core\Datetime\Element\Datelist::valueCallback
+   *  - Drupal\Core\Datetime\Element\Datetime::valueCallback
+   *  - Drupal\Core\Render\Element\ImageButton::valueCallback
+   *  - Drupal\file\Plugin\Field\FieldWidget\FileWidget::value
+   *  - color_palette_color_value
+   *
+   * @var array
+   */
+  protected $safeCoreValueCallables = [
+    'Drupal\Core\Render\Element\Checkbox::valueCallback',
+    'Drupal\Core\Render\Element\Checkboxes::valueCallback',
+    'Drupal\Core\Render\Element\Email::valueCallback',
+    'Drupal\Core\Render\Element\FormElement::valueCallback',
+    'Drupal\Core\Render\Element\MachineName::valueCallback',
+    'Drupal\Core\Render\Element\Number::valueCallback',
+    'Drupal\Core\Render\Element\PathElement::valueCallback',
+    'Drupal\Core\Render\Element\Password::valueCallback',
+    'Drupal\Core\Render\Element\PasswordConfirm::valueCallback',
+    'Drupal\Core\Render\Element\Radio::valueCallback',
+    'Drupal\Core\Render\Element\Radios::valueCallback',
+    'Drupal\Core\Render\Element\Range::valueCallback',
+    'Drupal\Core\Render\Element\Search::valueCallback',
+    'Drupal\Core\Render\Element\Select::valueCallback',
+    'Drupal\Core\Render\Element\Tableselect::valueCallback',
+    'Drupal\Core\Render\Element\Table::valueCallback',
+    'Drupal\Core\Render\Element\Tel::valueCallback',
+    'Drupal\Core\Render\Element\Textarea::valueCallback',
+    'Drupal\Core\Render\Element\Textfield::valueCallback',
+    'Drupal\Core\Render\Element\Token::valueCallback',
+    'Drupal\Core\Render\Element\Url::valueCallback',
+    'Drupal\Core\Render\Element\Weight::valueCallback',
+  ];
+
+  /**
    * Constructs a new FormBuilder.
    *
    * @param \Drupal\Core\Form\FormValidatorInterface $form_validator
@@ -111,12 +161,14 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
    *   The request stack.
    * @param \Drupal\Core\DependencyInjection\ClassResolverInterface $class_resolver
    *   The class resolver.
+   * @param \Drupal\Core\Render\ElementInfoManagerInterface $element_info
+   *   The element info manager.
    * @param \Drupal\Core\Theme\ThemeManagerInterface $theme_manager
    *   The theme manager.
    * @param \Drupal\Core\Access\CsrfTokenGenerator $csrf_token
    *   The CSRF token generator.
    */
-  public function __construct(FormValidatorInterface $form_validator, FormSubmitterInterface $form_submitter, FormCacheInterface $form_cache, ModuleHandlerInterface $module_handler, EventDispatcherInterface $event_dispatcher, RequestStack $request_stack, ClassResolverInterface $class_resolver, ThemeManagerInterface $theme_manager, CsrfTokenGenerator $csrf_token = NULL) {
+  public function __construct(FormValidatorInterface $form_validator, FormSubmitterInterface $form_submitter, FormCacheInterface $form_cache, ModuleHandlerInterface $module_handler, EventDispatcherInterface $event_dispatcher, RequestStack $request_stack, ClassResolverInterface $class_resolver, ElementInfoManagerInterface $element_info, ThemeManagerInterface $theme_manager, CsrfTokenGenerator $csrf_token = NULL) {
     $this->formValidator = $form_validator;
     $this->formSubmitter = $form_submitter;
     $this->formCache = $form_cache;
@@ -124,6 +176,7 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     $this->eventDispatcher = $event_dispatcher;
     $this->requestStack = $request_stack;
     $this->classResolver = $class_resolver;
+    $this->elementInfo = $element_info;
     $this->csrfToken = $csrf_token;
     $this->themeManager = $theme_manager;
   }
@@ -139,7 +192,7 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     }
 
     if (!is_object($form_arg) || !($form_arg instanceof FormInterface)) {
-      throw new \InvalidArgumentException(String::format('The form argument @form_arg is not a valid form.', array('@form_arg' => $form_arg)));
+      throw new \InvalidArgumentException("The form argument $form_arg is not a valid form.");
     }
 
     // Add the $form_arg as the callback object and determine the form ID.
@@ -171,9 +224,22 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     // Ensure the form ID is prepared.
     $form_id = $this->getFormId($form_id, $form_state);
 
+    $request = $this->requestStack->getCurrentRequest();
+
+    // Inform $form_state about the request method that's building it, so that
+    // it can prevent persisting state changes during HTTP methods for which
+    // that is disallowed by HTTP: GET and HEAD.
+    $form_state->setRequestMethod($request->getMethod());
+
+    // Initialize the form's user input. The user input should include only the
+    // input meant to be treated as part of what is submitted to the form, so
+    // we base it on the form's method rather than the request's method. For
+    // example, when someone does a GET request for
+    // /node/add/article?destination=foo, which is a form that expects its
+    // submission method to be POST, the user input during the GET request
+    // should be initialized to empty rather than to ['destination' => 'foo'].
     $input = $form_state->getUserInput();
     if (!isset($input)) {
-      $request = $this->requestStack->getCurrentRequest();
       $input = $form_state->isMethodType('get') ? $request->query->all() : $request->request->all();
       $form_state->setUserInput($input);
     }
@@ -233,6 +299,12 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       }
     }
 
+    // If this form is an AJAX request, disable all form redirects.
+    $request = $this->requestStack->getCurrentRequest();
+    if ($ajax_form_request = $request->query->has(static::AJAX_FORM_REQUEST)) {
+      $form_state->disableRedirect();
+    }
+
     // Now that we have a constructed form, process it. This is where:
     // - Element #process functions get called to further refine $form.
     // - User input, if any, gets incorporated in the #value property of the
@@ -245,6 +317,24 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     // All of the handlers in the pipeline receive $form_state by reference and
     // can use it to know or update information about the state of the form.
     $response = $this->processForm($form_id, $form, $form_state);
+
+    // In case the post request exceeds the configured allowed size
+    // (post_max_size), the post request is potentially broken. Add some
+    // protection against that and at the same time have a nice error message.
+    if ($ajax_form_request && !isset($form_state->getUserInput()['form_id'])) {
+      throw new BrokenPostRequestException($this->getFileUploadMaxSize());
+    }
+
+    // After processing the form, if this is an AJAX form request, interrupt
+    // form rendering and return by throwing an exception that contains the
+    // processed form and form state. This exception will be caught by
+    // \Drupal\Core\Form\EventSubscriber\FormAjaxSubscriber::onException() and
+    // then passed through
+    // \Drupal\Core\Form\FormAjaxResponseBuilderInterface::buildResponse() to
+    // build a proper AJAX response.
+    if ($ajax_form_request && $form_state->isProcessingInput()) {
+      throw new FormAjaxException($form, $form_state);
+    }
 
     // If the form returns a response, skip subsequent page construction by
     // throwing an exception.
@@ -275,8 +365,22 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
    */
   public function rebuildForm($form_id, FormStateInterface &$form_state, $old_form = NULL) {
     $form = $this->retrieveForm($form_id, $form_state);
-    // All rebuilt forms will be cached.
-    $form_state->setCached();
+
+    // Only GET and POST are valid form methods. If the form receives its input
+    // via POST, then $form_state must be persisted when it is rebuilt between
+    // submissions. If the form receives its input via GET, then persisting
+    // state is forbidden by $form_state->setCached(), and the form must use
+    // the URL itself to transfer its state across steps. Although $form_state
+    // throws an exception based on the request method rather than the form's
+    // method, we base the decision to cache on the form method, because:
+    // - It's the form method that defines what the form needs to do to manage
+    //   its state.
+    // - rebuildForm() should only be called after successful input processing,
+    //   which means the request method matches the form method, and if not,
+    //   there's some other error, so it's ok if an exception is thrown.
+    if ($form_state->isMethodType('POST')) {
+      $form_state->setCached();
+    }
 
     // If only parts of the form will be returned to the browser (e.g., Ajax or
     // RIA clients), or if the form already had a new build ID regenerated when
@@ -301,9 +405,9 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       $form['#build_id'] = 'form-' . Crypt::randomBytesBase64();
     }
 
-    // #action defaults to request_uri(), but in case of Ajax and other partial
-    // rebuilds, the form is submitted to an alternate URL, and the original
-    // #action needs to be retained.
+    // #action defaults to $request->getRequestUri(), but in case of Ajax and
+    // other partial rebuilds, the form is submitted to an alternate URL, and
+    // the original #action needs to be retained.
     if (isset($old_form['#action']) && !empty($rebuild_info['copy']['#action'])) {
       $form['#action'] = $old_form['#action'];
     }
@@ -338,6 +442,13 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
    */
   public function setCache($form_build_id, $form, FormStateInterface $form_state) {
     $this->formCache->setCache($form_build_id, $form, $form_state);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function deleteCache($form_build_id) {
+    $this->formCache->deleteCache($form_build_id);
   }
 
   /**
@@ -450,11 +561,6 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
 
     // Only process the input if we have a correct form submission.
     if ($form_state->isProcessingInput()) {
-      // Form constructors may explicitly set #token to FALSE when cross site
-      // request forgery is irrelevant to the form, such as search forms.
-      if (isset($form['#token']) && $form['#token'] === FALSE) {
-        unset($form['#token']);
-      }
       // Form values for programmed form submissions typically do not include a
       // value for the submit button. But without a triggering element, a
       // potentially existing #limit_validation_errors property on the primary
@@ -477,8 +583,15 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
         Html::resetSeenIds();
       }
 
+      // If there are no errors and the form is not rebuilding, submit the form.
       if (!$form_state->isRebuilding() && !FormState::hasAnyErrors()) {
-        if ($submit_response = $this->formSubmitter->doSubmitForm($form, $form_state)) {
+        $submit_response = $this->formSubmitter->doSubmitForm($form, $form_state);
+        // If this form was cached, delete it from the cache after submission.
+        if ($form_state->isCached()) {
+          $this->deleteCache($form['#build_id']);
+        }
+        // If the form submission directly returned a response, return it now.
+        if ($submit_response) {
           return $submit_response;
         }
       }
@@ -525,6 +638,20 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
   }
 
   /**
+   * #lazy_builder callback; renders a form action URL.
+   *
+   * @return array
+   *   A renderable array representing the form action.
+   */
+  public function renderPlaceholderFormAction() {
+    return [
+      '#type' => 'markup',
+      '#markup' => $this->buildFormAction(),
+      '#cache' => ['contexts' => ['url.path', 'url.query_args']],
+    ];
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function prepareForm($form_id, &$form, FormStateInterface &$form_state) {
@@ -534,7 +661,17 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
 
     // Only update the action if it is not already set.
     if (!isset($form['#action'])) {
-      $form['#action'] = $this->requestUri();
+      // Instead of setting an actual action URL, we set the placeholder, which
+      // will be replaced at the very last moment. This ensures forms with
+      // dynamically generated action URLs don't have poor cacheability.
+      // Use the proper API to generate the placeholder, when we have one. See
+      // https://www.drupal.org/node/2562341.
+      $placeholder = 'form_action_' . hash('crc32b', __METHOD__);
+
+      $form['#attached']['placeholders'][$placeholder] = [
+        '#lazy_builder' => ['form_builder:renderPlaceholderFormAction', []],
+      ];
+      $form['#action'] = $placeholder;
     }
 
     // Fix the form method, if it is 'get' in $form_state, but not in $form.
@@ -570,14 +707,15 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     // since tokens are session-bound and forms displayed to anonymous users are
     // very likely cached, we cannot assign a token for them.
     // During installation, there is no $user yet.
-    if ($user && $user->isAuthenticated() && !$form_state->isProgrammed()) {
-      // Form constructors may explicitly set #token to FALSE when cross site
-      // request forgery is irrelevant to the form, such as search forms.
-      if (isset($form['#token']) && $form['#token'] === FALSE) {
-        unset($form['#token']);
-      }
-      // Otherwise, generate a public token based on the form id.
-      else {
+    // Form constructors may explicitly set #token to FALSE when cross site
+    // request forgery is irrelevant to the form, such as search forms.
+    if ($form_state->isProgrammed() || (isset($form['#token']) && $form['#token'] === FALSE)) {
+      unset($form['#token']);
+    }
+    else {
+      $form['#cache']['contexts'][] = 'user.roles:authenticated';
+      if ($user && $user->isAuthenticated()) {
+        // Generate a public token based on the form id.
         $form['#token'] = $form_id;
         $form['form_token'] = array(
           '#id' => Html::getUniqueId('edit-' . $form_id . '-form-token'),
@@ -587,6 +725,9 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
           // submitted form value appears literally, regardless of custom #tree
           // and #parents being set elsewhere.
           '#parents' => array('form_token'),
+          '#cache' => [
+            'max-age' => 0,
+          ],
         );
       }
     }
@@ -604,9 +745,12 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     }
     if (!isset($form['#id'])) {
       $form['#id'] = Html::getUniqueId($form_id);
+      // Provide a selector usable by JavaScript. As the ID is unique, its not
+      // possible to rely on it in JavaScript.
+      $form['#attributes']['data-drupal-selector'] = Html::getId($form_id);
     }
 
-    $form += $this->getElementInfo('form');
+    $form += $this->elementInfo->getInfo('form');
     $form += array('#tree' => FALSE, '#parents' => array());
     $form['#validate'][] = '::validateForm';
     $form['#submit'][] = '::submitForm';
@@ -632,6 +776,38 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     $hooks[] = 'form_' . $form_id;
     $this->moduleHandler->alter($hooks, $form, $form_state, $form_id);
     $this->themeManager->alter($hooks, $form, $form_state, $form_id);
+  }
+
+  /**
+   * Builds the $form['#action'].
+   *
+   * @return string
+   *   The URL to be used as the $form['#action'].
+   */
+  protected function buildFormAction() {
+    // @todo Use <current> instead of the master request in
+    //   https://www.drupal.org/node/2505339.
+    $request = $this->requestStack->getMasterRequest();
+    $request_uri = $request->getRequestUri();
+
+    // Prevent cross site requests via the Form API by using an absolute URL
+    // when the request uri starts with multiple slashes..
+    if (strpos($request_uri, '//') === 0) {
+      $request_uri = $request->getUri();
+    }
+
+    // @todo Remove this parsing once these are removed from the request in
+    //   https://www.drupal.org/node/2504709.
+    $parsed = UrlHelper::parse($request_uri);
+    unset($parsed['query'][static::AJAX_FORM_REQUEST], $parsed['query'][MainContentViewSubscriber::WRAPPER_FORMAT]);
+    return $parsed['path'] . ($parsed['query'] ? ('?' . UrlHelper::buildQuery($parsed['query'])) : '');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setInvalidTokenError(FormStateInterface $form_state) {
+    $this->formValidator->setInvalidTokenError($form_state);
   }
 
   /**
@@ -677,7 +853,7 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     $element['#processed'] = FALSE;
 
     // Use element defaults.
-    if (isset($element['#type']) && empty($element['#defaults_loaded']) && ($info = $this->getElementInfo($element['#type']))) {
+    if (isset($element['#type']) && empty($element['#defaults_loaded']) && ($info = $this->elementInfo->getInfo($element['#type']))) {
       // Overlay $info onto $element, retaining preexisting keys in $element.
       $element += $info;
       $element['#defaults_loaded'] = TRUE;
@@ -711,6 +887,20 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       $input = $form_state->getUserInput();
       if ($form_state->isProgrammed() || (!empty($input) && (isset($input['form_id']) && ($input['form_id'] == $form_id)))) {
         $form_state->setProcessInput();
+        if (isset($element['#token'])) {
+          $input = $form_state->getUserInput();
+          if (empty($input['form_token']) || !$this->csrfToken->validate($input['form_token'], $element['#token'])) {
+            // Set an early form error to block certain input processing since
+            // that opens the door for CSRF vulnerabilities.
+            $this->setInvalidTokenError($form_state);
+
+            // This value is checked in self::handleInputElement().
+            $form_state->setInvalidToken(TRUE);
+
+            // Make sure file uploads do not get processed.
+            $this->requestStack->getCurrentRequest()->files = new FileBag();
+          }
+        }
       }
       else {
         $form_state->setProcessInput(FALSE);
@@ -721,7 +911,16 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     }
 
     if (!isset($element['#id'])) {
-      $element['#id'] = Html::getUniqueId('edit-' . implode('-', $element['#parents']));
+      $unprocessed_id = 'edit-' . implode('-', $element['#parents']);
+      $element['#id'] = Html::getUniqueId($unprocessed_id);
+      // Provide a selector usable by JavaScript. As the ID is unique, its not
+      // possible to rely on it in JavaScript.
+      $element['#attributes']['data-drupal-selector'] = Html::getId($unprocessed_id);
+    }
+    else {
+      // Provide a selector usable by JavaScript. As the ID is unique, its not
+      // possible to rely on it in JavaScript.
+      $element['#attributes']['data-drupal-selector'] = Html::getId($element['#id']);
     }
 
     // Add the aria-describedby attribute to associate the form control with its
@@ -748,10 +947,17 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
 
     // Recurse through all child elements.
     $count = 0;
+    if (isset($element['#access'])) {
+      $access = $element['#access'];
+      $inherited_access = NULL;
+      if (($access instanceof AccessResultInterface && !$access->isAllowed()) || $access === FALSE) {
+        $inherited_access = $access;
+      }
+    }
     foreach (Element::children($element) as $key) {
       // Prior to checking properties of child elements, their default
       // properties need to be loaded.
-      if (isset($element[$key]['#type']) && empty($element[$key]['#defaults_loaded']) && ($info = $this->getElementInfo($element[$key]['#type']))) {
+      if (isset($element[$key]['#type']) && empty($element[$key]['#defaults_loaded']) && ($info = $this->elementInfo->getInfo($element[$key]['#type']))) {
         $element[$key] += $info;
         $element[$key]['#defaults_loaded'] = TRUE;
       }
@@ -761,9 +967,9 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
         $element[$key]['#tree'] = $element['#tree'];
       }
 
-      // Deny access to child elements if parent is denied.
-      if (isset($element['#access']) && !$element['#access']) {
-        $element[$key]['#access'] = FALSE;
+      // Children inherit #access from parent.
+      if (isset($inherited_access)) {
+        $element[$key]['#access'] = $inherited_access;
       }
 
       // Make child elements inherit their parent's #disabled and #allow_focus
@@ -801,8 +1007,8 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
     // The #after_build flag allows any piece of a form to be altered
     // after normal input parsing has been completed.
     if (isset($element['#after_build']) && !isset($element['#after_build_done'])) {
-      foreach ($element['#after_build'] as $callable) {
-        $element = call_user_func_array($callable, array($element, &$form_state));
+      foreach ($element['#after_build'] as $callback) {
+        $element = call_user_func_array($form_state->prepareCallback($callback), array($element, &$form_state));
       }
       $element['#after_build_done'] = TRUE;
     }
@@ -820,6 +1026,11 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       if ($form_state->hasFileElement()) {
         $element['#attributes']['enctype'] = 'multipart/form-data';
       }
+
+      // Allow Ajax submissions to the form action to bypass verification. This
+      // is especially useful for multipart forms, which cannot be verified via
+      // a response header.
+      $element['#attached']['drupalSettings']['ajaxTrustedUrl'][$element['#action']] = TRUE;
 
       // If a form contains a single textfield, and the ENTER key is pressed
       // within it, Internet Explorer submits the form with no POST data
@@ -864,6 +1075,31 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       }
     }
     return $element;
+  }
+
+  /**
+   * Helper function to normalize the different callable formats.
+   *
+   * @param callable $value_callable
+   *   The callable to be checked.
+   *
+   * @return bool
+   *   TRUE if the callable is safe even if the CSRF token is invalid, FALSE
+   *   otherwise.
+   */
+  protected function valueCallableIsSafe(callable $value_callable) {
+    // The same static class method callable may be formatted in two array and
+    // two string forms:
+    // ['\Classname', 'methodname']
+    // ['Classname', 'methodname']
+    // '\Classname::methodname'
+    // 'Classname::methodname'
+    if (is_callable($value_callable, FALSE, $callable_name)) {
+      // The third parameter of is_callable() is set to a string form, but we
+      // still have to normalize further by stripping a leading '\'.
+      return in_array(ltrim($callable_name, '\\'), $this->safeCoreValueCallables);
+    }
+    return FALSE;
   }
 
   /**
@@ -955,7 +1191,14 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
         // If we have input for the current element, assign it to the #value
         // property, optionally filtered through $value_callback.
         if ($input_exists) {
-          $element['#value'] = call_user_func_array($value_callable, array(&$element, $input, &$form_state));
+          // Skip all value callbacks except safe ones like text if the CSRF
+          // token was invalid.
+          if (!$form_state->hasInvalidToken() || $this->valueCallableIsSafe($value_callable)) {
+            $element['#value'] = call_user_func_array($value_callable, array(&$element, $input, &$form_state));
+          }
+          else {
+            $input = NULL;
+          }
 
           if (!isset($element['#value']) && isset($input)) {
             $element['#value'] = $input;
@@ -1079,12 +1322,14 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
   }
 
   /**
-   * Wraps element_info().
+   * Wraps file_upload_max_size().
    *
-   * @return array
+   * @return string
+   *   A translated string representation of the size of the file size limit
+   *   based on the PHP upload_max_filesize and post_max_size.
    */
-  protected function getElementInfo($type) {
-    return element_info($type);
+  protected function getFileUploadMaxSize() {
+    return file_upload_max_size();
   }
 
   /**
@@ -1097,15 +1342,6 @@ class FormBuilder implements FormBuilderInterface, FormValidatorInterface, FormS
       $this->currentUser = \Drupal::currentUser();
     }
     return $this->currentUser;
-  }
-
-  /**
-   * Gets the current request URI.
-   *
-   * @return string
-   */
-  protected function requestUri() {
-    return request_uri();
   }
 
 }

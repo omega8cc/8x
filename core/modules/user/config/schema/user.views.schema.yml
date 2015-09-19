@@ -16,8 +16,8 @@ views.access.role:
       type: sequence
       label: 'List of roles'
       sequence:
-        - type: string
-          label: 'Role'
+        type: string
+        label: 'Role'
 
 views.argument.user_uid:
   type: views.argument.numeric
@@ -41,8 +41,8 @@ views.argument_validator.user:
       type: sequence
       label: 'Restrict to the selected roles'
       sequence:
-        - type: string
-          label: 'Role'
+        type: string
+        label: 'Role'
 
 views.argument_default.user:
   type: mapping
@@ -66,44 +66,6 @@ views_field_user:
     link_to_user:
       type: boolean
       label: 'Link this field to its user'
-
-views.field.user_language:
-  type: views_field_user
-  label: 'User language'
-
-views.field.user_link:
-  type: views_field
-  label: 'User link'
-  mapping:
-    text:
-      type: text
-      label: 'Text to display'
-
-views.field.user_link_cancel:
-  type: views.field.user_link
-  label: 'User cancel link'
-
-views.field.user_link_edit:
-  type: views.field.user_link
-  label: 'User edit link'
-
-views.field.user_mail:
-  type: views_field_user
-  label: 'User language'
-
-views.field.user_name:
-  type: views_field_user
-  label: 'User name'
-  mapping:
-    format_username:
-      type: boolean
-      label: 'Use formatted username'
-    overwrite_anonymous:
-      type: boolean
-      label: 'Overwrite the value to display for anonymous users'
-    anonymous_text:
-      type: label
-      label: 'Text to display for anonymous users'
 
 views.field.user_permissions:
   type: views.field.prerender_list

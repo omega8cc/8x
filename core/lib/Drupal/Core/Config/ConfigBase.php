@@ -8,7 +8,9 @@
 namespace Drupal\Core\Config;
 
 use Drupal\Component\Utility\NestedArray;
-use Drupal\Component\Utility\String;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Cache\RefinableCacheableDependencyInterface;
+use Drupal\Core\Cache\RefinableCacheableDependencyTrait;
 use \Drupal\Core\DependencyInjection\DependencySerializationTrait;
 
 /**
@@ -26,8 +28,9 @@ use \Drupal\Core\DependencyInjection\DependencySerializationTrait;
  * @see \Drupal\Core\Config\Config
  * @see \Drupal\Core\Theme\ThemeSettings
  */
-abstract class ConfigBase {
+abstract class ConfigBase implements RefinableCacheableDependencyInterface {
   use DependencySerializationTrait;
+  use RefinableCacheableDependencyTrait;
 
   /**
    * The name of the configuration object.
@@ -95,24 +98,17 @@ abstract class ConfigBase {
   public static function validateName($name) {
     // The name must be namespaced by owner.
     if (strpos($name, '.') === FALSE) {
-      throw new ConfigNameException(String::format('Missing namespace in Config object name @name.', array(
-        '@name' => $name,
-      )));
+      throw new ConfigNameException("Missing namespace in Config object name $name.");
     }
     // The name must be shorter than Config::MAX_NAME_LENGTH characters.
     if (strlen($name) > self::MAX_NAME_LENGTH) {
-      throw new ConfigNameException(String::format('Config object name @name exceeds maximum allowed length of @length characters.', array(
-        '@name' => $name,
-        '@length' => self::MAX_NAME_LENGTH,
-      )));
+      throw new ConfigNameException("Config object name $name exceeds maximum allowed length of " . static::MAX_NAME_LENGTH . " characters.");
     }
 
     // The name must not contain any of the following characters:
     // : ? * < > " ' / \
     if (preg_match('/[:?*<>"\'\/\\\\]/', $name)) {
-      throw new ConfigNameException(String::format('Invalid character in Config object name @name.', array(
-        '@name' => $name,
-      )));
+      throw new ConfigNameException("Invalid character in Config object name $name.");
     }
   }
 
@@ -220,7 +216,7 @@ abstract class ConfigBase {
   protected function validateKeys(array $data) {
     foreach ($data as $key => $value) {
       if (strpos($key, '.') !== FALSE) {
-        throw new ConfigValueException(String::format('@key key contains a dot which is not supported.', array('@key' => $key)));
+        throw new ConfigValueException("$key key contains a dot which is not supported.");
       }
       if (is_array($value)) {
         $this->validateKeys($value);
@@ -264,13 +260,24 @@ abstract class ConfigBase {
   }
 
   /**
-   * The unique cache tag associated with this configuration object.
-   *
-   * @return string[]
-   *   An array of cache tags.
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return $this->cacheContexts;
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function getCacheTags() {
-    return ['config:' . $this->name];
+    return Cache::mergeTags(['config:' . $this->name], $this->cacheTags);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheMaxAge() {
+    return $this->cacheMaxAge;
   }
 
 }

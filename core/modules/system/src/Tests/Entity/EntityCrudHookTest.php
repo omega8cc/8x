@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Entity\EntityCrudHookTest.
+ * Contains \Drupal\system\Tests\Entity\EntityCrudHookTest.
  */
 
 namespace Drupal\system\Tests\Entity;
@@ -16,6 +16,8 @@ use Drupal\block\Entity\Block;
 use Drupal\taxonomy\Entity\Term;
 use Drupal\node\Entity\Node;
 use Drupal\taxonomy\Entity\Vocabulary;
+use Drupal\user\Entity\User;
+use Drupal\file\Entity\File;
 
 /**
  * Tests the invocation of hooks when creating, inserting, loading, updating or
@@ -52,6 +54,7 @@ class EntityCrudHookTest extends EntityUnitTestBase {
     $this->installSchema('file', array('file_usage'));
     $this->installSchema('node', array('node_access'));
     $this->installSchema('comment', array('comment_entity_statistics'));
+    $this->installConfig(['node', 'comment']);
   }
 
   /**
@@ -255,7 +258,7 @@ class EntityCrudHookTest extends EntityUnitTestBase {
     ));
 
     $GLOBALS['entity_crud_hook_test'] = array();
-    $file = file_load($file->id());
+    $file = File::load($file->id());
 
     $this->assertHookMessageOrder(array(
       'entity_crud_hook_test_entity_load called for type file',
@@ -503,7 +506,7 @@ class EntityCrudHookTest extends EntityUnitTestBase {
     ));
 
     $GLOBALS['entity_crud_hook_test'] = array();
-    user_load($account->id());
+    User::load($account->id());
 
     $this->assertHookMessageOrder(array(
       'entity_crud_hook_test_entity_load called for type user',

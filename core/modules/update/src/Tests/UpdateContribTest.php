@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\update\Tests\UpdateContribTest.
+ * Contains \Drupal\update\Tests\UpdateContribTest.
  */
 
 namespace Drupal\update\Tests;
@@ -66,6 +66,7 @@ class UpdateContribTest extends UpdateTestBase {
    * Tests the basic functionality of a contrib module on the status report.
    */
   function testUpdateContribBasic() {
+    $project_link = \Drupal::l(t('AAA Update test'), Url::fromUri('http://example.com/project/aaa_update_test'));
     $system_info = array(
       '#all' => array(
         'version' => '8.0.0',
@@ -87,7 +88,30 @@ class UpdateContribTest extends UpdateTestBase {
     $this->assertText(t('Up to date'));
     $this->assertRaw('<h3>' . t('Modules') . '</h3>');
     $this->assertNoText(t('Update available'));
-    $this->assertRaw(\Drupal::l(t('AAA Update test'), Url::fromUri('http://example.com/project/aaa_update_test')), 'Link to aaa_update_test project appears.');
+    $this->assertRaw($project_link, 'Link to aaa_update_test project appears.');
+
+    // Since aaa_update_test is installed the fact it is hidden and in the
+    // Testing package means it should not appear.
+    $system_info['aaa_update_test']['hidden'] = TRUE;
+    $this->config('update_test.settings')->set('system_info', $system_info)->save();
+    $this->refreshUpdateStatus(
+      array(
+        'drupal' => '0.0',
+        'aaa_update_test' => '1_0',
+      )
+    );
+    $this->assertNoRaw($project_link, 'Link to aaa_update_test project does not appear.');
+
+    // A hidden and installed project not in the Testing package should appear.
+    $system_info['aaa_update_test']['package'] = 'aaa_update_test';
+    $this->config('update_test.settings')->set('system_info', $system_info)->save();
+    $this->refreshUpdateStatus(
+      array(
+        'drupal' => '0.0',
+        'aaa_update_test' => '1_0',
+      )
+    );
+    $this->assertRaw($project_link, 'Link to aaa_update_test project appears.');
   }
 
   /**
@@ -157,8 +181,8 @@ class UpdateContribTest extends UpdateTestBase {
     // Instead of just searching for 'BBB Update test' or something, we want
     // to use the full markup that starts the project entry itself, so that
     // we're really testing that the project listings are in the right order.
-    $bbb_project_link = '<div class="project"><a href="http://example.com/project/bbb_update_test">BBB Update test</a>';
-    $ccc_project_link = '<div class="project"><a href="http://example.com/project/ccc_update_test">CCC Update test</a>';
+    $bbb_project_link = '<div class="project-update__title"><a href="http://example.com/project/bbb_update_test">BBB Update test</a>';
+    $ccc_project_link = '<div class="project-update__title"><a href="http://example.com/project/ccc_update_test">CCC Update test</a>';
     $this->assertTrue(strpos($this->getRawContent(), $bbb_project_link) < strpos($this->getRawContent(), $ccc_project_link), "'BBB Update test' project is listed before the 'CCC Update test' project");
   }
 
@@ -292,8 +316,8 @@ class UpdateContribTest extends UpdateTestBase {
       ),
     );
     $this->config('update_test.settings')->set('system_info', $system_info)->save();
-    $projects = update_get_projects();
-    $theme_data = system_rebuild_theme_data();
+    $projects = \Drupal::service('update.manager')->getProjects();
+    $theme_data = \Drupal::service('theme_handler')->rebuildThemeData();
     $project_info = new ProjectInfo();
     $project_info->processInfoList($projects, $theme_data, 'theme', TRUE);
 
@@ -341,10 +365,10 @@ class UpdateContribTest extends UpdateTestBase {
     // It should say we failed to get data, not that we're missing an update.
     $this->assertNoText(t('Update available'));
 
-    // We need to check that this string is found as part of a project row,
-    // not just in the "Failed to get available update data for ..." message
-    // at the top of the page.
-    $this->assertRaw('<div class="version-status">' . t('Failed to get available update data'));
+    // We need to check that this string is found as part of a project row, not
+    // just in the "Failed to get available update data" message at the top of
+    // the page.
+    $this->assertRaw('<div class="project-update__status">' . t('Failed to get available update data'));
 
     // We should see the output messages from fetching manually.
     $this->assertUniqueText(t('Checked available update data for 3 projects.'));

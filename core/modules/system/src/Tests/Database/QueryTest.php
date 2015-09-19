@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Database\QueryTest.
+ * Contains \Drupal\system\Tests\Database\QueryTest.
  */
 
 namespace Drupal\system\Tests\Database;
@@ -64,6 +64,22 @@ class QueryTest extends DatabaseTestBase {
       ->execute()
       ->fetchField();
     $this->assertFalse($result, 'SQL injection attempt did not result in a row being inserted in the database table.');
+  }
+
+  /**
+   * Tests numeric query parameter expansion in expressions.
+   *
+   * @see \Drupal\Core\Database\Driver\sqlite\Statement::getStatement()
+   * @see http://bugs.php.net/bug.php?id=45259
+   */
+  public function testNumericExpressionSubstitution() {
+    $count = db_query('SELECT COUNT(*) >= 3 FROM {test}')->fetchField();
+    $this->assertEqual((bool) $count, TRUE);
+
+    $count = db_query('SELECT COUNT(*) >= :count FROM {test}', array(
+      ':count' => 3,
+    ))->fetchField();
+    $this->assertEqual((bool) $count, TRUE);
   }
 
 }

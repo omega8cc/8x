@@ -7,7 +7,9 @@
 
 namespace Drupal\Tests;
 
+use Drupal\Component\FileCache\FileCacheFactory;
 use Drupal\Component\Utility\Random;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Cache\CacheTagsInvalidatorInterface;
 use Drupal\Core\DependencyInjection\ContainerBuilder;
 
@@ -41,7 +43,17 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
     // a previous test does not leak into this test.
     \Drupal::unsetContainer();
 
+    // Ensure that the NullFileCache implementation is used for the FileCache as
+    // unit tests should not be relying on caches implicitly.
+    FileCacheFactory::setConfiguration(['default' => ['class' => '\Drupal\Component\FileCache\NullFileCache']]);
+
     $this->root = dirname(dirname(substr(__DIR__, 0, -strlen(__NAMESPACE__))));
+
+    // Reset the static list of SafeStrings to prevent bleeding between tests.
+    $reflected_class = new \ReflectionClass('\Drupal\Component\Utility\SafeMarkup');
+    $reflected_property = $reflected_class->getProperty('safeStrings');
+    $reflected_property->setAccessible(true);
+    $reflected_property->setValue([]);
   }
 
   /**
@@ -202,7 +214,12 @@ abstract class UnitTestCase extends \PHPUnit_Framework_TestCase {
     $translation = $this->getMock('Drupal\Core\StringTranslation\TranslationInterface');
     $translation->expects($this->any())
       ->method('translate')
-      ->will($this->returnCallback('Drupal\Component\Utility\String::format'));
+      ->will($this->returnCallback('Drupal\Component\Utility\SafeMarkup::format'));
+    $translation->expects($this->any())
+      ->method('formatPlural')
+      ->willReturnCallback(function ($count, $singular, $plural, array $args = [], array $options = []) {
+        return $count === 1 ? SafeMarkup::format($singular, $args) : SafeMarkup::format($plural, $args + ['@count' => $count]);
+      });
     return $translation;
   }
 

@@ -8,6 +8,7 @@
 namespace Drupal\system\Controller;
 
 use Drupal\Component\Serialization\Json;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\Controller\ControllerBase;
 use Drupal\Core\Entity\Query\QueryFactory;
 use Drupal\Core\Extension\ThemeHandlerInterface;
@@ -128,8 +129,16 @@ class SystemController extends ControllerBase {
       array('callable' => 'menu.default_tree_manipulators:generateIndexAndSort'),
     );
     $tree = $this->menuLinkTree->transform($tree, $manipulators);
+    $tree_access_cacheability = new CacheableMetadata();
     $blocks = array();
     foreach ($tree as $key => $element) {
+      $tree_access_cacheability = $tree_access_cacheability->merge(CacheableMetadata::createFromObject($element->access));
+
+      // Only render accessible links.
+      if (!$element->access->isAllowed()) {
+        continue;
+      }
+
       $link = $element->link;
       $block['title'] = $link->getTitle();
       $block['description'] = $link->getDescription();
@@ -145,15 +154,19 @@ class SystemController extends ControllerBase {
 
     if ($blocks) {
       ksort($blocks);
-      return array(
+      $build = [
         '#theme' => 'admin_page',
         '#blocks' => $blocks,
-      );
+      ];
+      $tree_access_cacheability->applyTo($build);
+      return $build;
     }
     else {
-      return array(
+      $build = [
         '#markup' => $this->t('You do not have any administrative items.'),
-      );
+      ];
+      $tree_access_cacheability->applyTo($build);
+      return $build;
     }
   }
 
@@ -228,9 +241,10 @@ class SystemController extends ControllerBase {
 
       if (empty($theme->status)) {
         // Ensure this theme is compatible with this version of core.
+        $theme->incompatible_core = !isset($theme->info['core']) || ($theme->info['core'] != \DRUPAL::CORE_COMPATIBILITY);
         // Require the 'content' region to make sure the main page
         // content has a common place in all themes.
-        $theme->incompatible_core = !isset($theme->info['core']) || ($theme->info['core'] != \DRUPAL::CORE_COMPATIBILITY) || !isset($theme->info['regions']['content']);
+        $theme->incompatible_region = !isset($theme->info['regions']['content']);
         $theme->incompatible_php = version_compare(phpversion(), $theme->info['php']) < 0;
         // Confirmed that the base theme is available.
         $theme->incompatible_base = isset($theme->info['base theme']) && !isset($themes[$theme->info['base theme']]);
@@ -326,134 +340,6 @@ class SystemController extends ControllerBase {
     $build[] = $this->formBuilder->getForm('Drupal\system\Form\ThemeAdminForm', $admin_theme_options);
 
     return $build;
-  }
-
-  /**
-   * #post_render_cache callback; sets the "active" class on relevant links.
-   *
-   * This is a PHP implementation of the drupal.active-link JavaScript library.
-   *
-   * @param array $element
-   *  A renderable array with the following keys:
-   *    - #markup
-   *    - #attached
-   * @param array $context
-   *   An array with the following keys:
-   *   - path: the system path of the currently active page
-   *   - front: whether the current page is the front page (which implies the
-   *     current path might also be <front>)
-   *   - language: the language code of the currently active page
-   *   - query: the query string for the currently active page
-   *
-   * @return array
-   *   The updated renderable array.
-   *
-   * @todo Once a future version of PHP supports parsing HTML5 properly
-   *   (i.e. doesn't fail on https://drupal.org/comment/7938201#comment-7938201)
-   *   then we can get rid of this manual parsing and use DOMDocument instead.
-   */
-  public static function setLinkActiveClass(array $element, array $context) {
-    $search_key_current_path = 'data-drupal-link-system-path="' . $context['path'] . '"';
-    $search_key_front = 'data-drupal-link-system-path="&lt;front&gt;"';
-
-    // An active link's path is equal to the current path, so search the HTML
-    // for an attribute with that value.
-    $offset = 0;
-    while (strpos($element['#markup'], $search_key_current_path, $offset) !== FALSE || ($context['front'] && strpos($element['#markup'], $search_key_front, $offset) !== FALSE)) {
-      $pos_current_path = strpos($element['#markup'], $search_key_current_path, $offset);
-      $pos_front = strpos($element['#markup'], $search_key_front, $offset);
-
-      // Determine which of the two values is the next match: the exact path, or
-      // the <front> special case.
-      $pos_match = NULL;
-      if ($pos_front === FALSE) {
-        $pos_match = $pos_current_path;
-      }
-      elseif ($pos_current_path === FALSE) {
-        $pos_match = $pos_front;
-      }
-      elseif ($pos_current_path < $pos_front) {
-        $pos_match = $pos_current_path;
-      }
-      else {
-        $pos_match = $pos_front;
-      }
-
-      // Find beginning and ending of opening tag.
-      $pos_tag_start = NULL;
-      for ($i = $pos_match; $pos_tag_start === NULL && $i > 0; $i--) {
-        if ($element['#markup'][$i] === '<') {
-          $pos_tag_start = $i;
-        }
-      }
-      $pos_tag_end = NULL;
-      for ($i = $pos_match; $pos_tag_end === NULL && $i < strlen($element['#markup']); $i++) {
-        if ($element['#markup'][$i] === '>') {
-          $pos_tag_end = $i;
-        }
-      }
-
-      // Get the HTML: this will be the opening part of a single tag, e.g.:
-      //   <a href="/" data-drupal-link-system-path="&lt;front&gt;">
-      $tag = substr($element['#markup'], $pos_tag_start, $pos_tag_end - $pos_tag_start + 1);
-
-      // Parse it into a DOMDocument so we can reliably read and modify
-      // attributes.
-      $dom = new \DOMDocument();
-      @$dom->loadHTML('<!DOCTYPE html><html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" /></head><body>' . $tag . '</body></html>');
-      $node = $dom->getElementsByTagName('body')->item(0)->firstChild;
-
-      // Ensure we don't set the "active" class twice on the same element.
-      $class = $node->getAttribute('class');
-      $add_active = !in_array('active', explode(' ', $class));
-
-      // The language of an active link is equal to the current language.
-      if ($add_active && $context['language']) {
-        if ($node->hasAttribute('hreflang') && $node->getAttribute('hreflang') !== $context['language']) {
-          $add_active = FALSE;
-        }
-      }
-      // The query parameters of an active link are equal to the current
-      // parameters.
-      if ($add_active) {
-        if ($context['query']) {
-          if (!$node->hasAttribute('data-drupal-link-query') || $node->getAttribute('data-drupal-link-query') !== Json::encode($context['query'])) {
-            $add_active = FALSE;
-          }
-        }
-        else {
-          if ($node->hasAttribute('data-drupal-link-query')) {
-            $add_active = FALSE;
-          }
-        }
-      }
-
-      // Only if the path, the language and the query match, we set the
-      // "active" class.
-      if ($add_active) {
-        if (strlen($class) > 0) {
-          $class .= ' ';
-        }
-        $class .= 'active';
-        $node->setAttribute('class', $class);
-
-        // Get the updated tag.
-        $updated_tag = $dom->saveXML($node, LIBXML_NOEMPTYTAG);
-        // saveXML() added a closing tag, remove it.
-        $updated_tag = substr($updated_tag, 0, strrpos($updated_tag, '<'));
-
-        $element['#markup'] = str_replace($tag, $updated_tag, $element['#markup']);
-
-        // Ensure we only search the remaining HTML.
-        $offset = $pos_tag_end - strlen($tag) + strlen($updated_tag);
-      }
-      else {
-        // Ensure we only search the remaining HTML.
-        $offset = $pos_tag_end + 1;
-      }
-    }
-
-    return $element;
   }
 
 }

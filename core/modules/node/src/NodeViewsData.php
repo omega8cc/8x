@@ -24,7 +24,6 @@ class NodeViewsData extends EntityViewsData {
     $data['node_field_data']['table']['base']['access query tag'] = 'node_access';
     $data['node_field_data']['table']['wizard_id'] = 'node';
 
-    $data['node_field_data']['nid']['field']['id'] = 'node';
     $data['node_field_data']['nid']['field']['argument'] = [
       'id' => 'node_nid',
       'name field' => 'title',
@@ -32,18 +31,14 @@ class NodeViewsData extends EntityViewsData {
       'validate type' => 'nid',
     ];
 
-    $data['node_field_data']['title']['field']['id'] = 'node';
+    $data['node_field_data']['title']['field']['default_formatter_settings'] = ['link_to_entity' => TRUE];
+
     $data['node_field_data']['title']['field']['link_to_node default'] = TRUE;
 
-    $data['node_field_data']['type']['field']['id'] = 'node_type';
     $data['node_field_data']['type']['argument']['id'] = 'node_type';
 
     $data['node_field_data']['langcode']['help'] = t('The language of the content or translation.');
-    $data['node_field_data']['langcode']['field']['id'] = 'node_language';
 
-    $data['node_field_data']['status']['field']['output formats'] = [
-      'published-notpublished' => array(t('Published'), t('Not published')),
-    ];
     $data['node_field_data']['status']['filter']['label'] = t('Published status');
     $data['node_field_data']['status']['filter']['type'] = 'yes-no';
     // Use status = 1 instead of status <> 0 in WHERE statement.
@@ -59,52 +54,12 @@ class NodeViewsData extends EntityViewsData {
       ),
     );
 
-    $data['node_field_data']['promote']['field']['output formats'] = [
-      'promoted-notpromoted' => array(t('Promoted'), t('Not promoted')),
-    ];
     $data['node_field_data']['promote']['filter']['label'] = t('Promoted to front page status');
     $data['node_field_data']['promote']['filter']['type'] = 'yes-no';
 
-    $data['node_field_data']['sticky']['field']['output formats'] = [
-      'sticky' => array(t('Sticky'), t('Not sticky')),
-    ];
     $data['node_field_data']['sticky']['filter']['label'] = t('Sticky status');
     $data['node_field_data']['sticky']['filter']['type'] = 'yes-no';
     $data['node_field_data']['sticky']['sort']['help'] = t('Whether or not the content is sticky. To list sticky content first, set this to descending.');
-
-    if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
-      $data['node']['translation_link'] = array(
-        'title' => t('Translation link'),
-        'help' => t('Provide a link to the translations overview for nodes.'),
-        'field' => array(
-          'id' => 'content_translation_link',
-        ),
-      );
-    }
-
-    $data['node']['view_node'] = array(
-      'field' => array(
-        'title' => t('Link to content'),
-        'help' => t('Provide a simple link to the content.'),
-        'id' => 'node_link',
-      ),
-    );
-
-    $data['node']['edit_node'] = array(
-      'field' => array(
-        'title' => t('Link to edit content'),
-        'help' => t('Provide a simple link to edit the content.'),
-        'id' => 'node_link_edit',
-      ),
-    );
-
-    $data['node']['delete_node'] = array(
-      'field' => array(
-        'title' => t('Link to delete content'),
-        'help' => t('Provide a simple link to delete the content.'),
-        'id' => 'node_link_delete',
-      ),
-    );
 
     $data['node']['path'] = array(
       'field' => array(
@@ -125,7 +80,7 @@ class NodeViewsData extends EntityViewsData {
     // Bogus fields for aliasing purposes.
 
     // @todo Add similar support to any date field
-    // @see https://drupal.org/node/2337507
+    // @see https://www.drupal.org/node/2337507
     $data['node_field_data']['created_fulldate'] = array(
       'title' => t('Created date'),
       'help' => t('Date in the form of CCYYMMDD.'),
@@ -236,7 +191,6 @@ class NodeViewsData extends EntityViewsData {
 
     $data['node_field_data']['uid']['help'] = t('The user authoring the content. If you need more fields than the uid add the content: author relationship');
     $data['node_field_data']['uid']['filter']['id'] = 'user_name';
-    $data['node_field_data']['uid']['field']['id'] = 'user';
     $data['node_field_data']['uid']['relationship']['title'] = t('Content author');
     $data['node_field_data']['uid']['relationship']['help'] = t('Relate content to the user who created it.');
     $data['node_field_data']['uid']['relationship']['label'] = t('author');
@@ -289,9 +243,6 @@ class NodeViewsData extends EntityViewsData {
     ) + $data['node_revision']['vid'];
 
     $data['node_field_revision']['langcode']['help'] = t('The language the original content is in.');
-    $data['node_field_revision']['langcode']['field']['id'] = 'node_language';
-
-    $data['node_revision']['revision_log']['field']['id'] = 'xss';
 
     $data['node_revision']['revision_uid']['help'] = t('Relate a content revision to the user who created the revision.');
     $data['node_revision']['revision_uid']['relationship']['label'] = t('revision user');
@@ -301,19 +252,13 @@ class NodeViewsData extends EntityViewsData {
     $data['node_field_revision']['table']['join']['node_field_data']['left_field'] = 'vid';
     $data['node_field_revision']['table']['join']['node_field_data']['field'] = 'vid';
 
-    $data['node_field_revision']['status']['field']['output formats'] = [
-      'published-notpublished' => [t('Published'), t('Not published')],
-    ];
     $data['node_field_revision']['status']['filter']['label'] = t('Published');
     $data['node_field_revision']['status']['filter']['type'] = 'yes-no';
     $data['node_field_revision']['status']['filter']['use_equal'] = TRUE;
 
-    $data['node_field_revision']['title']['field']['id'] = 'node_revision';
-
     $data['node_field_revision']['langcode']['help'] = t('The language of the content or translation.');
-    $data['node_field_revision']['langcode']['field']['id'] = 'node_language';
 
-    $data['node_revision']['link_to_revision'] = array(
+    $data['node_field_revision']['link_to_revision'] = array(
       'field' => array(
         'title' => t('Link to revision'),
         'help' => t('Provide a simple link to the revision.'),
@@ -322,7 +267,7 @@ class NodeViewsData extends EntityViewsData {
       ),
     );
 
-    $data['node_revision']['revert_revision'] = array(
+    $data['node_field_revision']['revert_revision'] = array(
       'field' => array(
         'title' => t('Link to revert revision'),
         'help' => t('Provide a simple link to revert to the revision.'),
@@ -331,7 +276,7 @@ class NodeViewsData extends EntityViewsData {
       ),
     );
 
-    $data['node_revision']['delete_revision'] = array(
+    $data['node_field_revision']['delete_revision'] = array(
       'field' => array(
         'title' => t('Link to delete revision'),
         'help' => t('Provide a simple link to delete the content revision.'),
@@ -395,8 +340,9 @@ class NodeViewsData extends EntityViewsData {
         );
 
         $data['node_search_dataset']['table']['join'] = array(
-          'node_search_index' => array(
+          'node_field_data' => array(
             'left_field' => 'sid',
+            'left_table' => 'node_search_index',
             'field' => 'sid',
             'table' => 'search_dataset',
             'extra' => 'node_search_index.type = node_search_dataset.type AND node_search_index.langcode = node_search_dataset.langcode',

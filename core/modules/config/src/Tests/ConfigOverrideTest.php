@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\config\Tests\ConfigOverrideTest.
+ * Contains \Drupal\config\Tests\ConfigOverrideTest.
  */
 
 namespace Drupal\config\Tests;
@@ -111,7 +111,7 @@ class ConfigOverrideTest extends KernelTestBase {
     $this->assertFalse(isset($data['baz']));
     $this->assertIdentical($data['404'], $expected_new_data['404']);
 
-    // Verifiy the overrides are still working.
+    // Verify that the overrides are still working.
     $config = \Drupal::config('config_test.system');
     $this->assertIdentical($config->get('foo'), $overrides['config_test.system']['foo']);
     $this->assertIdentical($config->get('baz'), $overrides['config_test.system']['baz']);

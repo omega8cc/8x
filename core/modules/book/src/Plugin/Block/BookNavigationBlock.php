@@ -181,13 +181,22 @@ class BookNavigationBlock extends BlockBase implements ContainerFactoryPluginInt
   /**
    * {@inheritdoc}
    */
-  protected function getRequiredCacheContexts() {
+  public function getCacheContexts() {
     // The "Book navigation" block must be cached per role and book navigation
     // context.
     return [
       'user.roles',
-      'book.navigation',
+      'route.book_navigation',
     ];
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @todo Make cacheable in https://www.drupal.org/node/2483181
+   */
+  public function getCacheMaxAge() {
+    return 0;
   }
 
 }

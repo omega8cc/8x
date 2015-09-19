@@ -7,14 +7,15 @@
 
 namespace Drupal\views\Tests\Plugin;
 
-use Drupal\views\Tests\ViewUnitTestBase;
+use Drupal\Core\Cache\Cache;
+use Drupal\views\Tests\ViewKernelTestBase;
 
 /**
  * Tests views block config dependencies functionality.
  *
  * @group views
  */
-class BlockDependenciesTest extends ViewUnitTestBase {
+class BlockDependenciesTest extends ViewKernelTestBase {
 
   /**
    * Views used by this test.
@@ -28,7 +29,7 @@ class BlockDependenciesTest extends ViewUnitTestBase {
    *
    * @var array
    */
-  public static $modules = array('node', 'block', 'user');
+  public static $modules = array('node', 'block', 'user', 'field');
 
   /**
    * Tests that exposed filter blocks have the correct dependencies.
@@ -82,7 +83,7 @@ class BlockDependenciesTest extends ViewUnitTestBase {
    *   - region: 'sidebar_first'.
    *   - theme: The default theme.
    *   - visibility: Empty array.
-   *   - cache: array('max_age' => 0).
+   *   - cache: array('max_age' => Cache::PERMANENT).
    *
    * @return \Drupal\block\Entity\Block
    *   The block entity.
@@ -97,7 +98,7 @@ class BlockDependenciesTest extends ViewUnitTestBase {
       'visibility' => array(),
       'weight' => 0,
       'cache' => array(
-        'max_age' => 0,
+        'max_age' => Cache::PERMANENT,
       ),
     );
     $values = [];

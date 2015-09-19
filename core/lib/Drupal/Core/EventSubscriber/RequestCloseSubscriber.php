@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\EventSubscriber\RequestCloseSubscriber.
+ * Contains \Drupal\Core\EventSubscriber\RequestCloseSubscriber.
  */
 
 namespace Drupal\Core\EventSubscriber;
@@ -23,7 +23,10 @@ class RequestCloseSubscriber implements EventSubscriberInterface {
   protected $moduleHandler;
 
   /**
-   * Constructor.
+   * Constructs a new RequestCloseSubscriber instance.
+   *
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
+   *   The module handler.
    */
   function __construct(ModuleHandlerInterface $module_handler) {
     $this->moduleHandler = $module_handler;

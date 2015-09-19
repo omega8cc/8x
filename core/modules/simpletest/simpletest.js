@@ -1,13 +1,23 @@
+/**
+ * @file
+ * Simpletest behaviors.
+ */
+
 (function ($) {
 
   "use strict";
 
   /**
    * Collapses table rows followed by group rows on the test listing page.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attach collapse behavior on the test listing page.
    */
   Drupal.behaviors.simpleTestGroupCollapse = {
     attach: function (context) {
-      $(context).find('.simpletest-group').once('simpletest-group-collapse', function () {
+      $(context).find('.simpletest-group').once('simpletest-group-collapse').each(function () {
         var $group = $(this);
         var $image = $group.find('.simpletest-image');
         $image
@@ -25,10 +35,15 @@
 
   /**
    * Toggles test checkboxes to match the group checkbox.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches behavior for selecting all tests in a group.
    */
   Drupal.behaviors.simpleTestSelectAll = {
     attach: function (context) {
-      $(context).find('.simpletest-group').once('simpletest-group-select-all', function () {
+      $(context).find('.simpletest-group').once('simpletest-group-select-all').each(function () {
         var $group = $(this);
         var $cell = $group.find('.simpletest-group-select-all');
         var $groupCheckbox = $('<input type="checkbox" id="' + $cell.attr('id') + '-group-select-all" class="form-checkbox" />');
@@ -64,6 +79,11 @@
    * Text search input: input.table-filter-text
    * Target table:      input.table-filter-text[data-table]
    * Source text:       .table-filter-text-source
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches the filter behavior the the text input element.
    */
   Drupal.behaviors.simpletestTableFilterByText = {
     attach: function (context) {
@@ -84,8 +104,8 @@
 
         // Filter if the length of the query is at least 3 characters.
         if (query.length >= 3) {
-          // Indicate that a search has been performed, and hide the "select all"
-          // checkbox.
+          // Indicate that a search has been performed, and hide the
+          // "select all" checkbox.
           searched = true;
           $('#simpletest-form-table thead th.select-all input').hide();
 

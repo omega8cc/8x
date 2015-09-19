@@ -10,6 +10,7 @@ namespace Drupal\rdf\Tests;
 use Drupal\comment\CommentInterface;
 use Drupal\comment\CommentManagerInterface;
 use Drupal\comment\Tests\CommentTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests the RDFa markup of comments.
@@ -43,7 +44,7 @@ class CommentAttributesTest extends CommentTestBase {
     parent::setUp();
 
     // Enables anonymous user comments.
-    user_role_change_permissions(DRUPAL_ANONYMOUS_RID, array(
+    user_role_change_permissions(RoleInterface::ANONYMOUS_ID, array(
       'access comments' => TRUE,
       'post comments' => TRUE,
       'skip comment approval' => TRUE,
@@ -141,6 +142,24 @@ class CommentAttributesTest extends CommentTestBase {
     $graph = new \EasyRdf_Graph();
     $parser->parse($graph, $this->drupalGet('node/' . $this->node->id()), 'rdfa', $this->baseUri);
     $this->assertTrue($graph->hasProperty($this->nodeUri, 'http://rdfs.org/sioc/ns#num_replies', $expected_value), 'Number of comments found in RDF output of full node view mode (sioc:num_replies).');
+  }
+
+  /**
+   * Tests comment author link markup has not been broken by RDF.
+   */
+  public function testCommentRdfAuthorMarkup() {
+    // Post a comment as a registered user.
+    $this->saveComment($this->node->id(), $this->webUser->id());
+
+    // Give the user access to view user profiles so the profile link shows up.
+    user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, ['access user profiles']);
+    $this->drupalLogin($this->webUser);
+
+    // Ensure that the author link still works properly after the author output
+    // is modified by the RDF module.
+    $this->drupalGet('node/' . $this->node->id());
+    $this->assertLink($this->webUser->getUsername());
+    $this->assertLinkByHref('user/' . $this->webUser->id());
   }
 
   /**
@@ -263,14 +282,14 @@ class CommentAttributesTest extends CommentTestBase {
     // Comment date.
     $expected_value = array(
       'type' => 'literal',
-      'value' => date('c', $comment->getCreatedTime()),
+      'value' => format_date($comment->getCreatedTime(), 'custom', 'c', 'UTC'),
       'datatype' => 'http://www.w3.org/2001/XMLSchema#dateTime',
     );
     $this->assertTrue($graph->hasProperty($comment_uri, 'http://purl.org/dc/terms/date', $expected_value), 'Comment date found in RDF output (dc:date).');
     // Comment date.
     $expected_value = array(
       'type' => 'literal',
-      'value' => date('c', $comment->getCreatedTime()),
+      'value' => format_date($comment->getCreatedTime(), 'custom', 'c', 'UTC'),
       'datatype' => 'http://www.w3.org/2001/XMLSchema#dateTime',
     );
     $this->assertTrue($graph->hasProperty($comment_uri, 'http://purl.org/dc/terms/created', $expected_value), 'Comment date found in RDF output (dc:created).');

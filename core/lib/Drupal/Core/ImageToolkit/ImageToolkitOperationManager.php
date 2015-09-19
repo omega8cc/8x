@@ -12,7 +12,7 @@ use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Component\Plugin\Factory\DefaultFactory;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Psr\Log\LoggerInterface;
 
 /**
@@ -77,12 +77,12 @@ class ImageToolkitOperationManager extends DefaultPluginManager implements Image
     );
 
     if (!$definitions) {
-      $message = String::format("No image operation plugin for '@toolkit' toolkit and '@operation' operation.", array('@toolkit' => $toolkit_id, '@operation' => $operation));
+      $message = SafeMarkup::format("No image operation plugin for '@toolkit' toolkit and '@operation' operation.", array('@toolkit' => $toolkit_id, '@operation' => $operation));
       throw new PluginNotFoundException($toolkit_id . '.' . $operation, $message);
     }
     else {
       // Pickup the first plugin found.
-      // @todo In https://drupal.org/node/2110591 we'll return here the UI
+      // @todo In https://www.drupal.org/node/2110591 we'll return here the UI
       //   selected plugin or the first found if missed.
       $definition = reset($definitions);
       return $definition['id'];

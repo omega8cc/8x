@@ -7,7 +7,9 @@
 
 namespace Drupal\user\Plugin\Block;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
+use Drupal\Core\Routing\RedirectDestinationTrait;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Routing\UrlGeneratorTrait;
 use Drupal\Core\Url;
@@ -27,6 +29,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
 class UserLoginBlock extends BlockBase implements ContainerFactoryPluginInterface {
 
   use UrlGeneratorTrait;
+  use RedirectDestinationTrait;
 
   /**
    * The route match.
@@ -74,7 +77,11 @@ class UserLoginBlock extends BlockBase implements ContainerFactoryPluginInterfac
    */
   protected function blockAccess(AccountInterface $account) {
     $route_name = $this->routeMatch->getRouteName();
-    return ($account->isAnonymous() && !in_array($route_name, array('user.register', 'user.login', 'user.logout')));
+    if ($account->isAnonymous() && !in_array($route_name, array('user.register', 'user.login', 'user.logout'))) {
+      return AccessResult::allowed()
+        ->addCacheContexts(['route.name', 'user.roles:anonymous']);
+    }
+    return AccessResult::forbidden();
   }
 
   /**
@@ -83,11 +90,16 @@ class UserLoginBlock extends BlockBase implements ContainerFactoryPluginInterfac
   public function build() {
     $form = \Drupal::formBuilder()->getForm('Drupal\user\Form\UserLoginForm');
     unset($form['name']['#attributes']['autofocus']);
+    // When unsetting field descriptions, also unset aria-describedby attributes
+    // to avoid introducing an accessibility bug.
+    // @todo Do this automatically in https://www.drupal.org/node/2547063.
     unset($form['name']['#description']);
+    unset($form['name']['#attributes']['aria-describedby']);
     unset($form['pass']['#description']);
+    unset($form['pass']['#attributes']['aria-describedby']);
     $form['name']['#size'] = 15;
     $form['pass']['#size'] = 15;
-    $form['#action'] = $this->url('<current>', [], ['query' => drupal_get_destination(), 'external' => FALSE]);
+    $form['#action'] = $this->url('<current>', [], ['query' => $this->getDestinationArray(), 'external' => FALSE]);
     // Build action links.
     $items = array();
     if (\Drupal::config('user.settings')->get('register') != USER_REGISTER_ADMINISTRATORS_ONLY) {
@@ -111,6 +123,15 @@ class UserLoginBlock extends BlockBase implements ContainerFactoryPluginInterfac
         '#items' => $items,
       ),
     );
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * @todo Make cacheable once https://www.drupal.org/node/2351015 lands.
+   */
+  public function getCacheMaxAge() {
+    return 0;
   }
 
 }

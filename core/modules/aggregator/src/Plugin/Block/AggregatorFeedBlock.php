@@ -9,6 +9,7 @@ namespace Drupal\aggregator\Plugin\Block;
 
 use Drupal\aggregator\FeedStorageInterface;
 use Drupal\aggregator\ItemStorageInterface;
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Entity\Query\QueryInterface;
@@ -96,13 +97,6 @@ class AggregatorFeedBlock extends BlockBase implements ContainerFactoryPluginInt
     return array(
       'block_count' => 10,
       'feed' => NULL,
-      // Modify the default max age for the 'Aggregator Feed' blocks:
-      // modifications made to feeds or feed items will automatically invalidate
-      // corresponding cache tags, therefore allowing us to cache these blocks
-      // forever.
-      'cache' => array(
-        'max_age' => \Drupal\Core\Cache\Cache::PERMANENT,
-      ),
     );
   }
 
@@ -111,7 +105,7 @@ class AggregatorFeedBlock extends BlockBase implements ContainerFactoryPluginInt
    */
   protected function blockAccess(AccountInterface $account) {
     // Only grant access to users with the 'access news feeds' permission.
-    return $account->hasPermission('access news feeds');
+    return AccessResult::allowedIfHasPermission($account, 'access news feeds');
   }
 
   /**
@@ -160,32 +154,27 @@ class AggregatorFeedBlock extends BlockBase implements ContainerFactoryPluginInt
         ->sort('iid', 'DESC')
         ->execute();
 
-      $items = $this->itemStorage->loadMultiple($result);
+      if ($result) {
+        // Only display the block if there are items to show.
+        $items = $this->itemStorage->loadMultiple($result);
 
-      $more_link = array(
-        '#type' => 'more_link',
-        '#url' => $feed->urlInfo(),
-        '#attributes' => array('title' => $this->t("View this feed's recent news.")),
-      );
-      $read_more = drupal_render($more_link);
-      $rendered_items = array();
-      foreach ($items as $item) {
-        $aggregator_block_item = array(
-          '#type' => 'link',
-          '#href' => $item->getLink(),
-          '#title' => $item->label(),
-        );
-        $rendered_items[] = drupal_render($aggregator_block_item);
-      }
-      // Only display the block if there are items to show.
-      if (count($rendered_items) > 0) {
-        $item_list = array(
+        $build['list'] = [
           '#theme' => 'item_list',
-          '#items' => $rendered_items,
-        );
-        return array(
-          '#children' => drupal_render($item_list) . $read_more,
-        );
+          '#items' => [],
+        ];
+        foreach ($items as $item) {
+          $build['list']['#items'][$item->id()] = [
+            '#type' => 'link',
+            '#url' => $item->urlInfo(),
+            '#title' => $item->label(),
+          ];
+        }
+        $build['more_link'] = [
+          '#type' => 'more_link',
+          '#url' => $feed->urlInfo(),
+          '#attributes' => ['title' => $this->t("View this feed's recent news.")],
+        ];
+        return $build;
       }
     }
   }

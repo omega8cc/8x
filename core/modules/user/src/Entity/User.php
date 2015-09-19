@@ -8,11 +8,12 @@
 namespace Drupal\user\Entity;
 
 use Drupal\Core\Entity\ContentEntityBase;
-use Drupal\Core\Entity\EntityMalformedException;
+use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\user\RoleInterface;
 use Drupal\user\UserInterface;
 
 /**
@@ -29,7 +30,6 @@ use Drupal\user\UserInterface;
  *     "storage_schema" = "Drupal\user\UserStorageSchema",
  *     "access" = "Drupal\user\UserAccessControlHandler",
  *     "list_builder" = "Drupal\user\UserListBuilder",
- *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
  *     "views_data" = "Drupal\user\UserViewsData",
  *     "route_provider" = {
  *       "html" = "Drupal\user\Entity\UserRouteProvider",
@@ -57,17 +57,20 @@ use Drupal\user\UserInterface;
  *     "cancel-form" = "/user/{user}/cancel",
  *     "collection" = "/admin/people",
  *   },
- *   field_ui_base_route = "entity.user.admin_form"
+ *   field_ui_base_route = "entity.user.admin_form",
+ *   common_reference_target = TRUE
  * )
  */
 class User extends ContentEntityBase implements UserInterface {
 
+  use EntityChangedTrait;
+
   /**
-   * The hostname for this user.
+   * Stores a reference for a reusable anonymous user entity.
    *
-   * @var string
+   * @var \Drupal\user\UserInterface
    */
-  protected $hostname;
+  protected static $anonymousUser;
 
   /**
    * {@inheritdoc}
@@ -84,26 +87,8 @@ class User extends ContentEntityBase implements UserInterface {
 
     // Make sure that the authenticated/anonymous roles are not persisted.
     foreach ($this->get('roles') as $index => $item) {
-      if (in_array($item->target_id, array(DRUPAL_ANONYMOUS_RID, DRUPAL_AUTHENTICATED_RID))) {
+      if (in_array($item->target_id, array(RoleInterface::ANONYMOUS_ID, RoleInterface::AUTHENTICATED_ID))) {
         $this->get('roles')->offsetUnset($index);
-      }
-    }
-
-    // Update the user password if it has changed.
-    if ($this->isNew() || ($this->pass->value && $this->pass->value != $this->original->pass->value)) {
-      // Allow alternate password hashing schemes.
-      $this->pass->value = \Drupal::service('password')->hash(trim($this->pass->value));
-      // Abort if the hashing failed and returned FALSE.
-      if (!$this->pass->value) {
-        throw new EntityMalformedException('The entity does not have a password.');
-      }
-    }
-
-    if (!$this->isNew()) {
-      // If the password is empty, that means it was not changed, so use the
-      // original password.
-      if (empty($this->pass->value)) {
-        $this->pass->value = $this->original->pass->value;
       }
     }
 
@@ -165,10 +150,10 @@ class User extends ContentEntityBase implements UserInterface {
     // Users with an ID always have the authenticated user role.
     if (!$exclude_locked_roles) {
       if ($this->isAuthenticated()) {
-        $roles[] = DRUPAL_AUTHENTICATED_RID;
+        $roles[] = RoleInterface::AUTHENTICATED_ID;
       }
       else {
-        $roles[] = DRUPAL_ANONYMOUS_RID;
+        $roles[] = RoleInterface::ANONYMOUS_ID;
       }
     }
 
@@ -184,37 +169,6 @@ class User extends ContentEntityBase implements UserInterface {
   /**
    * {@inheritdoc}
    */
-  public function getSecureSessionId() {
-    return NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSessionData() {
-    return array();
-  }
-  /**
-   * {@inheritdoc}
-   */
-  public function getSessionId() {
-    return NULL;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getHostname() {
-    if (!isset($this->hostname) && \Drupal::hasRequest()) {
-      $this->hostname = \Drupal::request()->getClientIp();
-    }
-
-    return $this->hostname;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
   public function hasRole($rid) {
     return in_array($rid, $this->getRoles());
   }
@@ -224,7 +178,7 @@ class User extends ContentEntityBase implements UserInterface {
    */
   public function addRole($rid) {
 
-    if (in_array($rid, [DRUPAL_AUTHENTICATED_RID, DRUPAL_ANONYMOUS_RID])) {
+    if (in_array($rid, [RoleInterface::AUTHENTICATED_ID, RoleInterface::ANONYMOUS_ID])) {
       throw new \InvalidArgumentException('Anonymous or authenticated role ID must not be assigned manually.');
     }
 
@@ -279,36 +233,6 @@ class User extends ContentEntityBase implements UserInterface {
    */
   public function setEmail($mail) {
     $this->get('mail')->value = $mail;
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSignature() {
-    return $this->get('signature')->value;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setSignature($signature) {
-    $this->get('signature')->value = $signature;
-    return $this;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function getSignatureFormat() {
-    return $this->get('signature_format')->value;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function setSignatureFormat($signature_format) {
-    $this->get('signature_format')->value = $signature_format;
     return $this;
   }
 
@@ -461,6 +385,40 @@ class User extends ContentEntityBase implements UserInterface {
   /**
    * {@inheritdoc}
    */
+  public function setExistingPassword($password) {
+    $this->get('pass')->existing = $password;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function checkExistingPassword(UserInterface $account_unchanged) {
+    return !empty($this->get('pass')->existing) && \Drupal::service('password')->check(trim($this->get('pass')->existing), $account_unchanged->getPassword());
+  }
+
+  /**
+   * Returns an anonymous user entity.
+   *
+   * @return \Drupal\user\UserInterface
+   *   An anonymous user entity.
+   */
+  public static function getAnonymousUser() {
+    if (!isset(static::$anonymousUser)) {
+
+      // @todo Use the entity factory once available, see
+      //   https://www.drupal.org/node/1867228.
+      $entity_manager = \Drupal::entityManager();
+      $entity_type = $entity_manager->getDefinition('user');
+      $class = $entity_type->getClass();
+
+      static::$anonymousUser = new $class(['uid' => [LanguageInterface::LANGCODE_DEFAULT => 0]], $entity_type->id());
+    }
+    return clone static::$anonymousUser;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public static function baseFieldDefinitions(EntityTypeInterface $entity_type) {
     $fields['uid'] = BaseFieldDefinition::create('integer')
       ->setLabel(t('User ID'))
@@ -475,7 +433,8 @@ class User extends ContentEntityBase implements UserInterface {
 
     $fields['langcode'] = BaseFieldDefinition::create('language')
       ->setLabel(t('Language code'))
-      ->setDescription(t('The user language code.'));
+      ->setDescription(t('The user language code.'))
+      ->setTranslatable(TRUE);
 
     $fields['preferred_langcode'] = BaseFieldDefinition::create('language')
       ->setLabel(t('Preferred language code'))
@@ -504,38 +463,27 @@ class User extends ContentEntityBase implements UserInterface {
     $fields['name'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Name'))
       ->setDescription(t('The name of this user.'))
-      ->setDefaultValue('')
+      ->setRequired(TRUE)
       ->setConstraints(array(
         // No Length constraint here because the UserName constraint also covers
         // that.
         'UserName' => array(),
         'UserNameUnique' => array(),
       ));
+    $fields['name']->getItemDefinition()->setClass('\Drupal\user\UserNameItem');
 
     $fields['pass'] = BaseFieldDefinition::create('password')
       ->setLabel(t('Password'))
-      ->setDescription(t('The password of this user (hashed).'));
+      ->setDescription(t('The password of this user (hashed).'))
+      ->addConstraint('ProtectedUserField');
 
     $fields['mail'] = BaseFieldDefinition::create('email')
       ->setLabel(t('Email'))
       ->setDescription(t('The email of this user.'))
       ->setDefaultValue('')
       ->addConstraint('UserMailUnique')
-      ->addConstraint('UserMailRequired');
-
-    // @todo Convert to a text field in https://drupal.org/node/1548204.
-    $fields['signature'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Signature'))
-      ->setDescription(t('The signature of this user.'))
-      ->setTranslatable(TRUE);
-    $fields['signature_format'] = BaseFieldDefinition::create('string')
-      ->setLabel(t('Signature format'))
-      ->setDescription(t('The signature format of this user.'))
-      // @todo: Define this via an options provider once
-      // https://www.drupal.org/node/2329937 is completed.
-      ->addPropertyConstraints('value', array(
-        'AllowedValues' => array('callback' => __CLASS__ . '::getAllowedSignatureFormats'),
-      ));
+      ->addConstraint('UserMailRequired')
+      ->addConstraint('ProtectedUserField');
 
     $fields['timezone'] = BaseFieldDefinition::create('string')
       ->setLabel(t('Timezone'))
@@ -558,7 +506,8 @@ class User extends ContentEntityBase implements UserInterface {
 
     $fields['changed'] = BaseFieldDefinition::create('changed')
       ->setLabel(t('Changed'))
-      ->setDescription(t('The time that the user was last edited.'));
+      ->setDescription(t('The time that the user was last edited.'))
+      ->setTranslatable(TRUE);
 
     $fields['access'] = BaseFieldDefinition::create('timestamp')
       ->setLabel(t('Last access'))
@@ -592,20 +541,6 @@ class User extends ContentEntityBase implements UserInterface {
    */
   protected function getRoleStorage() {
     return \Drupal::entityManager()->getStorage('user_role');
-  }
-
-  /**
-   * Defines allowed signature formats for the field's AllowedValues constraint.
-   *
-   * @return string[]
-   *   The allowed values.
-   */
-  public static function getAllowedSignatureFormats() {
-    if (\Drupal::moduleHandler()->moduleExists('filter')) {
-      return array_keys(filter_formats());
-    }
-    // If filter.module is disabled, no value may be assigned.
-    return array();
   }
 
   /**

@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\user\Plugin\views\filter\Roles.
+ * Contains \Drupal\user\Plugin\views\filter\Roles.
  */
 
 namespace Drupal\user\Plugin\views\filter;
 
+use Drupal\user\RoleInterface;
 use Drupal\user\RoleStorageInterface;
 use Drupal\views\Plugin\views\filter\ManyToOne;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -58,7 +59,7 @@ class Roles extends ManyToOne {
 
   public function getValueOptions() {
     $this->valueOptions = user_role_names(TRUE);
-    unset($this->valueOptions[DRUPAL_AUTHENTICATED_RID]);
+    unset($this->valueOptions[RoleInterface::AUTHENTICATED_ID]);
   }
 
   /**

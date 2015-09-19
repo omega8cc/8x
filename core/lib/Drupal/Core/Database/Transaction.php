@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Database\Transaction
+ * Contains \Drupal\Core\Database\Transaction.
  */
 
 namespace Drupal\Core\Database;
@@ -38,7 +38,7 @@ class Transaction {
   /**
    * A boolean value to indicate whether this transaction has been rolled back.
    *
-   * @var Boolean
+   * @var bool
    */
   protected $rolledBack = FALSE;
 

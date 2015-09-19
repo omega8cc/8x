@@ -1,3 +1,14 @@
+/**
+ * @file
+ * Positioning extensions for dialogs.
+ */
+
+/**
+ * Triggers when content inside a dialog changes.
+ *
+ * @event dialogContentResize
+ */
+
 (function ($, Drupal, drupalSettings, debounce, displace) {
 
   "use strict";
@@ -11,13 +22,21 @@
    * This is used as a window resize and scroll callback to reposition the
    * jQuery UI dialog. Although not a built-in jQuery UI option, this can
    * be disabled by setting autoResize: false in the options array when creating
-   * a new Drupal.dialog().
+   * a new {@link Drupal.dialog}.
+   *
+   * @function Drupal.dialog~resetSize
+   *
+   * @param {jQuery.Event} event
+   *
+   * @fires event:dialogContentResize
    */
   function resetSize(event) {
     var positionOptions = ['width', 'height', 'minWidth', 'minHeight', 'maxHeight', 'maxWidth', 'position'];
     var adjustedOptions = {};
     var windowHeight = $(window).height();
-    var option, optionValue, adjustedValue;
+    var option;
+    var optionValue;
+    var adjustedValue;
     for (var n = 0; n < positionOptions.length; n++) {
       option = positionOptions[n];
       optionValue = event.data.settings[option];
@@ -44,6 +63,12 @@
 
   /**
    * Position the dialog's center at the center of displace.offsets boundaries.
+   *
+   * @function Drupal.dialog~resetPosition
+   *
+   * @param {object} options
+   *
+   * @return {object}
    */
   function resetPosition(options) {
     var offsets = displace.offsets;

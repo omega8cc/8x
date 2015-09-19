@@ -6,13 +6,13 @@ services:
       - { name: breadcrumb_builder, priority: 701 }
   book.manager:
     class: Drupal\book\BookManager
-    arguments: ['@entity.manager', '@string_translation', '@config.factory', '@book.outline_storage']
+    arguments: ['@entity.manager', '@string_translation', '@config.factory', '@book.outline_storage', '@renderer']
   book.outline:
     class: Drupal\book\BookOutline
     arguments: ['@book.manager']
   book.export:
     class: Drupal\book\BookExport
-    arguments: ['@entity.manager', '@book.manager']
+    arguments: ['@entity.manager', '@book.manager', '@renderer']
   book.outline_storage:
     class: Drupal\book\BookOutlineStorage
     arguments: ['@database']
@@ -23,8 +23,17 @@ services:
     arguments: ['@book.manager']
     tags:
       - { name: access_check, applies_to: _access_book_removable }
-  cache_context.book.navigation:
+  cache_context.route.book_navigation:
     class: Drupal\book\Cache\BookNavigationCacheContext
     arguments: ['@request_stack']
+    calls:
+      - [setContainer, ['@service_container']]
     tags:
       - { name: cache.context}
+
+  book.uninstall_validator:
+    class: Drupal\book\BookUninstallValidator
+    tags:
+      - { name: module_install.uninstall_validator }
+    arguments: ['@book.outline_storage', '@entity.query', '@string_translation']
+    lazy: true

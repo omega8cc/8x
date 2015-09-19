@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\block\Tests\BlockLanguageTest.
+ * Contains \Drupal\block\Tests\BlockLanguageTest.
  */
 
 namespace Drupal\block\Tests;
@@ -11,7 +11,7 @@ use Drupal\simpletest\WebTestBase;
 use Drupal\block\Entity\Block;
 
 /**
- * Tests if a block can be configure to be only visibile on a particular
+ * Tests if a block can be configured to be only visible on a particular
  * language.
  *
  * @group block
@@ -90,6 +90,7 @@ class BlockLanguageTest extends WebTestBase {
           'langcodes' => array(
             'fr' => 'fr',
           ),
+          'context_mapping' => ['language' => '@language.current_language_context:language_interface'],
         ),
       ),
     );
@@ -119,11 +120,16 @@ class BlockLanguageTest extends WebTestBase {
    * Tests block language visibility with different language types.
    */
   public function testMultipleLanguageTypes() {
-    // Customize content language settings from their defaults.
+    // Customize content language detection to be different from interface
+    // language detection.
     $edit = [
-      'language_content[configurable]' => TRUE,
+      // Interface language detection: only using session.
       'language_interface[enabled][language-url]' => FALSE,
       'language_interface[enabled][language-session]' => TRUE,
+      // Content language detection: only using URL.
+      'language_content[configurable]' => TRUE,
+      'language_content[enabled][language-url]' => TRUE,
+      'language_content[enabled][language-interface]' => FALSE,
     ];
     $this->drupalPostForm('admin/config/regional/language/detection', $edit, t('Save settings'));
 
@@ -136,7 +142,7 @@ class BlockLanguageTest extends WebTestBase {
     // Enable a standard block and set visibility to French only.
     $block_id = strtolower($this->randomMachineName(8));
     $edit = [
-      'visibility[language][context_mapping][language]' => 'language.language_interface',
+      'visibility[language][context_mapping][language]' => '@language.current_language_context:language_interface',
       'visibility[language][langcodes][fr]' => TRUE,
       'id' => $block_id,
       'region' => 'sidebar_first',
@@ -149,6 +155,10 @@ class BlockLanguageTest extends WebTestBase {
     $this->drupalGet('node', ['query' => ['language' => 'fr']]);
     $this->assertText('Powered by Drupal', 'The body of the block appears on the page.');
 
+    // Re-login in order to clear the interface language stored in the session.
+    $this->drupalLogout();
+    $this->drupalLogin($this->adminUser);
+
     // Content language does not depend on session/request arguments.
     // It will fall back on English (site default) and not display the block.
     $this->drupalGet('en');
@@ -158,7 +168,7 @@ class BlockLanguageTest extends WebTestBase {
 
     // Change visibility to now depend on content language for this block.
     $edit = [
-      'visibility[language][context_mapping][language]' => 'language.language_content'
+      'visibility[language][context_mapping][language]' => '@language.current_language_context:language_content'
     ];
     $this->drupalPostForm('admin/structure/block/manage/' . $block_id, $edit, t('Save block'));
 

@@ -38,11 +38,6 @@
  * - title: The page title, for use in the actual content.
  * - title_suffix: Additional output populated by modules, intended to be
  *   displayed after the main title tag that appears in the template.
- * - messages: Status and error messages. Should be displayed prominently.
- * - tabs: Tabs linking to any sub-pages beneath the current page (e.g., the
- *   view and edit tabs when displaying a node).
- * - action_links: Actions local to the page, such as "Add menu" on the menu
- *   administration interface.
  * - node: Fully loaded node, if there is an automatically-loaded node
  *   associated with the page and the node ID is the second argument in the
  *   page's path (e.g. node/12345 and node/12345/revisions, but not
@@ -50,10 +45,10 @@
  *
  * Regions:
  * - page.header: Items for the header region.
+ * - page.highlighted: Items for the highlighted region.
  * - page.primary_menu: Items for the primary menu region.
  * - page.secondary_menu: Items for the secondary menu region.
  * - page.featured_top: Items for the featured top region.
- * - page.help: Dynamic help text, mostly for admin pages.
  * - page.content: The main content of the current page.
  * - page.sidebar_first: Items for the first sidebar.
  * - page.sidebar_second: Items for the second sidebar.
@@ -74,8 +69,8 @@
 #}
 <div id="page-wrapper">
   <div id="page">
-    <header id="header" role="banner" aria-label="{{ 'Site header'|t}}">
-      <div class="section clearfix">
+    <header id="header" class="header" role="banner" aria-label="{{ 'Site header'|t}}">
+      <div class="section layout-container clearfix">
         {{ page.secondary_menu }}
         {% if logo %}
           <a href="{{ front_page }}" title="{{ 'Home'|t }}" rel="home" id="logo">
@@ -109,40 +104,33 @@
         {{ page.primary_menu }}
       </div>
     </header>
-    {% if messages %}
-      <div id="messages">
-        <div class="section clearfix">{{ messages }}</div>
+    {% if page.highlighted %}
+      <div class="highlighted">
+        <aside class="layout-container section clearfix" role="complementary">
+          {{ page.highlighted }}
+        </aside>
       </div>
     {% endif %}
     {% if page.featured_top %}
       <div class="featured-top">
-        <aside class="featured-top__inner clearfix" role="complementary">
+        <aside class="featured-top__inner section layout-container clearfix" role="complementary">
           {{ page.featured_top }}
         </aside>
       </div>
     {% endif %}
-    <div id="main-wrapper" class="clearfix">
-      <div id="main" class="clearfix">
+    <div id="main-wrapper" class="layout-main-wrapper layout-container clearfix">
+      <div id="main" class="layout-main clearfix">
         {{ page.breadcrumb }}
-        <main id="content" class="column" role="main">
+        <main id="content" class="column main-content" role="main">
           <section class="section">
             <a id="main-content" tabindex="-1"></a>
             {{ title_prefix }}
             {% if title %}
-              <h1 class="title" id="page-title">
+              <h1 class="title page-title">
                 {{ title }}
               </h1>
             {% endif %}
             {{ title_suffix }}
-            {% if tabs %}
-              <nav class="tabs" role="navigation" aria-label="{{ 'Tabs'|t }}">
-                {{ tabs }}
-              </nav>
-            {% endif %}
-            {{ page.help }}
-            {% if action_links %}
-              <ul class="action-links">{{ action_links }}</ul>
-            {% endif %}
             {{ page.content }}
           </section>
         </main>
@@ -163,18 +151,18 @@
       </div>
     </div>
     {% if page.featured_bottom_first or page.featured_bottom_second or page.featured_bottom_third %}
-      <div id="featured-bottom-wrapper">
-        <aside id="featured-bottom" class="clearfix" role="complementary">
+      <div class="featured-bottom">
+        <aside class="layout-container clearfix" role="complementary">
           {{ page.featured_bottom_first }}
           {{ page.featured_bottom_second }}
           {{ page.featured_bottom_third }}
         </aside>
       </div>
     {% endif %}
-    <div id="site-footer__wrapper">
-      <footer class="site-footer">
+    <footer class="site-footer">
+      <div class="layout-container">
         {% if page.footer_first or page.footer_second or page.footer_third or page.footer_fourth %}
-          <div id="footer-columns" class="clearfix">
+          <div class="site-footer__top clearfix">
             {{ page.footer_first }}
             {{ page.footer_second }}
             {{ page.footer_third }}
@@ -182,11 +170,11 @@
           </div>
         {% endif %}
         {% if page.footer_fifth %}
-          <div id="site-footer__bottom" role="contentinfo">
+          <div class="site-footer__bottom">
             {{ page.footer_fifth }}
           </div>
         {% endif %}
-      </footer>
-    </div>
+      </div>
+    </footer>
   </div>
 </div>

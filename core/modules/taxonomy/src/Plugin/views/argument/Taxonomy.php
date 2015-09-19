@@ -2,15 +2,15 @@
 
 /**
  * @file
- * Definition of Drupal\taxonomy\Plugin\views\argument\Taxonomy.
+ * Contains \Drupal\taxonomy\Plugin\views\argument\Taxonomy.
  */
 
 namespace Drupal\taxonomy\Plugin\views\argument;
 
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
-use Drupal\views\Plugin\views\argument\Numeric;
-use Drupal\Component\Utility\String;
+use Drupal\views\Plugin\views\argument\NumericArgument;
+use Drupal\Component\Utility\SafeMarkup;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -20,7 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsArgument("taxonomy")
  */
-class Taxonomy extends Numeric implements ContainerFactoryPluginInterface {
+class Taxonomy extends NumericArgument implements ContainerFactoryPluginInterface {
 
   /**
    * @var EntityStorageInterface
@@ -56,7 +56,7 @@ class Taxonomy extends Numeric implements ContainerFactoryPluginInterface {
     if ($this->argument) {
       $term = $this->termStorage->load($this->argument);
       if (!empty($term)) {
-        return String::checkPlain($term->getName());
+        return SafeMarkup::checkPlain($term->getName());
       }
     }
     // TODO review text

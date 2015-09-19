@@ -2,13 +2,11 @@
 
 /**
  * @file
- * Contains Drupal\config\Tests\ConfigOtherModuleTest.
+ * Contains \Drupal\config\Tests\ConfigOtherModuleTest.
  */
 
 namespace Drupal\config\Tests;
 
-use Drupal\Core\Config\PreExistingConfigException;
-use Drupal\Core\Config\StorageInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -59,24 +57,22 @@ class ConfigOtherModuleTest extends WebTestBase {
     // Default configuration provided by config_test should still exist.
     $this->assertTrue(entity_load('config_test', 'dotted.default', TRUE), 'The configuration is not deleted.');
 
-    // Re-enable module to test that pre-existing default configuration throws
-    // an error.
-    $msg = "The expected PreExistingConfigException is thrown by reinstalling config_other_module_config_test.";
-    try {
-      $this->installModule('config_other_module_config_test');
-      $this->fail($msg);
-    }
-    catch (PreExistingConfigException $e) {
-      $this->pass($msg);
-      $this->assertEqual($e->getExtension(), 'config_other_module_config_test');
-      $this->assertEqual($e->getConfigObjects(), [StorageInterface::DEFAULT_COLLECTION => ['config_test.dynamic.other_module_test']]);
-    }
+    // Re-enable module to test that pre-existing optional configuration does
+    // not throw an error.
+    $this->installModule('config_other_module_config_test');
+    $this->assertTrue(\Drupal::moduleHandler()->moduleExists('config_other_module_config_test'), 'The config_other_module_config_test module is installed.');
+
+    // Ensure that optional configuration with unmet dependencies is only
+    // installed once all the dependencies are met.
+    $this->assertNull(entity_load('config_test', 'other_module_test_unmet', TRUE), 'The optional configuration whose dependencies are met is not created.');
+    $this->installModule('config_install_dependency_test');
+    $this->assertTrue(entity_load('config_test', 'other_module_test_unmet', TRUE), 'The optional configuration whose dependencies are met is now created.');
   }
 
   /**
    * Tests enabling the provider of the config entity type first.
    */
-  public function testInstallConfigEnityModuleFirst() {
+  public function testInstallConfigEntityModuleFirst() {
     $this->installModule('config_test');
     $this->assertFalse(entity_load('config_test', 'other_module_test', TRUE), 'Default configuration provided by config_other_module_config_test does not exist.');
 

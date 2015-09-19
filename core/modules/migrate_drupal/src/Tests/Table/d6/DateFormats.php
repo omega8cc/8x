@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\DateFormats.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\DateFormats.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -44,10 +44,11 @@ class DateFormats extends DrupalDumpBase {
         'locked' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("date_formats")->fields(array(
       'dfid',
@@ -234,3 +235,4 @@ class DateFormats extends DrupalDumpBase {
   }
 
 }
+#7b7e1b59dbb8771c5f9dacbfb31bc771

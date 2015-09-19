@@ -7,6 +7,7 @@
 
 namespace Drupal\views\Plugin\Block;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -93,7 +94,13 @@ abstract class ViewsBlockBase extends BlockBase implements ContainerFactoryPlugi
    * {@inheritdoc}
    */
   protected function blockAccess(AccountInterface $account) {
-    return $this->view->access($this->displayID);
+    if ($this->view->access($this->displayID)) {
+      $access = AccessResult::allowed();
+    }
+    else {
+      $access = AccessResult::forbidden();
+    }
+    return $access;
   }
 
   /**
@@ -194,8 +201,13 @@ abstract class ViewsBlockBase extends BlockBase implements ContainerFactoryPlugi
       if (is_string($output)) {
         $output = array('#markup' => $output);
       }
-      // Add the contextual links.
-      views_add_contextual_links($output, $block_type, $this->view, $this->displayID);
+
+      // views_add_contextual_links() needs the following information in
+      // order to be attached to the view.
+      $output['#view_id'] = $this->view->storage->id();
+      $output['#view_display_show_admin_links'] = $this->view->getShowAdminLinks();
+      $output['#view_display_plugin_id'] = $this->view->display_handler->getPluginId();
+      views_add_contextual_links($output, $block_type, $this->displayID);
     }
   }
 

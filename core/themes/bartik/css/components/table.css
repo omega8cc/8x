@@ -1,4 +1,7 @@
-/* ------------------ Table Styles ------------------ */
+/**
+ * @file
+ * Styles for Bartik's tables.
+ */
 
 table {
   border: 0;
@@ -9,9 +12,6 @@ table {
   width: 100%;
 }
 table table {
-  font-size: 1em;
-}
-#footer-wrapper table {
   font-size: 1em;
 }
 tr {
@@ -52,6 +52,7 @@ tr th {
 [dir="rtl"] tr th {
   text-align: right;
 }
+
 /**
  * Responsive tables.
  */
@@ -68,11 +69,6 @@ tr th {
   td.priority-low {
     display: none;
   }
-}
-#footer-wrapper tr td,
-#footer-wrapper tr th {
-  border-color: #555;
-  border-color: rgba(255, 255, 255, 0.18);
 }
 table ul.links {
   margin: 0;

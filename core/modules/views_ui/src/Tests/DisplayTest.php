@@ -8,7 +8,7 @@
 namespace Drupal\views_ui\Tests;
 
 use Drupal\Component\Serialization\Json;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 
 use Drupal\views\Views;
 use Drupal\Core\Template\Attribute;
@@ -130,7 +130,7 @@ class DisplayTest extends UITestBase {
     // Assert that the expected text is found in each area category.
     foreach ($areas as $type) {
       $element = $this->xpath('//div[contains(@class, :class)]/div', array(':class' => $type));
-      $this->assertEqual((string) $element[0], String::format('The selected display type does not use @type plugins', array('@type' => $type)));
+      $this->assertEqual((string) $element[0], SafeMarkup::format('The selected display type does not use @type plugins', array('@type' => $type)));
     }
   }
 
@@ -178,16 +178,17 @@ class DisplayTest extends UITestBase {
     $this->drupalLogin($this->drupalCreateUser(array('administer views', 'access contextual links')));
     $view = entity_load('view', 'test_display');
     $view->enable()->save();
+    $this->container->get('router.builder')->rebuildIfNeeded();
 
     $this->drupalGet('test-display');
-    $id = 'entity.view.edit_form:view=test_display:location=page&name=test_display&display_id=page_1';
+    $id = 'entity.view.edit_form:view=test_display:location=page&name=test_display&display_id=page_1&langcode=en';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
     $this->assertRaw('<div' . new Attribute(array('data-contextual-id' => $id)) . '></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
 
     // Get server-rendered contextual links.
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:renderContextualLinks()
     $post = array('ids[0]' => $id);
-    $response = $this->drupalPost('contextual/render', 'application/json', $post, array('query' => array('destination' => 'test-display')));
+    $response = $this->drupalPostWithFormat('contextual/render', 'json', $post, array('query' => array('destination' => 'test-display')));
     $this->assertResponse(200);
     $json = Json::decode($response);
     $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="entityviewedit-form"><a href="' . base_path() . 'admin/structure/views/view/test_display/edit/page_1">Edit view</a></li></ul>');

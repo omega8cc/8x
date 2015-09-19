@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Users.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Users.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -52,19 +52,19 @@ class Users extends DrupalDumpBase {
         'mode' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'sort' => array(
           'type' => 'int',
           'not null' => FALSE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'threshold' => array(
           'type' => 'int',
           'not null' => FALSE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'theme' => array(
@@ -82,7 +82,7 @@ class Users extends DrupalDumpBase {
         'signature_format' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '6',
+          'length' => '11',
           'default' => '0',
         ),
         'created' => array(
@@ -106,7 +106,7 @@ class Users extends DrupalDumpBase {
         'status' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'timezone' => array(
@@ -161,6 +161,7 @@ class Users extends DrupalDumpBase {
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("users")->fields(array(
       'uid',
@@ -250,12 +251,12 @@ class Users extends DrupalDumpBase {
       'access' => '1391259674',
       'login' => '1391152255',
       'status' => '1',
-      'timezone' => '3600',
+      'timezone' => '-28800',
       'language' => 'en',
       'picture' => '',
       'init' => 'bloggs@example.com',
       'data' => 'a:0:{}',
-      'timezone_name' => NULL,
+      'timezone_name' => 'America/Anchorage',
       'pass_plain' => 'joe.bloggs_pass',
       'expected_timezone' => NULL,
       'timezone_id' => '0',
@@ -274,12 +275,12 @@ class Users extends DrupalDumpBase {
       'access' => '1391259574',
       'login' => '1391162255',
       'status' => '1',
-      'timezone' => '3600',
+      'timezone' => '0',
       'language' => 'en',
       'picture' => '',
       'init' => 'sal.saraniti@example.com',
       'data' => 'a:0:{}',
-      'timezone_name' => NULL,
+      'timezone_name' => 'UTC',
       'pass_plain' => 'sal.saraniti',
       'expected_timezone' => NULL,
       'timezone_id' => '0',
@@ -298,7 +299,7 @@ class Users extends DrupalDumpBase {
       'access' => '1390259574',
       'login' => '1390162255',
       'status' => '1',
-      'timezone' => '3600',
+      'timezone' => NULL,
       'language' => 'en',
       'picture' => '',
       'init' => 'terry.saraniti@example.com',
@@ -311,3 +312,4 @@ class Users extends DrupalDumpBase {
   }
 
 }
+#4a42570fa3c819b0b84e9552d689e2e7

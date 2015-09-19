@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentGroup.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentGroup.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -62,6 +62,7 @@ class ContentGroup extends DrupalDumpBase {
         'type_name',
         'group_name',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_group")->fields(array(
       'group_type',
@@ -75,3 +76,4 @@ class ContentGroup extends DrupalDumpBase {
   }
 
 }
+#7e70933ab00570caa7341dab6424469a

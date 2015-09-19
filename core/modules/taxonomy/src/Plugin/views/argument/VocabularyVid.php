@@ -2,13 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\taxonomy\Plugin\views\argument\VocabularyVid.
+ * Contains \Drupal\taxonomy\Plugin\views\argument\VocabularyVid.
  */
 
 namespace Drupal\taxonomy\Plugin\views\argument;
 
-use Drupal\views\Plugin\views\argument\Numeric;
-use Drupal\Component\Utility\String;
+use Drupal\views\Plugin\views\argument\NumericArgument;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\taxonomy\VocabularyStorageInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -19,7 +19,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsArgument("vocabulary_vid")
  */
-class VocabularyVid extends Numeric {
+class VocabularyVid extends NumericArgument {
 
   /**
     * The vocabulary storage.
@@ -63,7 +63,7 @@ class VocabularyVid extends Numeric {
   function title() {
     $vocabulary = $this->vocabularyStorage->load($this->argument);
     if ($vocabulary) {
-      return String::checkPlain($vocabulary->label());
+      return SafeMarkup::checkPlain($vocabulary->label());
     }
 
     return $this->t('No vocabulary');

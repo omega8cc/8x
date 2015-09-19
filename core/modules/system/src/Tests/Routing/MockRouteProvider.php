@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\system\Tests\Routing\MockRouteProvider.
+ * Contains \Drupal\system\Tests\Routing\MockRouteProvider.
  */
 
 namespace Drupal\system\Tests\Routing;
@@ -54,6 +54,13 @@ class MockRouteProvider implements RouteProviderInterface {
     }
 
     return reset($routes);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function preLoadRoutes($names) {
+    // Nothing to do.
   }
 
   /**

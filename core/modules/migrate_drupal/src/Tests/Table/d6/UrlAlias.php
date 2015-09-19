@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\UrlAlias.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\UrlAlias.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -50,6 +50,7 @@ class UrlAlias extends DrupalDumpBase {
           'default' => '',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("url_alias")->fields(array(
       'pid',
@@ -71,3 +72,4 @@ class UrlAlias extends DrupalDumpBase {
   }
 
 }
+#8aa75592c75220bfb2ad948f7528f943

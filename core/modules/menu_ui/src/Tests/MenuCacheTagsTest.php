@@ -53,8 +53,10 @@ class MenuCacheTagsTest extends PageCacheTagsTestBase {
       'block_view',
       'config:block_list',
       'config:block.block.' . $block->id(),
-      'block_plugin:system_menu_block__llama',
       'config:system.menu.llama',
+      // The cache contexts associated with the (in)accessible menu links are
+      // bubbled.
+      'config:user.role.anonymous',
     );
     $this->verifyPageCache($url, 'HIT', $expected_tags);
 
@@ -108,7 +110,7 @@ class MenuCacheTagsTest extends PageCacheTagsTestBase {
     $this->verifyPageCache($url, 'MISS');
 
     // Verify a cache hit.
-    $this->verifyPageCache($url, 'HIT', ['config:block_list', 'rendered']);
+    $this->verifyPageCache($url, 'HIT', ['config:block_list', 'config:user.role.anonymous', 'rendered']);
   }
 
 }

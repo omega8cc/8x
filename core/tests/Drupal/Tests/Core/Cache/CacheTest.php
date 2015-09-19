@@ -9,6 +9,7 @@ namespace Drupal\Tests\Core\Cache;
 
 use Drupal\Core\Cache\Cache;
 use Drupal\Tests\UnitTestCase;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * @coversDefaultClass \Drupal\Core\Cache\Cache
@@ -27,6 +28,7 @@ class CacheTest extends UnitTestCase {
       [['foo'], FALSE],
       [['foo', 'bar'], FALSE],
       [['foo', 'bar', 'llama:2001988', 'baz', 'llama:14031991'], FALSE],
+      // Invalid.
       [[FALSE], 'Cache tags must be strings, boolean given.'],
       [[TRUE], 'Cache tags must be strings, boolean given.'],
       [['foo', FALSE], 'Cache tags must be strings, boolean given.'],
@@ -81,6 +83,38 @@ class CacheTest extends UnitTestCase {
    */
   public function testMergeTags(array $a, array $b, array $expected) {
     $this->assertEquals($expected, Cache::mergeTags($a, $b));
+  }
+
+  /**
+   * Provides a list of pairs of cache tags arrays to be merged.
+   *
+   * @return array
+   */
+  public function mergeMaxAgesProvider() {
+    return [
+      [Cache::PERMANENT, Cache::PERMANENT, Cache::PERMANENT],
+      [60, 60, 60],
+      [0, 0, 0],
+
+      [60, 0, 0],
+      [0, 60, 0],
+
+      [Cache::PERMANENT, 0, 0],
+      [0, Cache::PERMANENT, 0],
+
+      [Cache::PERMANENT, 60, 60],
+      [60, Cache::PERMANENT, 60],
+    ];
+  }
+
+
+  /**
+   * @covers ::mergeMaxAges
+   *
+   * @dataProvider mergeMaxAgesProvider
+   */
+  public function testMergeMaxAges($a, $b, $expected) {
+    $this->assertSame($expected, Cache::mergeMaxAges($a, $b));
   }
 
   /**

@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Book.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Book.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -47,6 +47,7 @@ class Book extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("book")->fields(array(
       'mlid',
@@ -77,3 +78,4 @@ class Book extends DrupalDumpBase {
   }
 
 }
+#6ddf63f063b1bfa617a96764d859a0f1

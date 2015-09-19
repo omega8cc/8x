@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\Core\TypedData\Type\Timestamp.
+ * Contains \Drupal\Core\TypedData\Plugin\DataType\Timestamp.
  */
 
 namespace Drupal\Core\TypedData\Plugin\DataType;
@@ -18,7 +18,7 @@ use Drupal\Core\TypedData\Type\DateTimeInterface;
  *   label = @Translation("String")
  * )
  */
-class Timestamp extends Integer implements DateTimeInterface {
+class Timestamp extends IntegerData implements DateTimeInterface {
 
   /**
    * The data value as a UNIX timestamp.

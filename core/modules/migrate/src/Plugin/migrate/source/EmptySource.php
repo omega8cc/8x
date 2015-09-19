@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\migrate\Plugin\migrate\source\Constants.
+ * Contains \Drupal\migrate\Plugin\migrate\source\EmptySource.
  */
 
 namespace Drupal\migrate\Plugin\migrate\source;
@@ -30,7 +30,7 @@ class EmptySource extends SourcePluginBase {
   /**
    * {@inheritdoc}
    */
-  public function getIterator() {
+  public function initializeIterator() {
     return new \ArrayIterator(array(array('id' => '')));
   }
 

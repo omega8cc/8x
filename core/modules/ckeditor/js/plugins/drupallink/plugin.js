@@ -1,6 +1,8 @@
 /**
  * @file
  * Drupal Link plugin.
+ *
+ * @ignore
  */
 
 (function ($, Drupal, drupalSettings, CKEDITOR) {
@@ -25,18 +27,19 @@
             linkDOMElement = linkElement.$;
 
             // Populate an array with the link's current attributes.
-            var attribute = null, attributeName;
+            var attribute = null;
+            var attributeName;
             for (var attrIndex = 0; attrIndex < linkDOMElement.attributes.length; attrIndex++) {
               attribute = linkDOMElement.attributes.item(attrIndex);
               attributeName = attribute.nodeName.toLowerCase();
-              // Don't consider data-cke-saved- attributes; they're just there to
-              // work around browser quirks.
+              // Don't consider data-cke-saved- attributes; they're just there
+              // to work around browser quirks.
               if (attributeName.substring(0, 15) === 'data-cke-saved-') {
                 continue;
               }
               // Store the value for this attribute, unless there's a
-              // data-cke-saved- alternative for it, which will contain the quirk-
-              // free, original value.
+              // data-cke-saved- alternative for it, which will contain the
+              // quirk-free, original value.
               existingValues[attributeName] = linkElement.data('cke-saved-' + attributeName) || attribute.nodeValue;
             }
           }
@@ -94,8 +97,8 @@
             editor.fire('saveSnapshot');
           };
           // Drupal.t() will not work inside CKEditor plugins because CKEditor
-          // loads the JavaScript file instead of Drupal. Pull translated strings
-          // from the plugin settings that are translated server-side.
+          // loads the JavaScript file instead of Drupal. Pull translated
+          // strings from the plugin settings that are translated server-side.
           var dialogSettings = {
             title: linkElement ? editor.config.drupalLink_dialogTitleEdit : editor.config.drupalLink_dialogTitleAdd,
             dialogClass: 'editor-link-dialog'
@@ -198,6 +201,7 @@
    *
    * The following selection will all return the link element.
    *
+   * @example
    *  <a href="#">li^nk</a>
    *  <a href="#">[link]</a>
    *  text[<a href="#">link]</a>
@@ -206,6 +210,11 @@
    *  [<a href="#"><b>li]nk</b></a>
    *
    * @param {CKEDITOR.editor} editor
+   *   The CKEditor editor object
+   *
+   * @return {?HTMLElement}
+   *   The selected link element, or null.
+   *
    */
   function getSelectedLink(editor) {
     var selection = editor.getSelection();

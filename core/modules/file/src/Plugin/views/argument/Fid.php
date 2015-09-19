@@ -2,15 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\file\Plugin\views\argument\Fid.
+ * Contains \Drupal\file\Plugin\views\argument\Fid.
  */
 
 namespace Drupal\file\Plugin\views\argument;
 
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Entity\Query\QueryFactory;
-use Drupal\views\Plugin\views\argument\Numeric;
-use Drupal\Component\Utility\String;
+use Drupal\views\Plugin\views\argument\NumericArgument;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
@@ -21,7 +20,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsArgument("file_fid")
  */
-class Fid extends Numeric implements ContainerFactoryPluginInterface {
+class Fid extends NumericArgument implements ContainerFactoryPluginInterface {
 
   /**
    * The entity manager service
@@ -48,7 +47,7 @@ class Fid extends Numeric implements ContainerFactoryPluginInterface {
    *   The plugin implementation definition.
    * @param \Drupal\Core\Entity\EntityManagerInterface $entity_manager
    *   The entity manager.
-   * @param \Drupal\Core\Entity\Query\QueryFactory
+   * @param \Drupal\Core\Entity\Query\QueryFactory $entity_query
    *   The entity query factory.
    */
   public function __construct(array $configuration, $plugin_id, $plugin_definition, EntityManagerInterface $entity_manager, QueryFactory $entity_query) {
@@ -81,7 +80,7 @@ class Fid extends Numeric implements ContainerFactoryPluginInterface {
     $files = $controller->loadMultiple($fids);
     $titles = array();
     foreach ($files as $file) {
-      $titles[] = String::checkPlain($file->getFilename());
+      $titles[] = $file->getFilename();
     }
     return $titles;
   }

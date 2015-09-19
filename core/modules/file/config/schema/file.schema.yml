@@ -1,7 +1,7 @@
 # Schema for the configuration files of the File module.
 
 file.settings:
-  type: mapping
+  type: config_object
   label: 'File settings'
   mapping:
     description:
@@ -46,6 +46,9 @@ base_file_field_field_settings:
     handler:
       type: string
       label: 'Reference method'
+    handler_settings:
+      type: entity_reference_selection.[%parent.handler]
+      label: 'Entity reference selection settings'
     file_directory:
       type: string
       label: 'File directory'
@@ -87,3 +90,42 @@ field.widget.settings.file_generic:
     progress_indicator:
       type: string
       label: 'Progress indicator'
+
+field_formatter_settings_base_file:
+  type: mapping
+  mapping:
+    link_to_file:
+      type: boolean
+      label: 'Link to file'
+
+field.formatter.settings.file_link:
+  type: field_formatter_settings_base_file
+
+field.formatter.settings.file_uri:
+  type: field_formatter_settings_base_file
+  mapping:
+    file_download_path:
+      type: boolean
+      label: 'Display download path'
+
+field.formatter.settings.file_filemime:
+  type: field_formatter_settings_base_file
+  mapping:
+    filemime_image:
+      type: boolean
+      label: 'Display the filemime as icon'
+
+field.formatter.settings.file_extension:
+  type: field_formatter_settings_base_file
+  mapping:
+    extension_detect_tar:
+      type: boolean
+      label: 'Detect tar'
+
+migrate.source.d6_upload_instance:
+  type: migrate_source_sql
+  label: 'Drupal 6 upload form display'
+  mapping:
+    constants:
+      type: migrate_entity_constant
+      label: 'Constants'

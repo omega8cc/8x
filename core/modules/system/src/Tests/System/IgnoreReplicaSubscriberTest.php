@@ -1,6 +1,7 @@
 <?php
 
 /**
+ * @file
  * Contains \Drupal\system\Tests\System\IgnoreReplicaSubscriberTest.
  */
 
@@ -32,7 +33,7 @@ class IgnoreReplicaSubscriberTest extends KernelTestBase {
     Database::addConnectionInfo('default', 'replica', $connection_info['default']);
 
     db_ignore_replica();
-    $class_loader = require \Drupal::root() . '/core/vendor/autoload.php';
+    $class_loader = require \Drupal::root() . '/autoload.php';
     $kernel = new DrupalKernel('testing', $class_loader, FALSE);
     $event = new GetResponseEvent($kernel, Request::create('http://example.com'), HttpKernelInterface::MASTER_REQUEST);
     $subscriber = new ReplicaDatabaseIgnoreSubscriber();

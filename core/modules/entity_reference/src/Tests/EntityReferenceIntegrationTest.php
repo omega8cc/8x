@@ -7,9 +7,10 @@
 
 namespace Drupal\entity_reference\Tests;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\config\Tests\AssertConfigEntityImportTrait;
 use Drupal\Core\Config\Entity\ConfigEntityBase;
+use Drupal\entity_reference\Tests\EntityReferenceTestTrait;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\simpletest\WebTestBase;
 
@@ -19,7 +20,9 @@ use Drupal\simpletest\WebTestBase;
  * @group entity_reference
  */
 class EntityReferenceIntegrationTest extends WebTestBase {
+
   use AssertConfigEntityImportTrait;
+  use EntityReferenceTestTrait;
 
   /**
    * The entity type used in this test.
@@ -68,7 +71,7 @@ class EntityReferenceIntegrationTest extends WebTestBase {
       $this->fieldName = 'field_test_' . $referenced_entities[0]->getEntityTypeId();
 
       // Create an Entity reference field.
-      entity_reference_create_field($this->entityType, $this->bundle, $this->fieldName, $this->fieldName, $referenced_entities[0]->getEntityTypeId(), 'default', array(), 2);
+      $this->createEntityReferenceField($this->entityType, $this->bundle, $this->fieldName, $this->fieldName, $referenced_entities[0]->getEntityTypeId(), 'default', array(), 2);
 
       // Test the default 'entity_reference_autocomplete' widget.
       entity_get_form_display($this->entityType, $this->bundle, 'default')->setComponent($this->fieldName)->save();
@@ -143,13 +146,13 @@ class EntityReferenceIntegrationTest extends WebTestBase {
         'default_value_input[' . $this->fieldName . '][0][target_id]' => $referenced_entities[0]->label() . ' (' . $referenced_entities[0]->id() . ')',
       );
       if ($key == 'content') {
-        $field_edit['field[settings][handler_settings][target_bundles][' . $referenced_entities[0]->getEntityTypeId() . ']'] = TRUE;
+        $field_edit['settings[handler_settings][target_bundles][' . $referenced_entities[0]->getEntityTypeId() . ']'] = TRUE;
       }
       $this->drupalPostForm($this->entityType . '/structure/' . $this->bundle .'/fields/' . $this->entityType . '.' . $this->bundle . '.' . $this->fieldName, $field_edit, t('Save settings'));
       // Ensure the configuration has the expected dependency on the entity that
       // is being used a default value.
       $field = FieldConfig::loadByName($this->entityType, $this->bundle, $this->fieldName);
-      $this->assertTrue(in_array($referenced_entities[0]->getConfigDependencyName(), $field->getDependencies()[$key]), String::format('Expected @type dependency @name found', ['@type' => $key, '@name' => $referenced_entities[0]->getConfigDependencyName()]));
+      $this->assertTrue(in_array($referenced_entities[0]->getConfigDependencyName(), $field->getDependencies()[$key]), SafeMarkup::format('Expected @type dependency @name found', ['@type' => $key, '@name' => $referenced_entities[0]->getConfigDependencyName()]));
       // Ensure that the field can be imported without change even after the
       // default value deleted.
       $referenced_entities[0]->delete();
@@ -163,7 +166,7 @@ class EntityReferenceIntegrationTest extends WebTestBase {
       $field = FieldConfig::loadByName($this->entityType, $this->bundle, $this->fieldName);
       $field->save();
       $dependencies = $field->getDependencies();
-      $this->assertFalse(isset($dependencies[$key]) && in_array($referenced_entities[0]->getConfigDependencyName(), $dependencies[$key]), String::format('@type dependency @name does not exist.', ['@type' => $key, '@name' => $referenced_entities[0]->getConfigDependencyName()]));
+      $this->assertFalse(isset($dependencies[$key]) && in_array($referenced_entities[0]->getConfigDependencyName(), $dependencies[$key]), SafeMarkup::format('@type dependency @name does not exist.', ['@type' => $key, '@name' => $referenced_entities[0]->getConfigDependencyName()]));
     }
   }
 

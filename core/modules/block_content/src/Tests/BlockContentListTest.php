@@ -7,13 +7,14 @@
 
 namespace Drupal\block_content\Tests;
 
-use Drupal\simpletest\WebTestBase;
-
 /**
  * Tests the listing of custom blocks.
  *
+ * Tests the fallback block content list when Views is disabled.
+ *
  * @group block_content
  * @see \Drupal\block\BlockContentListBuilder
+ * @see \Drupal\block_content\Tests\BlockContentListViewsTest
  */
 class BlockContentListTest extends BlockContentTestBase {
 
@@ -107,7 +108,7 @@ class BlockContentListTest extends BlockContentTestBase {
     $this->assertNoFieldByXpath('//td', $new_label, 'No label found for deleted custom block.');
 
     // Confirm that the empty text is displayed.
-    $this->assertText(t('There is no Custom Block yet.'));
+    $this->assertText(t('There is no Custom block yet.'));
   }
 
 }

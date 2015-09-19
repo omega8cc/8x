@@ -7,18 +7,48 @@
 
 namespace Drupal\Tests\Core\Form;
 
+use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Access\AccessResultForbidden;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Form\EnforcedResponseException;
+use Drupal\Core\Form\FormBuilder;
+use Drupal\Core\Form\FormBuilderInterface;
 use Drupal\Core\Form\FormInterface;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\RequestStack;
+use Drupal\Core\Cache\Context\CacheContextsManager;
+use Symfony\Component\DependencyInjection\ContainerBuilder;
 
 /**
  * @coversDefaultClass \Drupal\Core\Form\FormBuilder
  * @group Form
  */
 class FormBuilderTest extends FormTestBase {
+
+  /**
+   * The dependency injection container.
+   *
+   * @var \Symfony\Component\DependencyInjection\ContainerBuilder
+   */
+  protected $container;
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+
+    $this->container = new ContainerBuilder();
+    $cache_contexts_manager = $this->prophesize(CacheContextsManager::class)->reveal();
+    $this->container->set('cache_contexts_manager', $cache_contexts_manager);
+    \Drupal::setContainer($this->container);
+  }
 
   /**
    * Tests the getFormId() method with a string based form ID.
@@ -277,7 +307,7 @@ class FormBuilderTest extends FormTestBase {
   }
 
   /**
-   * Tests the rebuildForm() method.
+   * Tests the rebuildForm() method for a POST submission.
    */
   public function testRebuildForm() {
     $form_id = 'test_form_id';
@@ -297,6 +327,9 @@ class FormBuilderTest extends FormTestBase {
     $form = $this->formBuilder->buildForm($form_arg, $form_state);
     $original_build_id = $form['#build_id'];
 
+    $this->request->setMethod('POST');
+    $form_state->setRequestMethod('POST');
+
     // Rebuild the form, and assert that the build ID has not changed.
     $form_state->setRebuild();
     $input['form_id'] = $form_id;
@@ -304,11 +337,51 @@ class FormBuilderTest extends FormTestBase {
     $form_state->addRebuildInfo('copy', ['#build_id' => TRUE]);
     $this->formBuilder->processForm($form_id, $form, $form_state);
     $this->assertSame($original_build_id, $form['#build_id']);
+    $this->assertTrue($form_state->isCached());
 
     // Rebuild the form again, and assert that there is a new build ID.
     $form_state->setRebuildInfo([]);
     $form = $this->formBuilder->buildForm($form_arg, $form_state);
     $this->assertNotSame($original_build_id, $form['#build_id']);
+    $this->assertTrue($form_state->isCached());
+  }
+
+  /**
+   * Tests the rebuildForm() method for a GET submission.
+   */
+  public function testRebuildFormOnGetRequest() {
+    $form_id = 'test_form_id';
+    $expected_form = $form_id();
+
+    // The form will be built four times.
+    $form_arg = $this->getMock('Drupal\Core\Form\FormInterface');
+    $form_arg->expects($this->exactly(2))
+      ->method('getFormId')
+      ->will($this->returnValue($form_id));
+    $form_arg->expects($this->exactly(4))
+      ->method('buildForm')
+      ->will($this->returnValue($expected_form));
+
+    // Do an initial build of the form and track the build ID.
+    $form_state = new FormState();
+    $form_state->setMethod('GET');
+    $form = $this->formBuilder->buildForm($form_arg, $form_state);
+    $original_build_id = $form['#build_id'];
+
+    // Rebuild the form, and assert that the build ID has not changed.
+    $form_state->setRebuild();
+    $input['form_id'] = $form_id;
+    $form_state->setUserInput($input);
+    $form_state->addRebuildInfo('copy', ['#build_id' => TRUE]);
+    $this->formBuilder->processForm($form_id, $form, $form_state);
+    $this->assertSame($original_build_id, $form['#build_id']);
+    $this->assertFalse($form_state->isCached());
+
+    // Rebuild the form again, and assert that there is a new build ID.
+    $form_state->setRebuildInfo([]);
+    $form = $this->formBuilder->buildForm($form_arg, $form_state);
+    $this->assertNotSame($original_build_id, $form['#build_id']);
+    $this->assertFalse($form_state->isCached());
   }
 
   /**
@@ -332,6 +405,7 @@ class FormBuilderTest extends FormTestBase {
     // Do an initial build of the form and track the build ID.
     $form_state = (new FormState())
       ->addBuildInfo('files', [['module' => 'node', 'type' => 'pages.inc']])
+      ->setRequestMethod('POST')
       ->setCached();
     $form = $this->formBuilder->buildForm($form_arg, $form_state);
 
@@ -354,24 +428,6 @@ class FormBuilderTest extends FormTestBase {
   }
 
   /**
-   * Tests the sendResponse() method.
-   *
-   * @expectedException \Exception
-   */
-  public function testSendResponse() {
-    $form_id = 'test_form_id';
-    $expected_form = $this->getMockBuilder('Symfony\Component\HttpFoundation\Response')
-      ->disableOriginalConstructor()
-      ->getMock();
-
-    $form_arg = $this->getMockForm($form_id, $expected_form);
-
-    // Do an initial build of the form and track the build ID.
-    $form_state = new FormState();
-    $this->formBuilder->buildForm($form_arg, $form_state);
-  }
-
-  /**
    * Tests that HTML IDs are unique when rebuilding a form with errors.
    */
   public function testUniqueHtmlId() {
@@ -388,17 +444,387 @@ class FormBuilderTest extends FormTestBase {
       ->method('buildForm')
       ->will($this->returnValue($expected_form));
 
-    $form_state = $this->getMockBuilder('Drupal\Core\Form\FormState')
-      ->setMethods(array('drupalSetMessage'))
-      ->getMock();
+    $form_state = new FormState();
     $form = $this->simulateFormSubmission($form_id, $form_arg, $form_state);
     $this->assertSame('test-form-id', $form['#id']);
 
-    $form_state = $this->getMockBuilder('Drupal\Core\Form\FormState')
-      ->setMethods(array('drupalSetMessage'))
-      ->getMock();
+    $form_state = new FormState();
     $form = $this->simulateFormSubmission($form_id, $form_arg, $form_state);
     $this->assertSame('test-form-id--2', $form['#id']);
+  }
+
+  /**
+   * Tests that a cached form is deleted after submit.
+   */
+  public function testFormCacheDeletionCached() {
+    $form_id = 'test_form_id';
+    $form_build_id = $this->randomMachineName();
+
+    $expected_form = $form_id();
+    $expected_form['#build_id'] = $form_build_id;
+    $form_arg = $this->getMockForm($form_id, $expected_form);
+    $form_arg->expects($this->once())
+      ->method('submitForm')
+      ->willReturnCallback(function (array &$form, FormStateInterface $form_state) {
+        // Mimic EntityForm by cleaning the $form_state upon submit.
+        $form_state->cleanValues();
+      });
+
+    $this->formCache->expects($this->once())
+      ->method('deleteCache')
+      ->with($form_build_id);
+
+    $form_state = new FormState();
+    $form_state->setRequestMethod('POST');
+    $form_state->setCached();
+    $this->simulateFormSubmission($form_id, $form_arg, $form_state);
+  }
+
+  /**
+   * Tests that an uncached form does not trigger cache set or delete.
+   */
+  public function testFormCacheDeletionUncached() {
+    $form_id = 'test_form_id';
+    $form_build_id = $this->randomMachineName();
+
+    $expected_form = $form_id();
+    $expected_form['#build_id'] = $form_build_id;
+    $form_arg = $this->getMockForm($form_id, $expected_form);
+
+    $this->formCache->expects($this->never())
+      ->method('deleteCache');
+
+    $form_state = new FormState();
+    $this->simulateFormSubmission($form_id, $form_arg, $form_state);
+  }
+
+  /**
+   * @covers ::buildForm
+   *
+   * @expectedException \Drupal\Core\Form\Exception\BrokenPostRequestException
+   */
+  public function testExceededFileSize() {
+    $request = new Request([FormBuilderInterface::AJAX_FORM_REQUEST => TRUE]);
+    $request_stack = new RequestStack();
+    $request_stack->push($request);
+    $this->formBuilder = $this->getMockBuilder('\Drupal\Core\Form\FormBuilder')
+      ->setConstructorArgs([$this->formValidator, $this->formSubmitter, $this->formCache, $this->moduleHandler, $this->eventDispatcher, $request_stack, $this->classResolver, $this->elementInfo, $this->themeManager, $this->csrfToken])
+      ->setMethods(['getFileUploadMaxSize'])
+      ->getMock();
+    $this->formBuilder->expects($this->once())
+      ->method('getFileUploadMaxSize')
+      ->willReturn(33554432);
+
+    $form_arg = $this->getMockForm('test_form_id');
+    $form_state = new FormState();
+
+    $this->formBuilder->buildForm($form_arg, $form_state);
+  }
+
+  /**
+   * @covers ::buildForm
+   *
+   * @dataProvider providerTestChildAccessInheritance
+   */
+  public function testChildAccessInheritance($element, $access_checks) {
+    $form_arg = new TestFormWithPredefinedForm();
+    $form_arg->setForm($element);
+
+    $form_state = new FormState();
+
+    $form = $this->formBuilder->buildForm($form_arg, $form_state);
+
+    $actual_access_structure = [];
+    $expected_access_structure = [];
+
+    // Ensure that the expected access checks are set.
+    foreach ($access_checks as $access_check) {
+      $parents = $access_check[0];
+      $parents[] = '#access';
+
+      $actual_access = NestedArray::getValue($form, $parents);
+      $actual_access_structure[] = [$parents, $actual_access];
+      $expected_access_structure[] = [$parents, $access_check[1]];
+    }
+
+    $this->assertEquals($expected_access_structure, $actual_access_structure);
+  }
+
+  /**
+   * Data provider for testChildAccessInheritance.
+   *
+   * @return array
+   */
+  public function providerTestChildAccessInheritance() {
+    $data = [];
+
+    $element = [
+      'child0' => [
+        '#type' => 'checkbox',
+      ],
+      'child1' => [
+        '#type' => 'checkbox',
+      ],
+      'child2' => [
+        '#type' => 'fieldset',
+        'child2.0' => [
+          '#type' => 'checkbox',
+        ],
+        'child2.1' => [
+          '#type' => 'checkbox',
+        ],
+        'child2.2' => [
+          '#type' => 'checkbox',
+        ],
+      ],
+    ];
+
+    // Sets access FALSE on the root level, this should be inherited completely.
+    $clone = $element;
+    $clone['#access'] = FALSE;
+
+    $expected_access = [];
+    $expected_access[] = [[], FALSE];
+    $expected_access[] = [['child0'], FALSE];
+    $expected_access[] = [['child1'], FALSE];
+    $expected_access[] = [['child2'], FALSE];
+    $expected_access[] = [['child2', 'child2.0'], FALSE];
+    $expected_access[] = [['child2', 'child2.1'], FALSE];
+    $expected_access[] = [['child2', 'child2.2'], FALSE];
+
+    $data['access-false-root'] = [$clone, $expected_access];
+
+    $clone = $element;
+    $access_result = AccessResult::forbidden();
+    $clone['#access'] = $access_result;
+
+    $expected_access = [];
+    $expected_access[] = [[], $access_result];
+    $expected_access[] = [['child0'], $access_result];
+    $expected_access[] = [['child1'], $access_result];
+    $expected_access[] = [['child2'], $access_result];
+    $expected_access[] = [['child2', 'child2.0'], $access_result];
+    $expected_access[] = [['child2', 'child2.1'], $access_result];
+    $expected_access[] = [['child2', 'child2.2'], $access_result];
+
+    $data['access-forbidden-root'] = [$clone, $expected_access];
+
+    // Allow access on the most outer level but set FALSE otherwise.
+    $clone = $element;
+    $clone['#access'] = TRUE;
+    $clone['child0']['#access'] = FALSE;
+
+    $expected_access = [];
+    $expected_access[] = [[], TRUE];
+    $expected_access[] = [['child0'], FALSE];
+    $expected_access[] = [['child1'], NULL];
+    $expected_access[] = [['child2'], NULL];
+    $expected_access[] = [['child2', 'child2.0'], NULL];
+    $expected_access[] = [['child2', 'child2.1'], NULL];
+    $expected_access[] = [['child2', 'child2.2'], NULL];
+
+    $data['access-true-root'] = [$clone, $expected_access];
+
+    // Allow access on the most outer level but forbid otherwise.
+    $clone = $element;
+    $access_result_allowed = AccessResult::allowed();
+    $clone['#access'] = $access_result_allowed;
+    $access_result_forbidden = AccessResult::forbidden();
+    $clone['child0']['#access'] = $access_result_forbidden;
+
+    $expected_access = [];
+    $expected_access[] = [[], $access_result_allowed];
+    $expected_access[] = [['child0'], $access_result_forbidden];
+    $expected_access[] = [['child1'], NULL];
+    $expected_access[] = [['child2'], NULL];
+    $expected_access[] = [['child2', 'child2.0'], NULL];
+    $expected_access[] = [['child2', 'child2.1'], NULL];
+    $expected_access[] = [['child2', 'child2.2'], NULL];
+
+    $data['access-allowed-root'] = [$clone, $expected_access];
+
+    // Allow access on the most outer level, deny access on a parent, and allow
+    // on a child. The denying should be inherited.
+    $clone = $element;
+    $clone['#access'] = TRUE;
+    $clone['child2']['#access'] = FALSE;
+    $clone['child2.0']['#access'] = TRUE;
+    $clone['child2.1']['#access'] = TRUE;
+    $clone['child2.2']['#access'] = TRUE;
+
+    $expected_access = [];
+    $expected_access[] = [[], TRUE];
+    $expected_access[] = [['child0'], NULL];
+    $expected_access[] = [['child1'], NULL];
+    $expected_access[] = [['child2'], FALSE];
+    $expected_access[] = [['child2', 'child2.0'], FALSE];
+    $expected_access[] = [['child2', 'child2.1'], FALSE];
+    $expected_access[] = [['child2', 'child2.2'], FALSE];
+
+    $data['access-mixed-parents'] = [$clone, $expected_access];
+
+    $clone = $element;
+    $clone['#access'] = $access_result_allowed;
+    $clone['child2']['#access'] = $access_result_forbidden;
+    $clone['child2.0']['#access'] = $access_result_allowed;
+    $clone['child2.1']['#access'] = $access_result_allowed;
+    $clone['child2.2']['#access'] = $access_result_allowed;
+
+    $expected_access = [];
+    $expected_access[] = [[], $access_result_allowed];
+    $expected_access[] = [['child0'], NULL];
+    $expected_access[] = [['child1'], NULL];
+    $expected_access[] = [['child2'], $access_result_forbidden];
+    $expected_access[] = [['child2', 'child2.0'], $access_result_forbidden];
+    $expected_access[] = [['child2', 'child2.1'], $access_result_forbidden];
+    $expected_access[] = [['child2', 'child2.2'], $access_result_forbidden];
+
+    $data['access-mixed-parents-object'] = [$clone, $expected_access];
+
+    return $data;
+  }
+
+  /**
+   * @covers ::valueCallableIsSafe
+   *
+   * @dataProvider providerTestValueCallableIsSafe
+   */
+  public function testValueCallableIsSafe($callback, $expected) {
+    $method = new \ReflectionMethod(FormBuilder::class, 'valueCallableIsSafe');
+    $method->setAccessible(true);
+    $is_safe = $method->invoke($this->formBuilder, $callback);
+    $this->assertSame($expected, $is_safe);
+  }
+
+  public function providerTestValueCallableIsSafe() {
+    $data = [];
+    $data['string_no_slash'] = [
+      'Drupal\Core\Render\Element\Token::valueCallback',
+      TRUE,
+    ];
+    $data['string_with_slash'] = [
+      '\Drupal\Core\Render\Element\Token::valueCallback',
+      TRUE,
+    ];
+    $data['array_no_slash'] = [
+      ['Drupal\Core\Render\Element\Token', 'valueCallback'],
+      TRUE,
+    ];
+    $data['array_with_slash'] = [
+      ['\Drupal\Core\Render\Element\Token', 'valueCallback'],
+      TRUE,
+    ];
+    $data['closure'] = [
+      function () {},
+      FALSE,
+    ];
+    return $data;
+  }
+
+  /**
+   * @covers ::doBuildForm
+   *
+   * @dataProvider providerTestInvalidToken
+   */
+  public function testInvalidToken($expected, $valid_token, $user_is_authenticated) {
+    $form_token = 'the_form_token';
+    $form_id = 'test_form_id';
+
+    if (is_bool($valid_token)) {
+      $this->csrfToken->expects($this->any())
+        ->method('get')
+        ->willReturnArgument(0);
+      $this->csrfToken->expects($this->atLeastOnce())
+        ->method('validate')
+        ->will($this->returnValueMap([
+          [$form_token, $form_id, $valid_token],
+          [$form_id, $form_id, $valid_token],
+        ]));
+    }
+
+    $current_user = $this->prophesize(AccountInterface::class);
+    $current_user->isAuthenticated()->willReturn($user_is_authenticated);
+    $property = new \ReflectionProperty(FormBuilder::class, 'currentUser');
+    $property->setAccessible(TRUE);
+    $property->setValue($this->formBuilder, $current_user->reveal());
+
+    $expected_form = $form_id();
+    $form_arg = $this->getMockForm($form_id, $expected_form);
+
+    $form_state = new FormState();
+    $input['form_id'] = $form_id;
+    $input['form_token'] = $form_token;
+    $form_state->setUserInput($input);
+    $this->simulateFormSubmission($form_id, $form_arg, $form_state, FALSE);
+    $this->assertSame($expected, $form_state->hasInvalidToken());
+  }
+
+  public function providerTestInvalidToken() {
+    $data = [];
+    $data['authenticated_invalid'] = [TRUE, FALSE, TRUE];
+    $data['authenticated_valid'] = [FALSE, TRUE, TRUE];
+    // If the user is not authenticated, we will not have a token.
+    $data['anonymous'] = [FALSE, NULL, FALSE];
+    return $data;
+  }
+
+  /**
+   * @covers ::prepareForm
+   *
+   * @dataProvider providerTestFormTokenCacheability
+   */
+  function testFormTokenCacheability($token, $is_authenticated, $expected_form_cacheability, $expected_token_cacheability) {
+    $user = $this->prophesize(AccountProxyInterface::class);
+    $user->isAuthenticated()
+      ->willReturn($is_authenticated);
+    $this->container->set('current_user', $user->reveal());
+    \Drupal::setContainer($this->container);
+
+    $form_id = 'test_form_id';
+    $form = $form_id();
+
+    if (isset($token)) {
+      $form['#token'] = $token;
+    }
+
+    $form_arg = $this->getMock('Drupal\Core\Form\FormInterface');
+    $form_arg->expects($this->once())
+      ->method('getFormId')
+      ->will($this->returnValue($form_id));
+    $form_arg->expects($this->once())
+      ->method('buildForm')
+      ->will($this->returnValue($form));
+
+    $form_state = new FormState();
+    $built_form = $this->formBuilder->buildForm($form_arg, $form_state);
+    if (!isset($expected_form_cacheability)) {
+      $this->assertFalse(isset($built_form['#cache']));
+    }
+    else {
+      $this->assertTrue(isset($built_form['#cache']));
+      $this->assertEquals($expected_form_cacheability, $built_form['#cache']);
+    }
+    if (!isset($expected_token_cacheability)) {
+      $this->assertFalse(isset($built_form['form_token']));
+    }
+    else {
+      $this->assertTrue(isset($built_form['form_token']));
+      $this->assertEquals($expected_token_cacheability, $built_form['form_token']['#cache']);
+    }
+  }
+
+  /**
+   * Data provider for testFormTokenCacheability.
+   *
+   * @return array
+   */
+  function providerTestFormTokenCacheability() {
+    return [
+      'token:none,authenticated:true' => [NULL, TRUE, ['contexts' => ['user.roles:authenticated']], ['max-age' => 0]],
+      'token:false,authenticated:true' => [FALSE, TRUE, NULL, NULL],
+      'token:none,authenticated:false' => [NULL, FALSE, ['contexts' => ['user.roles:authenticated']], NULL],
+      'token:false,authenticated:false' => [FALSE, FALSE, NULL, NULL],
+    ];
   }
 
 }
@@ -418,4 +844,22 @@ class TestFormInjected extends TestForm implements ContainerInjectionInterface {
   public static function create(ContainerInterface $container) {
     return new static();
   }
+}
+
+
+class TestFormWithPredefinedForm extends TestForm {
+
+  /**
+   * @var array
+   */
+  protected $form;
+
+  public function setForm($form) {
+    $this->form = $form;
+  }
+
+  public function buildForm(array $form, FormStateInterface $form_state) {
+    return $this->form;
+  }
+
 }

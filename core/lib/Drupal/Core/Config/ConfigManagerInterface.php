@@ -51,7 +51,7 @@ interface ConfigManagerInterface {
   public function getConfigFactory();
 
   /**
-   * Return a formatted diff of a named config between two storages.
+   * Creates a Diff object using the config data from the two storages.
    *
    * @param \Drupal\Core\Config\StorageInterface $source_storage
    *   The storage to diff configuration from.
@@ -66,10 +66,12 @@ interface ConfigManagerInterface {
    *   (optional) The configuration collection name. Defaults to the default
    *   collection.
    *
-   * @return core/lib/Drupal/Component/Diff
-   *   A formatted string showing the difference between the two storages.
+   * @return \Drupal\Component\Diff\Diff
+   *   A Diff object using the config data from the two storages.
    *
    * @todo Make renderer injectable
+   *
+   * @see \Drupal\Core\Diff\DiffFormatter
    */
   public function diff(StorageInterface $source_storage, StorageInterface $target_storage, $source_name, $target_name = NULL, $collection = StorageInterface::DEFAULT_COLLECTION);
 
@@ -160,22 +162,21 @@ interface ConfigManagerInterface {
   public function getConfigEntitiesToChangeOnDependencyRemoval($type, array $names, $dry_run = TRUE);
 
   /**
-   * Determines if the provided collection supports configuration entities.
-   *
-   * @param string $collection
-   *   The collection to check.
-   *
-   * @return bool
-   *   TRUE if the collection support configuration entities, FALSE if not.
-   */
-  public function supportsConfigurationEntities($collection);
-
-  /**
    * Gets available collection information using the event system.
    *
    * @return \Drupal\Core\Config\ConfigCollectionInfo
    *   The object which contains information about the available collections.
    */
   public function getConfigCollectionInfo();
+
+  /**
+   * Finds missing content dependencies declared in configuration entities.
+   *
+   * @return array
+   *   A list of missing content dependencies. The array is keyed by UUID. Each
+   *   value is an array with the following keys: 'entity_type', 'bundle' and
+   *   'uuid'.
+   */
+  public function findMissingContentDependencies();
 
 }

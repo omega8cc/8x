@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\NodeCounter.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\NodeCounter.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -34,14 +34,14 @@ class NodeCounter extends DrupalDumpBase {
         'totalcount' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '20',
+          'length' => '10',
           'default' => '0',
           'unsigned' => TRUE,
         ),
         'daycount' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '8',
+          'length' => '10',
           'default' => '0',
           'unsigned' => TRUE,
         ),
@@ -53,6 +53,7 @@ class NodeCounter extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("node_counter")->fields(array(
       'nid',
@@ -64,3 +65,4 @@ class NodeCounter extends DrupalDumpBase {
   }
 
 }
+#f1e838ae00ed337fca5d80787d9d0748

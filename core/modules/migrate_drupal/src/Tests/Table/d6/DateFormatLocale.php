@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\DateFormatLocale.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\DateFormatLocale.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -42,6 +42,7 @@ class DateFormatLocale extends DrupalDumpBase {
         'type',
         'language',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("date_format_locale")->fields(array(
       'format',
@@ -52,3 +53,4 @@ class DateFormatLocale extends DrupalDumpBase {
   }
 
 }
+#a9092bf2a65e6797eb144166d7a27ddf

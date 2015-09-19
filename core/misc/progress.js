@@ -1,16 +1,46 @@
-(function ($) {
+/**
+ * @file
+ * Progress bar.
+ */
+
+(function ($, Drupal) {
 
   "use strict";
+
+  /**
+   * Theme function for the progress bar.
+   *
+   * @param {string} id
+   *
+   * @return {string}
+   *   The HTML for the progress bar.
+   */
+  Drupal.theme.progressBar = function (id) {
+    return '<div id="' + id + '" class="progress" aria-live="polite">' +
+      '<div class="progress__label">&nbsp;</div>' +
+      '<div class="progress__track"><div class="progress__bar"></div></div>' +
+      '<div class="progress__percentage"></div>' +
+      '<div class="progress__description">&nbsp;</div>' +
+      '</div>';
+  };
 
   /**
    * A progressbar object. Initialized with the given id. Must be inserted into
    * the DOM afterwards through progressBar.element.
    *
-   * method is the function which will perform the HTTP request to get the
+   * Method is the function which will perform the HTTP request to get the
    * progress bar state. Either "GET" or "POST".
    *
-   * e.g. pb = new Drupal.ProgressBar('myProgressBar');
-   *      some_element.appendChild(pb.element);
+   * @example
+   * pb = new Drupal.ProgressBar('myProgressBar');
+   * some_element.appendChild(pb.element);
+   *
+   * @constructor
+   *
+   * @param {string} id
+   * @param {function} updateCallback
+   * @param {string} method
+   * @param {function} errorCallback
    */
   Drupal.ProgressBar = function (id, updateCallback, method, errorCallback) {
     this.id = id;
@@ -18,18 +48,21 @@
     this.updateCallback = updateCallback;
     this.errorCallback = errorCallback;
 
-    // The WAI-ARIA setting aria-live="polite" will announce changes after users
-    // have completed their current activity and not interrupt the screen reader.
-    this.element = $('<div class="progress" aria-live="polite"></div>').attr('id', id);
-    this.element.html('<div class="progress__label">&nbsp;</div>' +
-      '<div class="progress__track"><div class="progress__bar"></div></div>' +
-      '<div class="progress__percentage"></div>' +
-      '<div class="progress__description">&nbsp;</div>');
+    // The WAI-ARIA setting aria-live="polite" will announce changes after
+    // users
+    // have completed their current activity and not interrupt the screen
+    // reader.
+    this.element = $(Drupal.theme('progressBar', id));
   };
 
-  $.extend(Drupal.ProgressBar.prototype, {
+  $.extend(Drupal.ProgressBar.prototype, /** @lends Drupal.ProgressBar# */{
+
     /**
      * Set the percentage and status message for the progressbar.
+     *
+     * @param {number} percentage
+     * @param {string} message
+     * @param {string} label
      */
     setProgress: function (percentage, message, label) {
       if (percentage >= 0 && percentage <= 100) {
@@ -45,6 +78,9 @@
 
     /**
      * Start monitoring progress via Ajax.
+     *
+     * @param {string} uri
+     * @param {number} delay
      */
     startMonitoring: function (uri, delay) {
       this.delay = delay;
@@ -72,11 +108,18 @@
         var pb = this;
         // When doing a post request, you need non-null data. Otherwise a
         // HTTP 411 or HTTP 406 (with Apache mod_security) error may result.
+        var uri = this.uri;
+        if (uri.indexOf('?') === -1) {
+          uri += '?';
+        }
+        else {
+          uri += '&';
+        }
+        uri += '_format=json';
         $.ajax({
           type: this.method,
-          url: this.uri,
+          url: uri,
           data: '',
-          dataType: 'json',
           success: function (progress) {
             // Display errors.
             if (progress.status === 0) {
@@ -98,6 +141,8 @@
 
     /**
      * Display errors on the page.
+     *
+     * @param {string} string
      */
     displayError: function (string) {
       var error = $('<div class="messages messages--error"></div>').html(string);
@@ -109,4 +154,4 @@
     }
   });
 
-})(jQuery);
+})(jQuery, Drupal);

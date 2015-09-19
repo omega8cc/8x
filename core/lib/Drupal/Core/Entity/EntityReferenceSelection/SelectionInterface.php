@@ -23,7 +23,7 @@ use Drupal\Core\Plugin\PluginFormInterface;
 interface SelectionInterface extends PluginFormInterface {
 
   /**
-   * Returns a list of referenceable entities.
+   * Gets the list of referenceable entities.
    *
    * @return array
    *   A nested array of entities, the first level is keyed by the
@@ -59,7 +59,7 @@ interface SelectionInterface extends PluginFormInterface {
    *   The current form state.
    * @param array $form
    *   The form.
-   * @param boolean $strict
+   * @param bool $strict
    *   Whether to trigger a form error if an element from $input (eg. an entity)
    *   is not found. Defaults to TRUE.
    *

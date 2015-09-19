@@ -6,6 +6,14 @@
 
   "use strict";
 
+  /**
+   * Behaviors for settings summaries on path edit forms.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches summary behavior on path edit forms.
+   */
   Drupal.behaviors.pathDetailsSummaries = {
     attach: function (context) {
       $(context).find('.path-form').drupalSetSummary(function (context) {

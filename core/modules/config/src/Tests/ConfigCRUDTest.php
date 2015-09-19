@@ -2,12 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\config\Tests\ConfigCRUDTest.
+ * Contains \Drupal\config\Tests\ConfigCRUDTest.
  */
 
 namespace Drupal\config\Tests;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Config\ConfigNameException;
 use Drupal\Core\Config\ConfigValueException;
 use Drupal\Core\Config\InstallStorage;
@@ -275,6 +275,14 @@ class ConfigCRUDTest extends KernelTestBase {
     $this->assertIdentical($config->get(), $data);
     $this->assertIdentical($storage->read($name), $data);
 
+    // Test that schema type enforcement can be overridden by trusting the data.
+    $this->assertIdentical(99, $config->get('int'));
+    $config->set('int', '99')->save(TRUE);
+    $this->assertIdentical('99', $config->get('int'));
+    // Test that re-saving without testing the data enforces the schema type.
+    $config->save();
+    $this->assertIdentical($data, $config->get());
+
     // Test that setting an unsupported type for a config object with a schema
     // fails.
     try {
@@ -282,7 +290,7 @@ class ConfigCRUDTest extends KernelTestBase {
       $this->fail('No Exception thrown upon saving invalid data type.');
     }
     catch (UnsupportedDataTypeConfigException $e) {
-      $this->pass(String::format('%class thrown upon saving invalid data type.', array(
+      $this->pass(SafeMarkup::format('%class thrown upon saving invalid data type.', array(
         '%class' => get_class($e),
       )));
     }
@@ -299,7 +307,7 @@ class ConfigCRUDTest extends KernelTestBase {
       $this->fail('No Exception thrown upon saving invalid data type.');
     }
     catch (UnsupportedDataTypeConfigException $e) {
-      $this->pass(String::format('%class thrown upon saving invalid data type.', array(
+      $this->pass(SafeMarkup::format('%class thrown upon saving invalid data type.', array(
         '%class' => get_class($e),
       )));
     }

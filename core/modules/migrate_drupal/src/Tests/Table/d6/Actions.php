@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Actions.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Actions.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -55,6 +55,7 @@ class Actions extends DrupalDumpBase {
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("actions")->fields(array(
       'aid',
@@ -133,3 +134,4 @@ class Actions extends DrupalDumpBase {
   }
 
 }
+#31f375c70c6a362432e25e1256101076

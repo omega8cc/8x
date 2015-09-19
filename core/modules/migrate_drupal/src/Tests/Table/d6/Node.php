@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Node.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Node.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -118,6 +118,7 @@ class Node extends DrupalDumpBase {
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("node")->fields(array(
       'nid',
@@ -268,3 +269,4 @@ class Node extends DrupalDumpBase {
   }
 
 }
+#42987fa1c890b420098af95ec7c86d00

@@ -8,6 +8,7 @@
 namespace Drupal\Core\Config;
 
 use Drupal\Core\Site\Settings;
+use Drupal\Core\Extension\ExtensionDiscovery;
 
 /**
  * Storage to access configuration and schema in enabled extensions.
@@ -45,7 +46,7 @@ class ExtensionInstallStorage extends InstallStorage {
    *   default collection.
    * @param bool $include_profile
    *   (optional) Whether to include the install profile in extensions to
-   *   search.
+   *   search and to get overrides from.
    */
   public function __construct(StorageInterface $config_storage, $directory = self::CONFIG_INSTALL_DIRECTORY, $collection = StorageInterface::DEFAULT_COLLECTION, $include_profile = TRUE) {
     $this->configStorage = $config_storage;
@@ -80,33 +81,57 @@ class ExtensionInstallStorage extends InstallStorage {
   protected function getAllFolders() {
     if (!isset($this->folders)) {
       $this->folders = array();
-      $this->folders += $this->getComponentNames('core', array('core'));
+      $this->folders += $this->getCoreNames();
 
+      $install_profile = Settings::get('install_profile');
+      $profile = drupal_get_profile();
       $extensions = $this->configStorage->read('core.extension');
+      // @todo Remove this scan as part of https://www.drupal.org/node/2186491
+      $listing = new ExtensionDiscovery(\Drupal::root());
       if (!empty($extensions['module'])) {
         $modules = $extensions['module'];
-        if (!$this->includeProfile) {
-          if ($install_profile = Settings::get('install_profile')) {
-            unset($modules[$install_profile]);
+        // Remove the install profile as this is handled later.
+        unset($modules[$install_profile]);
+        $profile_list = $listing->scan('profile');
+        if ($profile && isset($profile_list[$profile])) {
+          // Prime the drupal_get_filename() static cache with the profile info
+          // file location so we can use drupal_get_path() on the active profile
+          // during the module scan.
+          // @todo Remove as part of https://www.drupal.org/node/2186491
+          drupal_get_filename('profile', $profile, $profile_list[$profile]->getPathname());
+        }
+        $module_list_scan = $listing->scan('module');
+        $module_list = array();
+        foreach (array_keys($modules) as $module) {
+          if (isset($module_list_scan[$module])) {
+            $module_list[$module] = $module_list_scan[$module];
           }
         }
-        $this->folders += $this->getComponentNames('module', array_keys($modules));
+        $this->folders += $this->getComponentNames($module_list);
       }
       if (!empty($extensions['theme'])) {
-        $this->folders += $this->getComponentNames('theme', array_keys($extensions['theme']));
+        $theme_list_scan = $listing->scan('theme');
+        foreach (array_keys($extensions['theme']) as $theme) {
+          if (isset($theme_list_scan[$theme])) {
+            $theme_list[$theme] = $theme_list_scan[$theme];
+          }
+        }
+        $this->folders += $this->getComponentNames($theme_list);
       }
 
-      // The install profile can override module default configuration. We do
-      // this by replacing the config file path from the module/theme with the
-      // install profile version if there are any duplicates.
-      $profile_folders = array();
-      $profile = drupal_get_profile();
-      if (!empty($profile)) {
-        $profile_folders = $this->getComponentNames('profile', array($profile));
-      }
-      $folders_to_replace = array_intersect_key($profile_folders, $this->folders);
-      if (!empty($folders_to_replace)) {
-        $this->folders = array_merge($this->folders, $folders_to_replace);
+      if ($this->includeProfile) {
+        // The install profile can override module default configuration. We do
+        // this by replacing the config file path from the module/theme with the
+        // install profile version if there are any duplicates.
+        if (isset($profile)) {
+          if (!isset($profile_list)) {
+            $profile_list = $listing->scan('profile');
+          }
+          if (isset($profile_list[$profile])) {
+            $profile_folders = $this->getComponentNames(array($profile_list[$profile]));
+            $this->folders = $profile_folders + $this->folders;
+          }
+        }
       }
     }
     return $this->folders;

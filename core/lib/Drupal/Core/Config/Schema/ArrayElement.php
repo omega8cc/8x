@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\Config\Schema;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Config\TypedConfigManagerInterface;
 use Drupal\Core\TypedData\TypedData;
 
@@ -94,20 +93,8 @@ abstract class ArrayElement extends TypedData implements \IteratorAggregate, Typ
       return $element;
     }
     else {
-      throw new \InvalidArgumentException(String::format("The configuration property @key doesn't exist.", array('@key' => $name)));
+      throw new \InvalidArgumentException("The configuration property $name doesn't exist.");
     }
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function set($key, $value) {
-    $this->value[$key] = $value;
-    // Parsed elements must be rebuilt with new values
-    unset($this->elements);
-    // Directly notify ourselves.
-    $this->onChange($key, $value);
-    return $this;
   }
 
   /**

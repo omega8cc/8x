@@ -8,7 +8,6 @@
 namespace Drupal\Core\Mail;
 
 use Drupal\Component\Utility\Html;
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Site\Settings;
@@ -127,7 +126,7 @@ class MailFormatHelper {
     $string = preg_replace('!</?(strong|b)((?> +)[^>]*)?>!i', '*', $string);
 
     // Replace inline <a> tags with the text of link and a footnote.
-    // 'See <a href="http://drupal.org">the Drupal site</a>' becomes
+    // 'See <a href="https://www.drupal.org">the Drupal site</a>' becomes
     // 'See the Drupal site [1]' with the URL included as a footnote.
     static::htmlToMailUrls(NULL, TRUE);
     $pattern = '@(<a[^>]+?href="([^"]*)"[^>]*?>(.+?)</a>)@i';
@@ -264,7 +263,7 @@ class MailFormatHelper {
       else {
         // Convert inline HTML text to plain text; not removing line-breaks or
         // white-space, since that breaks newlines when sanitizing plain-text.
-        $value = trim(String::decodeEntities($value));
+        $value = trim(Html::decodeEntities($value));
         if (Unicode::strlen($value)) {
           $chunk = $value;
         }

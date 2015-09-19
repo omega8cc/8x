@@ -10,7 +10,6 @@ namespace Drupal\Tests\Core\Extension;
 use Drupal\Core\Extension\Extension;
 use Drupal\Core\Extension\InfoParser;
 use Drupal\Core\Extension\ThemeHandler;
-use Drupal\Core\Config\ConfigInstaller;
 use Drupal\Core\KeyValueStore\KeyValueMemoryFactory;
 use Drupal\Core\State\State;
 use Drupal\Tests\UnitTestCase;
@@ -20,13 +19,6 @@ use Drupal\Tests\UnitTestCase;
  * @group Extension
  */
 class ThemeHandlerTest extends UnitTestCase {
-
-  /**
-   * The mocked route builder indicator.
-   *
-   * @var \Drupal\Core\Routing\RouteBuilderIndicatorInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $routeBuilderIndicator;
 
   /**
    * The mocked info parser.
@@ -57,20 +49,6 @@ class ThemeHandlerTest extends UnitTestCase {
   protected $moduleHandler;
 
   /**
-   * The mocked config installer.
-   *
-   * @var \Drupal\Core\Config\ConfigInstaller|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $configInstaller;
-
-  /**
-   * The mocked config manager.
-   *
-   * @var \Drupal\Core\Config\ConfigManagerInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $configManager;
-
-  /**
    * The extension discovery.
    *
    * @var \Drupal\Core\Extension\ExtensionDiscovery|\PHPUnit_Framework_MockObject_MockObject
@@ -78,16 +56,9 @@ class ThemeHandlerTest extends UnitTestCase {
   protected $extensionDiscovery;
 
   /**
-   * The CSS asset collection optimizer service.
-   *
-   * @var \Drupal\Core\Asset\AssetCollectionOptimizerInterface|\PHPUnit_Framework_MockObject_MockObject
-   */
-  protected $cssCollectionOptimizer;
-
-  /**
    * The tested theme handler.
    *
-   * @var \Drupal\Core\Extension\ThemeHandler|\Drupal\Tests\Core\Extension\TestThemeHandler
+   * @var \Drupal\Core\Extension\ThemeHandler|\Drupal\Tests\Core\Extension\StubThemeHandler
    */
   protected $themeHandler;
 
@@ -109,17 +80,10 @@ class ThemeHandlerTest extends UnitTestCase {
     $this->moduleHandler = $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface');
     $this->state = new State(new KeyValueMemoryFactory());
     $this->infoParser = $this->getMock('Drupal\Core\Extension\InfoParserInterface');
-    $this->configInstaller = $this->getMock('Drupal\Core\Config\ConfigInstallerInterface');
-    $this->configManager = $this->getMock('Drupal\Core\Config\ConfigManagerInterface');
-    $this->routeBuilderIndicator = $this->getMock('Drupal\Core\Routing\RouteBuilderIndicatorInterface');
     $this->extensionDiscovery = $this->getMockBuilder('Drupal\Core\Extension\ExtensionDiscovery')
       ->disableOriginalConstructor()
       ->getMock();
-    $this->cssCollectionOptimizer = $this->getMockBuilder('\Drupal\Core\Asset\CssCollectionOptimizer') //\Drupal\Core\Asset\AssetCollectionOptimizerInterface');
-      ->disableOriginalConstructor()
-      ->getMock();
-    $logger = $this->getMock('Psr\Log\LoggerInterface');
-    $this->themeHandler = new TestThemeHandler($this->root, $this->configFactory, $this->moduleHandler, $this->state, $this->infoParser, $logger, $this->cssCollectionOptimizer, $this->configInstaller, $this->configManager, $this->routeBuilderIndicator, $this->extensionDiscovery);
+    $this->themeHandler = new StubThemeHandler($this->root, $this->configFactory, $this->moduleHandler, $this->state, $this->infoParser, $this->extensionDiscovery);
 
     $cache_tags_invalidator = $this->getMock('Drupal\Core\Cache\CacheTagsInvalidatorInterface');
     $this->getContainerWithCacheTagsInvalidator($cache_tags_invalidator);
@@ -330,7 +294,28 @@ class ThemeHandlerTest extends UnitTestCase {
 /**
  * Extends the default theme handler to mock some drupal_ methods.
  */
-class TestThemeHandler extends ThemeHandler {
+class StubThemeHandler extends ThemeHandler {
+
+  /**
+   * Whether the CSS cache was cleared.
+   *
+   * @var bool
+   */
+  protected $clearedCssCache;
+
+  /**
+   * Whether the registry should be rebuilt.
+   *
+   * @var bool
+   */
+  protected $registryRebuild;
+
+  /**
+   * A list of themes keyed by name.
+   *
+   * @var array
+   */
+  protected $systemList;
 
   /**
    * {@inheritdoc}

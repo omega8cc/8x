@@ -9,7 +9,6 @@ namespace Drupal\Core\Entity;
 
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
-use Drupal\Component\Utility\String;
 
 /**
  * Defines a generic implementation to build a listing of entities.
@@ -40,9 +39,12 @@ class EntityListBuilder extends EntityHandlerBase implements EntityListBuilderIn
   protected $entityType;
 
   /**
-   * The number of entities to list per page.
+   * The number of entities to list per page, or FALSE to list all entities.
    *
-   * @var int
+   * For example, set this to FALSE if the list uses client-side filters that
+   * require all entities to be listed (like the views overview).
+   *
+   * @var int|false
    */
   protected $limit = 50;
 
@@ -86,29 +88,37 @@ class EntityListBuilder extends EntityHandlerBase implements EntityListBuilderIn
   }
 
   /**
-   * Loads entity IDs using a pager.
+   * Loads entity IDs using a pager sorted by the entity id.
    *
    * @return array
    *   An array of entity IDs.
    */
   protected function getEntityIds() {
-    $query = $this->getStorage()->getQuery();
-    return $query
-      ->pager($this->limit)
-      ->execute();
+    $query = $this->getStorage()->getQuery()
+      ->sort($this->entityType->getKey('id'));
+
+    // Only add the pager if a limit is specified.
+    if ($this->limit) {
+      $query->pager($this->limit);
+    }
+    return $query->execute();
   }
 
   /**
-   * Returns the escaped label of an entity.
+   * Gets the label of an entity.
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity being listed.
    *
    * @return string
-   *   The escaped entity label.
+   *   The entity label.
+   *
+   * @deprecated in Drupal 8.0.x, will be removed before Drupal 9.0.0
+   *   Use $entity->label() instead. This method used to escape the entity
+   *   label. The render system's autoescape is now relied upon.
    */
   protected function getLabel(EntityInterface $entity) {
-    return String::checkPlain($entity->label());
+    return $entity->label();
   }
 
   /**
@@ -216,20 +226,27 @@ class EntityListBuilder extends EntityHandlerBase implements EntityListBuilderIn
       '#title' => $this->getTitle(),
       '#rows' => array(),
       '#empty' => $this->t('There is no @label yet.', array('@label' => $this->entityType->getLabel())),
+      '#cache' => [
+        'contexts' => $this->entityType->getListCacheContexts(),
+      ],
     );
     foreach ($this->load() as $entity) {
       if ($row = $this->buildRow($entity)) {
         $build['table']['#rows'][$entity->id()] = $row;
       }
     }
-    $build['pager'] = array(
-      '#theme' => 'pager',
-    );
+
+    // Only add the pager if a limit is specified.
+    if ($this->limit) {
+      $build['pager'] = array(
+        '#type' => 'pager',
+      );
+    }
     return $build;
   }
 
   /**
-   * Returns the title of the page.
+   * Gets the title of the page.
    *
    * @return string
    *   A string title of the page.

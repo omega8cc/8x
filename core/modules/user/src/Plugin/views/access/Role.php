@@ -2,14 +2,15 @@
 
 /**
  * @file
- * Definition of Drupal\user\Plugin\views\access\Role.
+ * Contains \Drupal\user\Plugin\views\access\Role.
  */
 
 namespace Drupal\user\Plugin\views\access;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\user\RoleStorageInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\Plugin\views\access\AccessPluginBase;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\Routing\Route;
@@ -26,7 +27,7 @@ use Drupal\Core\Session\AccountInterface;
  *   help = @Translation("Access will be granted to users with any of the specified roles.")
  * )
  */
-class Role extends AccessPluginBase {
+class Role extends AccessPluginBase implements CacheablePluginInterface {
 
   /**
    * Overrides Drupal\views\Plugin\Plugin::$usesOptions.
@@ -96,7 +97,7 @@ class Role extends AccessPluginBase {
     else {
       $rids = user_role_names();
       $rid = reset($this->options['role']);
-      return String::checkPlain($rids[$rid]);
+      return SafeMarkup::checkPlain($rids[$rid]);
     }
   }
 
@@ -114,7 +115,7 @@ class Role extends AccessPluginBase {
       '#type' => 'checkboxes',
       '#title' => $this->t('Role'),
       '#default_value' => $this->options['role'],
-      '#options' => array_map('\Drupal\Component\Utility\String::checkPlain', user_role_names()),
+      '#options' => array_map('\Drupal\Component\Utility\SafeMarkup::checkPlain', user_role_names()),
       '#description' => $this->t('Only the checked roles will be able to access this display.'),
     );
   }
@@ -145,4 +146,19 @@ class Role extends AccessPluginBase {
     return $dependencies;
   }
 
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return ['user.roles'];
+  }
+
 }
+

@@ -16,6 +16,8 @@ use Symfony\Component\Routing\Route;
 
 /**
  * Provides an access checker for node revisions.
+ *
+ * @ingroup node_access
  */
 class NodeRevisionAccessCheck implements AccessInterface {
 
@@ -77,7 +79,7 @@ class NodeRevisionAccessCheck implements AccessInterface {
       $node = $this->nodeStorage->loadRevision($node_revision);
     }
     $operation = $route->getRequirement('_access_node_revision');
-    return AccessResult::allowedIf($node && $this->checkAccess($node, $account, $operation))->cachePerRole();
+    return AccessResult::allowedIf($node && $this->checkAccess($node, $account, $operation))->cachePerPermissions();
   }
 
   /**

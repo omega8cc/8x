@@ -11,6 +11,7 @@ use Drupal\Core\Url;
 use Drupal\system\Tests\Cache\PageCacheTagsTestBase;
 use Drupal\tour\Entity\Tour;
 use Drupal\user\Entity\Role;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests the Tour entity's cache tags.
@@ -32,7 +33,7 @@ class TourCacheTagsTest extends PageCacheTagsTestBase {
 
     // Give anonymous users permission to view nodes, so that we can verify the
     // cache tags of cached versions of node pages.
-    Role::load(DRUPAL_ANONYMOUS_RID)->grantPermission('access tour')
+    Role::load(RoleInterface::ANONYMOUS_ID)->grantPermission('access tour')
      ->save();
   }
 
@@ -51,6 +52,7 @@ class TourCacheTagsTest extends PageCacheTagsTestBase {
     // Verify a cache hit, but also the presence of the correct cache tags.
     $expected_tags = [
       'config:tour.tour.tour-test',
+      'config:user.role.anonymous',
       'rendered',
     ];
     $this->verifyPageCache($url, 'HIT', $expected_tags);
@@ -70,6 +72,7 @@ class TourCacheTagsTest extends PageCacheTagsTestBase {
 
     // Verify a cache hit.
     $expected_tags = [
+      'config:user.role.anonymous',
       'rendered',
     ];
     $this->verifyPageCache($url, 'HIT', $expected_tags);

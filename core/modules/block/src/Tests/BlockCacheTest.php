@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\block\Tests\BlockCacheTest.
+ * Contains \Drupal\block\Tests\BlockCacheTest.
  */
 
 namespace Drupal\block\Tests;
@@ -75,10 +75,7 @@ class BlockCacheTest extends WebTestBase {
    * Test "user.roles" cache context.
    */
   function testCachePerRole() {
-    $this->setBlockCacheConfig(array(
-      'max_age' => 600,
-      'contexts' => array('user.roles'),
-    ));
+    \Drupal::state()->set('block_test.cache_contexts', ['user.roles']);
 
     // Enable our test block. Set some content for it to display.
     $current_content = $this->randomMachineName();
@@ -122,12 +119,12 @@ class BlockCacheTest extends WebTestBase {
   }
 
   /**
-   * Test a cacheable block without any cache context.
+   * Test a cacheable block without any additional cache context.
    */
-  function testCacheGlobal() {
-    $this->setBlockCacheConfig(array(
-      'max_age' => 600,
-    ));
+  function testCachePermissions() {
+    // user.permissions is a required context, so a user with different
+    // permissions will see a different version of the block.
+    \Drupal::state()->set('block_test.cache_contexts', []);
 
     $current_content = $this->randomMachineName();
     \Drupal::state()->set('block_test.content', $current_content);
@@ -139,9 +136,12 @@ class BlockCacheTest extends WebTestBase {
     $current_content = $this->randomMachineName();
     \Drupal::state()->set('block_test.content', $current_content);
 
-    $this->drupalLogout();
     $this->drupalGet('user');
     $this->assertText($old_content, 'Block content served from cache.');
+
+    $this->drupalLogout();
+    $this->drupalGet('user');
+    $this->assertText($current_content, 'Block content not served from cache.');
   }
 
   /**
@@ -170,10 +170,7 @@ class BlockCacheTest extends WebTestBase {
    * Test "user" cache context.
    */
   function testCachePerUser() {
-    $this->setBlockCacheConfig(array(
-      'max_age' => 600,
-      'contexts' => array('user'),
-    ));
+    \Drupal::state()->set('block_test.cache_contexts', ['user']);
 
     $current_content = $this->randomMachineName();
     \Drupal::state()->set('block_test.content', $current_content);
@@ -202,10 +199,7 @@ class BlockCacheTest extends WebTestBase {
    * Test "url" cache context.
    */
   function testCachePerPage() {
-    $this->setBlockCacheConfig(array(
-      'max_age' => 600,
-      'contexts' => array('url'),
-    ));
+    \Drupal::state()->set('block_test.cache_contexts', ['url']);
 
     $current_content = $this->randomMachineName();
     \Drupal::state()->set('block_test.content', $current_content);

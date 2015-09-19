@@ -7,7 +7,7 @@
 
 namespace Drupal\taxonomy\Plugin\EntityReferenceSelection;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Database\Query\SelectInterface;
 use Drupal\Core\Entity\Plugin\EntityReferenceSelection\SelectionBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -39,12 +39,18 @@ class TermSelection extends SelectionBase {
   public function buildConfigurationForm(array $form, FormStateInterface $form_state) {
     $form = parent::buildConfigurationForm($form, $form_state);
 
+    $form['target_bundles']['#title'] = $this->t('Vocabularies');
     // @todo: Currently allow auto-create only on taxonomy terms.
     $form['auto_create'] = array(
       '#type' => 'checkbox',
       '#title' => $this->t("Create referenced entities if they don't already exist"),
       '#default_value' => isset($this->configuration['handler_settings']['auto_create']) ? $this->configuration['handler_settings']['auto_create'] : FALSE,
     );
+
+    // Sorting is not possible for taxonomy terms because we use
+    // \Drupal\taxonomy\TermStorageInterface::loadTree() to retrieve matches.
+    $form['sort']['#access'] = FALSE;
+
     return $form;
 
   }
@@ -67,7 +73,7 @@ class TermSelection extends SelectionBase {
       if ($vocabulary = Vocabulary::load($bundle)) {
         if ($terms = $this->entityManager->getStorage('taxonomy_term')->loadTree($vocabulary->id(), 0, NULL, TRUE)) {
           foreach ($terms as $term) {
-            $options[$vocabulary->id()][$term->id()] = str_repeat('-', $term->depth) . String::checkPlain($term->getName());
+            $options[$vocabulary->id()][$term->id()] = str_repeat('-', $term->depth) . SafeMarkup::checkPlain($term->getName());
           }
         }
       }

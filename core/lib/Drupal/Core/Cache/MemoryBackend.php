@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Cache\ArrayBackend.
+ * Contains \Drupal\Core\Cache\MemoryBackend.
  */
 
 namespace Drupal\Core\Cache;
@@ -94,7 +94,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
     $prepared->data = unserialize($prepared->data);
 
     // Check expire time.
-    $prepared->valid = $prepared->expire == Cache::PERMANENT || $prepared->expire >= REQUEST_TIME;
+    $prepared->valid = $prepared->expire == Cache::PERMANENT || $prepared->expire >= $this->getRequestTime();
 
     if (!$allow_invalid && !$prepared->valid) {
       return FALSE;
@@ -114,7 +114,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
     $this->cache[$cid] = (object) array(
       'cid' => $cid,
       'data' => serialize($data),
-      'created' => REQUEST_TIME,
+      'created' => $this->getRequestTime(),
       'expire' => $expire,
       'tags' => $tags,
     );
@@ -155,7 +155,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
    */
   public function invalidate($cid) {
     if (isset($this->cache[$cid])) {
-      $this->cache[$cid]->expire = REQUEST_TIME - 1;
+      $this->cache[$cid]->expire = $this->getRequestTime() - 1;
     }
   }
 
@@ -164,7 +164,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
    */
   public function invalidateMultiple(array $cids) {
     foreach ($cids as $cid) {
-      $this->cache[$cid]->expire = REQUEST_TIME - 1;
+      $this->cache[$cid]->expire = $this->getRequestTime() - 1;
     }
   }
 
@@ -174,7 +174,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
   public function invalidateTags(array $tags) {
     foreach ($this->cache as $cid => $item) {
       if (array_intersect($tags, $item->tags)) {
-        $this->cache[$cid]->expire = REQUEST_TIME - 1;
+        $this->cache[$cid]->expire = $this->getRequestTime() - 1;
       }
     }
   }
@@ -184,7 +184,7 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
    */
   public function invalidateAll() {
     foreach ($this->cache as $cid => $item) {
-      $this->cache[$cid]->expire = REQUEST_TIME - 1;
+      $this->cache[$cid]->expire = $this->getRequestTime() - 1;
     }
   }
 
@@ -198,6 +198,31 @@ class MemoryBackend implements CacheBackendInterface, CacheTagsInvalidatorInterf
    * {@inheritdoc}
    */
   public function removeBin() {
+    $this->cache = [];
+  }
+
+  /**
+   * Wrapper method for REQUEST_TIME constant.
+   *
+   * @return int
+   */
+  protected function getRequestTime() {
+    return defined('REQUEST_TIME') ? REQUEST_TIME : (int) $_SERVER['REQUEST_TIME'];
+  }
+
+  /**
+   * Prevents data stored in memory backends from being serialized.
+   */
+  public function __sleep() {
+    return [];
+  }
+
+  /**
+   * Reset statically cached variables.
+   *
+   * This is only used by tests.
+   */
+  public function reset() {
     $this->cache = [];
   }
 

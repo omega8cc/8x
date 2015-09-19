@@ -15,11 +15,39 @@ use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\HtmlCommand;
 use Drupal\editor\Ajax\EditorDialogSave;
 use Drupal\Core\Ajax\CloseModalDialogCommand;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Core\Entity\EntityStorageInterface;
 
 /**
  * Provides an image dialog for text editors.
  */
 class EditorImageDialog extends FormBase {
+
+  /**
+   * The file storage service.
+   *
+   * @var \Drupal\Core\Entity\EntityStorageInterface
+   */
+  protected $fileStorage;
+
+  /**
+   * Constructs a form object for image dialog.
+   *
+   * @param \Drupal\Core\Entity\EntityStorageInterface $file_storage
+   *   The file storage service.
+   */
+  public function __construct(EntityStorageInterface $file_storage) {
+    $this->fileStorage = $file_storage;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container) {
+    return new static(
+      $container->get('entity.manager')->getStorage('file')
+    );
+  }
 
   /**
    * {@inheritdoc}
@@ -60,7 +88,7 @@ class EditorImageDialog extends FormBase {
     }
     $max_filesize = min(Bytes::toInt($image_upload['max_size']), file_upload_max_size());
 
-    $existing_file = isset($image_element['data-entity-uuid']) ? entity_load_by_uuid('file', $image_element['data-entity-uuid']) : NULL;
+    $existing_file = isset($image_element['data-entity-uuid']) ? \Drupal::entityManager()->loadEntityByUuid('file', $image_element['data-entity-uuid']) : NULL;
     $fid = $existing_file ? $existing_file->id() : NULL;
 
     $form['fid'] = array(
@@ -208,7 +236,7 @@ class EditorImageDialog extends FormBase {
     // attributes and set data-entity-type to 'file'.
     $fid = $form_state->getValue(array('fid', 0));
     if (!empty($fid)) {
-      $file = file_load($fid);
+      $file = $this->fileStorage->load($fid);
       $file_url = file_create_url($file->getFileUri());
       // Transform absolute image URLs to relative image URLs: prevent problems
       // on multisite set-ups and prevent mixed content errors.
@@ -227,7 +255,7 @@ class EditorImageDialog extends FormBase {
     if ($form_state->getErrors()) {
       unset($form['#prefix'], $form['#suffix']);
       $form['status_messages'] = [
-        '#theme' => 'status_messages',
+        '#type' => 'status_messages',
         '#weight' => -10,
       ];
       $response->addCommand(new HtmlCommand('#editor-image-dialog-form', $form));

@@ -2,14 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugin\views\argument\Nid.
+ * Contains \Drupal\node\Plugin\views\argument\Nid.
  */
 
 namespace Drupal\node\Plugin\views\argument;
 
-use Drupal\Component\Utility\String;
 use Drupal\node\NodeStorageInterface;
-use Drupal\views\Plugin\views\argument\Numeric;
+use Drupal\views\Plugin\views\argument\NumericArgument;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -17,7 +16,7 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  *
  * @ViewsArgument("node_nid")
  */
-class Nid extends Numeric {
+class Nid extends NumericArgument {
 
   /**
    * The node storage.
@@ -62,7 +61,7 @@ class Nid extends Numeric {
 
     $nodes = $this->nodeStorage->loadMultiple($this->value);
     foreach ($nodes as $node) {
-      $titles[] = String::checkPlain($node->label());
+      $titles[] = $node->label();
     }
     return $titles;
   }

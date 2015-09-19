@@ -5,14 +5,15 @@
  * Token integration for the views module.
  */
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
+use Drupal\Core\Render\BubbleableMetadata;
 
 /**
  * Implements hook_token_info().
  */
 function views_token_info() {
   $info['types']['view'] = array(
-    'name' => t('View'),
+    'name' => t('View', [], ['context' => 'View entity type']),
     'description' => t('Tokens related to views.'),
     'needs-data' => 'view',
   );
@@ -68,9 +69,7 @@ function views_token_info() {
 /**
  * Implements hook_tokens().
  */
-function views_tokens($type, $tokens, array $data = array(), array $options = array()) {
-  $token_service = \Drupal::token();
-
+function views_tokens($type, $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
   $url_options = array('absolute' => TRUE);
   if (isset($options['language'])) {
     $url_options['language'] = $options['language'];
@@ -83,14 +82,16 @@ function views_tokens($type, $tokens, array $data = array(), array $options = ar
     /** @var \Drupal\views\ViewExecutable $view */
     $view = $data['view'];
 
+    $bubbleable_metadata->addCacheableDependency($view->storage);
+
     foreach ($tokens as $name => $original) {
       switch ($name) {
         case 'label':
-          $replacements[$original] = $sanitize ? String::checkPlain($view->storage->label()) : $view->storage->label();
+          $replacements[$original] = $sanitize ? Html::escape($view->storage->label()) : $view->storage->label();
           break;
 
         case 'description':
-          $replacements[$original] = $sanitize ? String::checkPlain($view->storage->get('description')) : $view->storage->get('description');
+          $replacements[$original] = $sanitize ? Html::escape($view->storage->get('description')) : $view->storage->get('description');
           break;
 
         case 'id':
@@ -99,12 +100,13 @@ function views_tokens($type, $tokens, array $data = array(), array $options = ar
 
         case 'title':
           $title = $view->getTitle();
-          $replacements[$original] = $sanitize ? String::checkPlain($title) : $title;
+          $replacements[$original] = $sanitize ? Html::escape($title) : $title;
           break;
 
         case 'url':
           if ($url = $view->getUrl()) {
-            $replacements[$original] = $url->setOptions($url_options)->toString();
+            $replacements[$original] = $url->setOptions($url_options)
+              ->toString();
           }
           break;
         case 'base-table':
@@ -127,13 +129,6 @@ function views_tokens($type, $tokens, array $data = array(), array $options = ar
           $per_page = $view->getItemsPerPage() ?: 1;
           $replacements[$original] = (int) ceil(count($view->result) / $per_page);
           break;
-      }
-    }
-
-    // [view:url:*] nested tokens. This only works if Token module is installed.
-    if ($url_tokens = $token_service->findWithPrefix($tokens, 'url')) {
-      if ($path = $view->getUrl()) {
-        $replacements += $token_service->generate('url', $url_tokens, array('path' => $url->getInternalPath()), $options);
       }
     }
   }

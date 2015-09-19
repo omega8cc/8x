@@ -7,7 +7,7 @@
 
 namespace Drupal\system\Tests\System;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Xss;
 use Drupal\simpletest\WebTestBase;
 
@@ -25,8 +25,8 @@ class PageTitleTest extends WebTestBase {
    */
   public static $modules = array('node', 'test_page_test', 'form_test');
 
-  protected $content_user;
-  protected $saved_title;
+  protected $contentUser;
+  protected $savedTitle;
 
   /**
    * Implement setUp().
@@ -36,8 +36,8 @@ class PageTitleTest extends WebTestBase {
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
 
-    $this->content_user = $this->drupalCreateUser(array('create page content', 'access content', 'administer themes', 'administer site configuration', 'link to any page'));
-    $this->drupalLogin($this->content_user);
+    $this->contentUser = $this->drupalCreateUser(array('create page content', 'access content', 'administer themes', 'administer site configuration', 'link to any page'));
+    $this->drupalLogin($this->contentUser);
   }
 
   /**
@@ -55,8 +55,9 @@ class PageTitleTest extends WebTestBase {
 
     $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $this->assertNotNull($node, 'Node created and found in database');
+    $this->assertText(Html::escape($edit['title[0][value]']), 'Check to make sure tags in the node title are converted.');
     $this->drupalGet("node/" . $node->id());
-    $this->assertText(String::checkPlain($edit['title[0][value]']), 'Check to make sure tags in the node title are converted.');
+    $this->assertText(Html::escape($edit['title[0][value]']), 'Check to make sure tags in the node title are converted.');
   }
 
   /**
@@ -65,7 +66,7 @@ class PageTitleTest extends WebTestBase {
   function testTitleXSS() {
     // Set some title with JavaScript and HTML chars to escape.
     $title = '</title><script type="text/javascript">alert("Title XSS!");</script> & < > " \' ';
-    $title_filtered = String::checkPlain($title);
+    $title_filtered = Html::escape($title);
 
     $slogan = '<script type="text/javascript">alert("Slogan XSS!");</script>';
     $slogan_filtered = Xss::filterAdmin($slogan);
@@ -137,6 +138,15 @@ class PageTitleTest extends WebTestBase {
     $this->assertTitle('Dynamic title | Drupal');
     $result = $this->xpath('//h1');
     $this->assertEqual('Dynamic title', (string) $result[0]);
+
+    // Ensure that titles are cacheable and are escaped normally if the
+    // controller does not escape them.
+    $this->drupalGet('test-page-cached-controller');
+    $this->assertTitle('Cached title | Drupal');
+    $this->assertRaw(Html::escape('<span>Cached title</span>') . '</h1>');
+    $this->drupalGet('test-page-cached-controller');
+    $this->assertTitle('Cached title | Drupal');
+    $this->assertRaw(Html::escape('<span>Cached title</span>') . '</h1>');
   }
 
 }

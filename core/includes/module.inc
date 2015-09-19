@@ -45,7 +45,7 @@ function system_list($type) {
     \Drupal::cache('bootstrap')->set('system_list', $lists);
   }
   // To avoid a separate database lookup for the filepath, prime the
-  // drupal_get_filename() static cache with all enabled modules and themes.
+  // drupal_get_filename() static cache with all enabled themes.
   foreach ($lists['filepaths'] as $item) {
     system_register($item['type'], $item['name'], $item['filepath']);
   }
@@ -179,10 +179,12 @@ function drupal_required_modules() {
 function module_set_weight($module, $weight) {
   $extension_config = \Drupal::configFactory()->getEditable('core.extension');
   if ($extension_config->get("module.$module") !== NULL) {
+    // Pre-cast the $weight to an integer so that we can save this without using
+    // schema. This is a performance improvement for module installation.
     $extension_config
-      ->set("module.$module", $weight)
+      ->set("module.$module", (int) $weight)
       ->set('module', module_config_sort($extension_config->get('module')))
-      ->save();
+      ->save(TRUE);
 
     // Prepare the new module list, sorted by weight, including filenames.
     // @see \Drupal\Core\Extension\ModuleHandler::install()

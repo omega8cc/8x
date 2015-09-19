@@ -7,15 +7,24 @@
 
   "use strict";
 
-  /**
-   * Implement a live setting parser to prevent text editors from automatically
-   * enabling buttons that are not allowed by this filter's configuration.
-   */
   if (Drupal.filterConfiguration) {
+
+    /**
+     * Implement a live setting parser to prevent text editors from automatically
+     * enabling buttons that are not allowed by this filter's configuration.
+     *
+     * @namespace
+     */
     Drupal.filterConfiguration.liveSettingParsers.filter_html = {
+
+      /**
+       * @return {Array}
+       *   An array of filter rules.
+       */
       getRules: function () {
         var currentValue = $('#edit-filters-filter-html-settings-allowed-html').val();
-        var rules = [], rule;
+        var rules = [];
+        var rule;
 
         // Build a FilterHTMLRule that reflects the hard-coded behavior that
         // strips all "style" attribute and all "on*" attributes.
@@ -36,9 +45,19 @@
     };
   }
 
+  /**
+   * Displays and updates what HTML tags are allowed to use in a filter.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @todo Remove everything but 'attach' and 'detach' and make a proper object.
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches behavior for updating allowed HTML tags.
+   */
   Drupal.behaviors.filterFilterHtmlUpdating = {
 
-    // The form item containg the "Allowed HTML tags" setting.
+    // The form item contains the "Allowed HTML tags" setting.
     $allowedHTMLFormItem: null,
 
     // The description for the "Allowed HTML tags" field.
@@ -55,7 +74,7 @@
 
     attach: function (context, settings) {
       var that = this;
-      $(context).find('[name="filters[filter_html][settings][allowed_html]"]').once('filter-filter_html-updating', function () {
+      $(context).find('[name="filters[filter_html][settings][allowed_html]"]').once('filter-filter_html-updating').each(function () {
         that.$allowedHTMLFormItem = $(this);
         that.$allowedHTMLDescription = that.$allowedHTMLFormItem.closest('.form-item').find('.description');
         that.userTags = that._parseSetting(this.value);
@@ -113,12 +132,13 @@
      * The filter_html filter is only concerned with the required tags, not with
      * any properties, nor with each feature's "allowed" tags.
      *
-     * @param Array userAllowedTags
+     * @param {Array} userAllowedTags
      *   The list of user-defined allowed tags.
-     * @param Object newFeatures
-     *   A list of Drupal.EditorFeature objects' rules, keyed by their name.
+     * @param {object} newFeatures
+     *   A list of {@link Drupal.EditorFeature} objects' rules, keyed by
+     *   their name.
      *
-     * @return Array
+     * @return {Array}
      *   A list of new allowed tags.
      */
     _calculateAutoAllowedTags: function (userAllowedTags, newFeatures) {
@@ -140,10 +160,10 @@
     /**
      * Parses the value of this.$allowedHTMLFormItem.
      *
-     * @param String setting
+     * @param {string} setting
      *   The string representation of the setting. e.g. "<p> <br> <a>"
      *
-     * @return Array
+     * @return {Array}
      *   The array representation of the setting. e.g. ['p', 'br', 'a']
      */
     _parseSetting: function (setting) {
@@ -153,10 +173,10 @@
     /**
      * Generates the value of this.$allowedHTMLFormItem.
      *
-     * @param Array setting
+     * @param {Array} tags
      *   The array representation of the setting. e.g. ['p', 'br', 'a']
      *
-     * @return Array
+     * @return {Array}
      *   The string representation of the setting. e.g. "<p> <br> <a>"
      */
     _generateSetting: function (tags) {
@@ -168,9 +188,10 @@
   /**
    * Theme function for the filter_html update message.
    *
-   * @param Array tags
+   * @param {Array} tags
    *   An array of the new tags that are to be allowed.
-   * @return
+   *
+   * @return {string}
    *   The corresponding HTML.
    */
   Drupal.theme.filterFilterHTMLUpdateMessage = function (tags) {

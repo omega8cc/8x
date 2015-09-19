@@ -2,10 +2,11 @@
 
 /**
  * @file
- * Definition of Drupal\shortcut\Tests\ShortcutSetsTest.
+ * Contains \Drupal\shortcut\Tests\ShortcutSetsTest.
  */
 
 namespace Drupal\shortcut\Tests;
+
 use Drupal\shortcut\Entity\ShortcutSet;
 
 /**
@@ -14,6 +15,22 @@ use Drupal\shortcut\Entity\ShortcutSet;
  * @group shortcut
  */
 class ShortcutSetsTest extends ShortcutTestBase {
+
+  /**
+   * Modules to enable.
+   *
+   * @var string[]
+   */
+  public static $modules = ['block'];
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+
+    $this->drupalPlaceBlock('local_actions_block');
+  }
 
   /**
    * Tests creating a shortcut set.
@@ -131,9 +148,11 @@ class ShortcutSetsTest extends ShortcutTestBase {
   function testShortcutSetSwitchNoSetName() {
     $edit = array('set' => 'new');
     $this->drupalPostForm('user/' . $this->adminUser->id() . '/shortcuts', $edit, t('Change set'));
-    $this->assertText(t('The new set label is required.'));
+    $this->assertRaw('1 error has been found:');
+    $this->assertRaw('<a href="#edit-label">Label</a>');
     $current_set = shortcut_current_displayed_set($this->adminUser);
     $this->assertEqual($current_set->id(), $this->set->id(), 'Attempting to switch to a new shortcut set without providing a set name does not succeed.');
+    $this->assertFieldByXPath("//input[@name='label' and contains(concat(' ', normalize-space(@class), ' '), ' error ')]", NULL, 'The new set label field has the error class');
   }
 
   /**

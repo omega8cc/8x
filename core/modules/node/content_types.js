@@ -7,6 +7,14 @@
 
   "use strict";
 
+  /**
+   * Behaviors for setting summaries on content type form.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches summary behaviors on content type edit forms.
+   */
   Drupal.behaviors.contentTypes = {
     attach: function (context) {
       var $context = $(context);

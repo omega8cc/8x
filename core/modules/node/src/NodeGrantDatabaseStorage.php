@@ -22,6 +22,8 @@ use Symfony\Component\DependencyInjection\ContainerInterface;
  * Defines a controller class that handles the node grants system.
  *
  * This is used to build node query access.
+ *
+ * @ingroup node_access
  */
 class NodeGrantDatabaseStorage implements NodeGrantDatabaseStorageInterface {
 
@@ -69,8 +71,14 @@ class NodeGrantDatabaseStorage implements NodeGrantDatabaseStorageInterface {
     // If no module implements the hook or the node does not have an id there is
     // no point in querying the database for access grants.
     if (!$this->moduleHandler->getImplementations('node_grants') || !$node->id()) {
-      // No opinion.
-      return AccessResult::neutral();
+      // Return the equivalent of the default grant, defined by
+      // self::writeDefault().
+      if ($operation === 'view') {
+        return AccessResult::allowedIf($node->getTranslation($langcode)->isPublished())->cacheUntilEntityChanges($node);
+      }
+      else {
+        return AccessResult::neutral();
+      }
     }
 
     // Check the database for potential access grants.
@@ -106,19 +114,18 @@ class NodeGrantDatabaseStorage implements NodeGrantDatabaseStorageInterface {
     // theoretically cacheable, because we don't have the necessary metadata to
     // know it for a fact.
     $set_cacheability = function (AccessResult $access_result) use ($operation) {
-      if ($operation === 'view') {
-        return $access_result->addCacheContexts(['node_view_grants']);
+      $access_result->addCacheContexts(['user.node_grants:' . $operation]);
+      if ($operation !== 'view') {
+        $access_result->setCacheMaxAge(0);
       }
-      else {
-        return $access_result->setCacheable(FALSE);
-      }
+      return $access_result;
     };
 
     if ($query->execute()->fetchField()) {
       return $set_cacheability(AccessResult::allowed());
     }
     else {
-      return $set_cacheability(AccessResult::forbidden());
+      return $set_cacheability(AccessResult::neutral());
     }
   }
 

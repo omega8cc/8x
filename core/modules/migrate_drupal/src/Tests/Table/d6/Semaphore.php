@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Semaphore.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Semaphore.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -40,9 +40,11 @@ class Semaphore extends DrupalDumpBase {
         'expire' => array(
           'type' => 'numeric',
           'not null' => TRUE,
-          'length' => 100,
+          'precision' => '10',
+          'scale' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("semaphore")->fields(array(
       'name',
@@ -53,3 +55,4 @@ class Semaphore extends DrupalDumpBase {
   }
 
 }
+#8dc0ab3dffca2c2b00141f705dc183a6

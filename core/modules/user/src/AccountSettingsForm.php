@@ -9,7 +9,7 @@ namespace Drupal\user;
 
 use Drupal\Core\Form\ConfigFormBase;
 use Drupal\Core\Config\ConfigFactoryInterface;
-use Drupal\Core\Extension\ModuleHandler;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -22,7 +22,7 @@ class AccountSettingsForm extends ConfigFormBase {
   /**
    * The module handler.
    *
-   * @var \Drupal\Core\Extension\ModuleHandler
+   * @var \Drupal\Core\Extension\ModuleHandlerInterface
    */
   protected $moduleHandler;
 
@@ -38,12 +38,12 @@ class AccountSettingsForm extends ConfigFormBase {
    *
    * @param \Drupal\Core\Config\ConfigFactoryInterface $config_factory
    *   The factory for configuration objects.
-   * @param \Drupal\Core\Extension\ModuleHandler $module_handler
+   * @param \Drupal\Core\Extension\ModuleHandlerInterface $module_handler
    *   The module handler.
    * @param \Drupal\user\RoleStorageInterface $role_storage
    *   The role storage.
    */
-  public function __construct(ConfigFactoryInterface $config_factory, ModuleHandler $module_handler, RoleStorageInterface $role_storage) {
+  public function __construct(ConfigFactoryInterface $config_factory, ModuleHandlerInterface $module_handler, RoleStorageInterface $role_storage) {
     parent::__construct($config_factory);
     $this->moduleHandler = $module_handler;
     $this->roleStorage = $role_storage;
@@ -112,7 +112,7 @@ class AccountSettingsForm extends ConfigFormBase {
     // Do not allow users to set the anonymous or authenticated user roles as the
     // administrator role.
     $roles = user_role_names(TRUE);
-    unset($roles[DRUPAL_AUTHENTICATED_RID]);
+    unset($roles[RoleInterface::AUTHENTICATED_ID]);
 
     $admin_roles = $this->roleStorage->getQuery()
       ->condition('is_admin', TRUE)
@@ -185,21 +185,6 @@ class AccountSettingsForm extends ConfigFormBase {
         $form['registration_cancellation']['user_cancel_method'][$key]['#access'] = FALSE;
       }
     }
-
-    // Account settings.
-    $filter_exists = $this->moduleHandler->moduleExists('filter');
-    $form['personalization'] = array(
-      '#type' => 'details',
-      '#title' => $this->t('Personalization'),
-      '#open' => TRUE,
-      '#access' => $filter_exists,
-    );
-    $form['personalization']['user_signatures'] = array(
-      '#type' => 'checkbox',
-      '#title' => $this->t('Enable signatures'),
-      '#default_value' => $filter_exists ? $config->get('signatures') : 0,
-      '#access' => $filter_exists,
-    );
 
     // Default notifications address.
     $form['mail_notification_address'] = array(
@@ -450,7 +435,6 @@ class AccountSettingsForm extends ConfigFormBase {
       ->set('register', $form_state->getValue('user_register'))
       ->set('password_strength', $form_state->getValue('user_password_strength'))
       ->set('verify_mail', $form_state->getValue('user_email_verification'))
-      ->set('signatures', $form_state->getValue('user_signatures'))
       ->set('cancel_method', $form_state->getValue('user_cancel_method'))
       ->set('notify.status_activated', $form_state->getValue('user_mail_status_activated_notify'))
       ->set('notify.status_blocked', $form_state->getValue('user_mail_status_blocked_notify'))
@@ -493,9 +477,6 @@ class AccountSettingsForm extends ConfigFormBase {
         $this->roleStorage->load($new_admin_role)->setIsAdmin(TRUE)->save();
       }
     }
-
-    // Clear field definition cache for signatures.
-    \Drupal::entityManager()->clearCachedFieldDefinitions();
   }
 
 }

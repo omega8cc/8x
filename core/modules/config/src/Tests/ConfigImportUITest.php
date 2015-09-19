@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\config\Tests\ConfigImportUITest.
+ * Contains \Drupal\config\Tests\ConfigImportUITest.
  */
 
 namespace Drupal\config\Tests;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Config\InstallStorage;
 use Drupal\simpletest\WebTestBase;
 
@@ -68,6 +69,8 @@ class ConfigImportUITest extends WebTestBase {
       'label' => 'New',
       'weight' => 0,
       'style' => '',
+      'size' => '',
+      'size_value' => '',
       'protected_property' => '',
     );
     $staging->write($dynamic_name, $original_dynamic_data);
@@ -273,22 +276,40 @@ class ConfigImportUITest extends WebTestBase {
     $change_key = 'foo';
     $remove_key = '404';
     $add_key = 'biff';
-    $add_data = 'bangpow';
-    $change_data = 'foobar';
+    $add_data = '<em>bangpow</em>';
+    $change_data = '<p><em>foobar</em></p>';
     $original_data = array(
-      'foo' => 'bar',
-      '404' => 'herp',
+      'foo' => '<p>foobar</p>',
+      'baz' => '<strong>no change</strong>',
+      '404' => '<em>herp</em>',
     );
+    // Update active storage to have html in config data.
+    $this->config($config_name)->setData($original_data)->save();
 
     // Change a configuration value in staging.
     $staging_data = $original_data;
     $staging_data[$change_key] = $change_data;
     $staging_data[$add_key] = $add_data;
+    unset($staging_data[$remove_key]);
     $staging->write($config_name, $staging_data);
 
     // Load the diff UI and verify that the diff reflects the change.
     $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
     $this->assertTitle(format_string('View changes of @config_name | Drupal', array('@config_name' => $config_name)));
+
+    // The following assertions do not use $this::assertEscaped() because
+    // \Drupal\Component\Diff\DiffFormatter adds markup that signifies what has
+    // changed.
+
+    // Changed values are escaped.
+    $this->assertText(Html::escape("foo: '<p><em>foobar</em></p>'"));
+    $this->assertText(Html::escape("foo: '<p>foobar</p>'"));
+    // The no change values are escaped.
+    $this->assertText(Html::escape("baz: '<strong>no change</strong>'"));
+    // Added value is escaped.
+    $this->assertText(Html::escape("biff: '<em>bangpow</em>'"));
+    // Deleted value is escaped.
+    $this->assertText(Html::escape("404: '<em>herp</em>'"));
 
     // Reset data back to original, and remove a key
     $staging_data = $original_data;
@@ -297,6 +318,11 @@ class ConfigImportUITest extends WebTestBase {
 
     // Load the diff UI and verify that the diff reflects a removed key.
     $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
+    // The no change values are escaped.
+    $this->assertText(Html::escape("foo: '<p>foobar</p>'"));
+    $this->assertText(Html::escape("baz: '<strong>no change</strong>'"));
+    // Removed key is escaped.
+    $this->assertText(Html::escape("404: '<em>herp</em>'"));
 
     // Reset data back to original and add a key
     $staging_data = $original_data;
@@ -305,10 +331,15 @@ class ConfigImportUITest extends WebTestBase {
 
     // Load the diff UI and verify that the diff reflects an added key.
     $this->drupalGet('admin/config/development/configuration/sync/diff/' . $config_name);
+    // The no change values are escaped.
+    $this->assertText(Html::escape("baz: '<strong>no change</strong>'"));
+    $this->assertText(Html::escape("404: '<em>herp</em>'"));
+    // Added key is escaped.
+    $this->assertText(Html::escape("biff: '<em>bangpow</em>'"));
   }
 
   /**
-   * Tests that mutliple validation errors are listed on the page.
+   * Tests that multiple validation errors are listed on the page.
    */
   public function testImportValidation() {
     // Set state value so that
@@ -324,7 +355,7 @@ class ConfigImportUITest extends WebTestBase {
     $this->drupalPostForm(NULL, array(), t('Import all'));
 
     // Verify that the validation messages appear.
-    $this->assertText('The configuration synchronization failed validation.');
+    $this->assertText('The configuration cannot be imported because it failed validation for the following reasons:');
     $this->assertText('Config import validate error 1.');
     $this->assertText('Config import validate error 2.');
 
@@ -373,7 +404,9 @@ class ConfigImportUITest extends WebTestBase {
       'label' => 'Primary',
       'weight' => 0,
       'style' => NULL,
-      'protected_property' => null,
+      'size' => NULL,
+      'size_value' => NULL,
+      'protected_property' => NULL,
     );
     $staging->write($name_primary, $values_primary);
     $values_secondary = array(
@@ -388,7 +421,9 @@ class ConfigImportUITest extends WebTestBase {
       'label' => 'Secondary Sync',
       'weight' => 0,
       'style' => NULL,
-      'protected_property' => null,
+      'size' => NULL,
+      'size_value' => NULL,
+      'protected_property' => NULL,
     );
     $staging->write($name_secondary, $values_secondary);
     // Verify that there are configuration differences to import.
@@ -397,7 +432,7 @@ class ConfigImportUITest extends WebTestBase {
 
     // Attempt to import configuration and verify that an error message appears.
     $this->drupalPostForm(NULL, array(), t('Import all'));
-    $this->assertText(String::format('Deleted and replaced configuration entity "@name"', array('@name' => $name_secondary)));
+    $this->assertText(SafeMarkup::format('Deleted and replaced configuration entity "@name"', array('@name' => $name_secondary)));
     $this->assertText(t('The configuration was imported with errors.'));
     $this->assertNoText(t('The configuration was imported successfully.'));
     $this->assertText(t('There are no configuration changes to import.'));
@@ -445,6 +480,41 @@ class ConfigImportUITest extends WebTestBase {
     $this->assertNoText(format_string('core.entity_view_display.node.@type.teaser', array('@type' => $node_type->id())));
     $this->assertNoText(format_string('core.entity_view_display.node.@type.default', array('@type' => $node_type->id())));
     $this->assertNoText(format_string('core.entity_form_display.node.@type.default', array('@type' => $node_type->id())));
+  }
+
+  /**
+   * Tests config importer cannot uninstall extensions which are depended on.
+   *
+   * @see \Drupal\Core\EventSubscriber\ConfigImportSubscriber
+   */
+  public function testExtensionValidation() {
+    \Drupal::service('module_installer')->install(['node']);
+    \Drupal::service('theme_handler')->install(['bartik']);
+    $this->rebuildContainer();
+
+    $staging = $this->container->get('config.storage.staging');
+    $this->copyConfig($this->container->get('config.storage'), $staging);
+    $core = $staging->read('core.extension');
+    // Node depends on text.
+    unset($core['module']['text']);
+    $module_data = system_rebuild_module_data();
+    $this->assertTrue(isset($module_data['node']->requires['text']), 'The Node module depends on the Text module.');
+    // Bartik depends on classy.
+    unset($core['theme']['classy']);
+    $theme_data = \Drupal::service('theme_handler')->rebuildThemeData();
+    $this->assertTrue(isset($theme_data['bartik']->requires['classy']), 'The Bartik theme depends on the Classy theme.');
+    // This module does not exist.
+    $core['module']['does_not_exist'] = 0;
+    // This theme does not exist.
+    $core['theme']['does_not_exist'] = 0;
+    $staging->write('core.extension', $core);
+
+    $this->drupalPostForm('admin/config/development/configuration', array(), t('Import all'));
+    $this->assertText('The configuration cannot be imported because it failed validation for the following reasons:');
+    $this->assertText('Unable to uninstall the Text module since the Node module is installed.');
+    $this->assertText('Unable to uninstall the Classy theme since the Bartik theme is installed.');
+    $this->assertText('Unable to install the does_not_exist module since it does not exist.');
+    $this->assertText('Unable to install the does_not_exist theme since it does not exist.');
   }
 
 }

@@ -76,7 +76,7 @@ class AggregatorPluginSettingsBaseTest extends UnitTestCase {
    * plugins that extend AggregatorPluginSettingsBase.
    */
   public function testSettingsForm() {
-    // Emulate a form state of a sumbitted form.
+    // Emulate a form state of a submitted form.
     $form_state = (new FormState())->setValues([
       'dummy_length' => '',
       'aggregator_allowed_html_tags' => '',
@@ -113,7 +113,7 @@ class AggregatorPluginSettingsBaseTest extends UnitTestCase {
 }
 
 namespace {
-  // @todo Delete after https://drupal.org/node/1858196 is in.
+  // @todo Delete after https://www.drupal.org/node/1858196 is in.
   if (!function_exists('drupal_set_message')) {
     function drupal_set_message() {}
   }

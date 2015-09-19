@@ -7,6 +7,7 @@
 
 namespace Drupal\help\Plugin\Block;
 
+use Drupal\Core\Access\AccessResult;
 use Drupal\Core\Block\BlockBase;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
@@ -24,13 +25,6 @@ use Symfony\Component\HttpFoundation\Request;
  * )
  */
 class HelpBlock extends BlockBase implements ContainerFactoryPluginInterface {
-
-  /**
-   * Stores the help text associated with the active menu item.
-   *
-   * @var string
-   */
-  protected $help;
 
   /**
    * The module handler.
@@ -92,14 +86,6 @@ class HelpBlock extends BlockBase implements ContainerFactoryPluginInterface {
   }
 
   /**
-   * {@inheritdoc}
-   */
-  protected function blockAccess(AccountInterface $account) {
-    $this->help = $this->getActiveHelp($this->request);
-    return (bool) $this->help;
-  }
-
-  /**
    * Returns the help associated with the active menu item.
    *
    * @param \Symfony\Component\HttpFoundation\Request $request
@@ -119,26 +105,21 @@ class HelpBlock extends BlockBase implements ContainerFactoryPluginInterface {
    * {@inheritdoc}
    */
   public function build() {
-    return array(
-      '#children' => $this->help,
-    );
+    $help = $this->getActiveHelp($this->request);
+    if (!$help) {
+      return [];
+    }
+    else {
+      return [
+        '#children' => $help,
+      ];
+    }
   }
 
   /**
    * {@inheritdoc}
    */
-  public function defaultConfiguration() {
-    // Modify the default max age for the Help block: help text is
-    // static for a given URL, except when a module is updated, in which case
-    // update.php must be run, which clears all caches. Thus it's safe to cache
-    // the output for this block forever on a per-URL basis.
-    return array('cache' => array('max_age' => \Drupal\Core\Cache\Cache::PERMANENT));
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function getRequiredCacheContexts() {
+  public function getCacheContexts() {
     // The "Help" block must be cached per URL: help is defined for a
     // given path, and does not come with any access restrictions.
     return array('url');

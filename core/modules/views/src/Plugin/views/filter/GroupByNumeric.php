@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\filter\GroupByNumeric.
+ * Contains \Drupal\views\Plugin\views\filter\GroupByNumeric.
  */
 
 namespace Drupal\views\Plugin\views\filter;
@@ -14,7 +14,7 @@ namespace Drupal\views\Plugin\views\filter;
  *
  * @ViewsFilter("groupby_numeric")
  */
-class GroupByNumeric extends Numeric {
+class GroupByNumeric extends NumericFilter {
 
   public function query() {
     $this->ensureMyTable();

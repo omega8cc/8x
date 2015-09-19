@@ -77,7 +77,7 @@ class InstallUninstallTest extends ModuleTestBase {
       $edit = array();
       $package = $module->info['package'];
       $edit["modules[$package][$name][enable]"] = TRUE;
-      $this->drupalPostForm('admin/modules', $edit, t('Save configuration'));
+      $this->drupalPostForm('admin/modules', $edit, t('Install'));
 
       // Handle the case where modules were installed along with this one and
       // where we therefore hit a confirmation screen.
@@ -85,7 +85,16 @@ class InstallUninstallTest extends ModuleTestBase {
         $this->drupalPostForm(NULL, array(), t('Continue'));
       }
 
-      $this->assertText(t('The configuration options have been saved.'), 'Modules status has been updated.');
+      // List the module display names to check the confirmation message.
+      $module_names = array();
+      foreach ($modules_to_install as $module_to_install) {
+        $module_names[] = $all_modules[$module_to_install]->info['name'];
+      }
+      $expected_text = \Drupal::translation()->formatPlural(count($module_names), 'Module @name has been enabled.', '@count modules have been enabled: @names.', array(
+        '@name' => $module_names[0],
+        '@names' => implode(', ', $module_names),
+      ));
+      $this->assertText($expected_text, 'Modules status has been updated.');
 
       // Check that hook_modules_installed() was invoked with the expected list
       // of modules, that each module's database tables now exist, and that
@@ -101,7 +110,7 @@ class InstallUninstallTest extends ModuleTestBase {
       // Uninstall the original module, and check appropriate
       // hooks, tables, and log messages. (Later, we'll go back and do the
       // same thing for modules that were enabled automatically.)
-      $this->assertSuccessfullUninstall($name, $package);
+      $this->assertSuccessfulUninstall($name, $package);
     }
 
     // Go through all modules that were automatically installed, and try to
@@ -116,7 +125,7 @@ class InstallUninstallTest extends ModuleTestBase {
         $disabled_checkbox = $this->xpath('//input[@type="checkbox" and @disabled="disabled" and @name="uninstall[' . $name . ']"]');
         if (empty($disabled_checkbox)) {
           $automatically_installed = array_diff($automatically_installed, array($name));
-          $this->assertSuccessfullUninstall($name, $package);
+          $this->assertSuccessfulUninstall($name, $package);
         }
       }
       $final_count = count($automatically_installed);
@@ -138,8 +147,8 @@ class InstallUninstallTest extends ModuleTestBase {
     foreach ($all_modules as $name => $module) {
       $edit['modules[' . $module->info['package'] . '][' . $name . '][enable]'] = TRUE;
     }
-    $this->drupalPostForm('admin/modules', $edit, t('Save configuration'));
-    $this->assertText(t('The configuration options have been saved.'), 'Modules status has been updated.');
+    $this->drupalPostForm('admin/modules', $edit, t('Install'));
+    $this->assertText(t('@count modules have been enabled: ', array('@count' => count($all_modules))), 'Modules status has been updated.');
   }
 
   /**
@@ -151,7 +160,7 @@ class InstallUninstallTest extends ModuleTestBase {
    *   (optional) The package of the module to uninstall. Defaults
    *   to 'Core'.
    */
-  protected function assertSuccessfullUninstall($module, $package = 'Core') {
+  protected function assertSuccessfulUninstall($module, $package = 'Core') {
     $edit = array();
     if ($module == 'forum') {
       // Forum cannot be uninstalled until all of the content entities related

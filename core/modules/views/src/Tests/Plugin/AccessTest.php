@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views\Tests\Plugin\AccessTest
+ * Contains \Drupal\views\Tests\Plugin\AccessTest.
  */
 
 namespace Drupal\views\Tests\Plugin;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\views\Tests\ViewTestData;
 use Drupal\views\Views;
 

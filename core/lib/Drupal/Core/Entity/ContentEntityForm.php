@@ -50,6 +50,12 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
    */
   public function form(array $form, FormStateInterface $form_state) {
     $form = parent::form($form, $form_state);
+    // Content entity forms do not use the parent's #after_build callback
+    // because they only need to rebuild the entity in the validation and the
+    // submit handler because Field API uses its own #after_build callback for
+    // its widgets.
+    unset($form['#after_build']);
+
     $this->getFormDisplay($form_state)->buildForm($this->entity, $form, $form_state);
     // Allow modules to act before and after form language is updated.
     $form['#entity_builders']['update_form_langcode'] = [$this, 'updateFormLangcode'];
@@ -58,25 +64,93 @@ class ContentEntityForm extends EntityForm implements ContentEntityFormInterface
 
   /**
    * {@inheritdoc}
-   *
-   * Note that extending classes should not override this method to add entity
-   * validation logic, but define further validation constraints using the
-   * entity validation API and/or provide a new validation constraint if
-   * necessary. This is the only way to ensure that the validation logic
-   * is correctly applied independently of form submissions; e.g., for REST
-   * requests.
-   * For more information about entity validation, see
-   * https://www.drupal.org/node/2015613.
    */
-  public function validate(array $form, FormStateInterface $form_state) {
-    $entity = $this->buildEntity($form, $form_state);
-    $this->getFormDisplay($form_state)->validateFormValues($entity, $form, $form_state);
+  public function buildEntity(array $form, FormStateInterface $form_state) {
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
+    $entity = parent::buildEntity($form, $form_state);
 
-    // @todo Remove this.
-    // Execute legacy global validation handlers.
-    $form_state->setValidateHandlers([]);
-    \Drupal::service('form_validator')->executeValidateHandlers($form, $form_state);
+    // Mark the entity as requiring validation.
+    $entity->setValidationRequired(!$form_state->getTemporaryValue('entity_validated'));
+
     return $entity;
+  }
+
+  /**
+   * {@inheritdoc}
+   *
+   * Button-level validation handlers are highly discouraged for entity forms,
+   * as they will prevent entity validation from running. If the entity is going
+   * to be saved during the form submission, this method should be manually
+   * invoked from the button-level validation handler, otherwise an exception
+   * will be thrown.
+   */
+  public function validateForm(array &$form, FormStateInterface $form_state) {
+    parent::validateForm($form, $form_state);
+    /** @var \Drupal\Core\Entity\ContentEntityInterface $entity */
+    $entity = $this->buildEntity($form, $form_state);
+
+    $violations = $entity->validate();
+
+    // Remove violations of inaccessible fields and not edited fields.
+    $violations
+      ->filterByFieldAccess($this->currentUser())
+      ->filterByFields(array_diff(array_keys($entity->getFieldDefinitions()), $this->getEditedFieldNames($form_state)));
+
+    $this->flagViolations($violations, $form, $form_state);
+
+    // The entity was validated.
+    $entity->setValidationRequired(FALSE);
+    $form_state->setTemporaryValue('entity_validated', TRUE);
+
+    return $entity;
+  }
+
+  /**
+   * Gets the names of all fields edited in the form.
+   *
+   * If the entity form customly adds some fields to the form (i.e. without
+   * using the form display), it needs to add its fields here and override
+   * flagViolations() for displaying the violations.
+   *
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @return string[]
+   *   An array of field names.
+   */
+  protected function getEditedFieldNames(FormStateInterface $form_state) {
+    return array_keys($this->getFormDisplay($form_state)->getComponents());
+  }
+
+  /**
+   * Flags violations for the current form.
+   *
+   * If the entity form customly adds some fields to the form (i.e. without
+   * using the form display), it needs to add its fields to array returned by
+   * getEditedFieldNames() and overwrite this method in order to show any
+   * violations for those fields; e.g.:
+   * @code
+   * foreach ($violations->getByField('name') as $violation) {
+   *   $form_state->setErrorByName('name', $violation->getMessage());
+   * }
+   * parent::flagViolations($violations, $form, $form_state);
+   * @endcode
+   *
+   * @param \Drupal\Core\Entity\EntityConstraintViolationListInterface $violations
+   *   The violations to flag.
+   * @param array $form
+   *   A nested array of form elements comprising the form.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   */
+  protected function flagViolations(EntityConstraintViolationListInterface $violations, array $form, FormStateInterface $form_state) {
+    // Flag entity level violations.
+    foreach ($violations->getEntityViolations() as $violation) {
+      /** @var \Symfony\Component\Validator\ConstraintViolationInterface $violation */
+      $form_state->setErrorByName('', $violation->getMessage());
+    }
+    // Let the form display flag violations of its fields.
+    $this->getFormDisplay($form_state)->flagWidgetsErrorsFromViolations($violations, $form, $form_state);
   }
 
   /**

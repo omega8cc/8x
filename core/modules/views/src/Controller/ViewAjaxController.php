@@ -12,8 +12,12 @@ use Drupal\Core\Ajax\AjaxResponse;
 use Drupal\Core\Ajax\ReplaceCommand;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityStorageInterface;
+use Drupal\Core\EventSubscriber\AjaxResponseSubscriber;
 use Drupal\Core\Path\CurrentPathStack;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
+use Drupal\Core\Routing\RedirectDestinationInterface;
 use Drupal\views\Ajax\ScrollTopCommand;
 use Drupal\views\Ajax\ViewAjaxResponse;
 use Drupal\views\ViewExecutableFactory;
@@ -56,6 +60,13 @@ class ViewAjaxController implements ContainerInjectionInterface {
   protected $currentPath;
 
   /**
+   * The redirect destination.
+   *
+   * @var \Drupal\Core\Routing\RedirectDestinationInterface
+   */
+  protected $redirectDestination;
+
+  /**
    * Constructs a ViewAjaxController object.
    *
    * @param \Drupal\Core\Entity\EntityStorageInterface $storage
@@ -66,12 +77,15 @@ class ViewAjaxController implements ContainerInjectionInterface {
    *   The renderer.
    * @param \Drupal\Core\Path\CurrentPathStack $current_path
    *   The current path.
+   * @param \Drupal\Core\Routing\RedirectDestinationInterface $redirect_destination
+   *   The redirect destination.
    */
-  public function __construct(EntityStorageInterface $storage, ViewExecutableFactory $executable_factory, RendererInterface $renderer, CurrentPathStack $current_path) {
+  public function __construct(EntityStorageInterface $storage, ViewExecutableFactory $executable_factory, RendererInterface $renderer, CurrentPathStack $current_path, RedirectDestinationInterface $redirect_destination) {
     $this->storage = $storage;
     $this->executableFactory = $executable_factory;
     $this->renderer = $renderer;
     $this->currentPath = $current_path;
+    $this->redirectDestination = $redirect_destination;
   }
 
   /**
@@ -82,7 +96,8 @@ class ViewAjaxController implements ContainerInjectionInterface {
       $container->get('entity.manager')->getStorage('view'),
       $container->get('views.executable'),
       $container->get('renderer'),
-      $container->get('path.current')
+      $container->get('path.current'),
+      $container->get('redirect.destination')
     );
   }
 
@@ -121,7 +136,7 @@ class ViewAjaxController implements ContainerInjectionInterface {
 
       // Remove all of this stuff from the query of the request so it doesn't
       // end up in pagers and tablesort URLs.
-      foreach (array('view_name', 'view_display_id', 'view_args', 'view_path', 'view_dom_id', 'pager_element', 'view_base_path', 'ajax_html_ids') as $key) {
+      foreach (array('view_name', 'view_display_id', 'view_args', 'view_path', 'view_dom_id', 'pager_element', 'view_base_path', AjaxResponseSubscriber::AJAX_REQUEST_PARAMETER) as $key) {
         $request->query->remove($key);
         $request->request->remove($key);
       }
@@ -145,27 +160,34 @@ class ViewAjaxController implements ContainerInjectionInterface {
         $request->query->replace($request_all + $query_all);
 
         // Overwrite the destination.
-        // @see drupal_get_destination()
+        // @see the redirect.destination service.
         $origin_destination = $path;
         $query = UrlHelper::buildQuery($request->query->all());
         if ($query != '') {
           $origin_destination .= '?' . $query;
         }
-        $destination = &drupal_static('drupal_get_destination');
-        $destination = array('destination' => $origin_destination);
+        $this->redirectDestination->set($origin_destination);
 
         // Override the display's pager_element with the one actually used.
         if (isset($pager_element)) {
-          $response->addCommand(new ScrollTopCommand(".view-dom-id-$dom_id"));
+          $response->addCommand(new ScrollTopCommand(".js-view-dom-id-$dom_id"));
           $view->displayHandlers->get($display_id)->setOption('pager_element', $pager_element);
         }
         // Reuse the same DOM id so it matches that in drupalSettings.
         $view->dom_id = $dom_id;
 
-        if ($preview = $view->preview($display_id, $args)) {
-          $response->addCommand(new ReplaceCommand(".view-dom-id-$dom_id", $this->renderer->render($preview)));
-          $response->setAttachments($preview['#attached']);
+        $context = new RenderContext();
+        $preview = $this->renderer->executeInRenderContext($context, function() use ($view, $display_id, $args) {
+          return $view->preview($display_id, $args);
+        });
+        if (!$context->isEmpty()) {
+          $bubbleable_metadata = $context->pop();
+          BubbleableMetadata::createFromRenderArray($preview)
+            ->merge($bubbleable_metadata)
+            ->applyTo($preview);
         }
+        $response->addCommand(new ReplaceCommand(".js-view-dom-id-$dom_id", $preview));
+
         return $response;
       }
       else {

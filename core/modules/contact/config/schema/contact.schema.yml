@@ -14,8 +14,8 @@ contact.form.*:
       type: sequence
       label: 'Recipients'
       sequence:
-        - type: email
-          label: 'Email address'
+        type: email
+        label: 'Email address'
     reply:
       type: text
       label: 'Auto-reply'
@@ -24,7 +24,7 @@ contact.form.*:
       label: 'Weight'
 
 contact.settings:
-  type: mapping
+  type: config_object
   label: 'Contact settings'
   mapping:
     default_form:
@@ -43,3 +43,14 @@ contact.settings:
     user_default_enabled:
       type: boolean
       label: 'Personal contact form enabled by default'
+
+migrate.source.d6_contact_settings:
+  type: migrate_source_sql
+  label: 'Drupal 6 contact settings'
+  mapping:
+    variables:
+      type: sequence
+      label: 'Variables'
+      sequence:
+        type: string
+        label: 'Variable'

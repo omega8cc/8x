@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Session\SessionTest.
+ * Contains \Drupal\system\Tests\Session\SessionTest.
  */
 
 namespace Drupal\system\Tests\Session;
@@ -138,17 +138,31 @@ class SessionTest extends WebTestBase {
   }
 
   /**
+   * Tests storing data in Session() object.
+   */
+  public function testSessionPersistenceOnLogin() {
+    // Store information via hook_user_login().
+    $user = $this->drupalCreateUser();
+    $this->drupalLogin($user);
+    // Test property added to session object form hook_user_login().
+    $this->drupalGet('session-test/get-from-session-object');
+    $this->assertText('foobar', 'Session data is saved in Session() object.', 'Session');
+  }
+
+  /**
    * Test that empty anonymous sessions are destroyed.
    */
   function testEmptyAnonymousSession() {
-    // Verify that no session is automatically created for anonymous user.
+    // Verify that no session is automatically created for anonymous user when
+    // page caching is disabled.
+    $this->container->get('module_installer')->uninstall(['page_cache']);
     $this->drupalGet('');
     $this->assertSessionCookie(FALSE);
     $this->assertSessionEmpty(TRUE);
 
     // The same behavior is expected when caching is enabled.
+    $this->container->get('module_installer')->install(['page_cache']);
     $config = $this->config('system.performance');
-    $config->set('cache.page.use_internal', 1);
     $config->set('cache.page.max_age', 300);
     $config->save();
     $this->drupalGet('');
@@ -276,7 +290,7 @@ class SessionTest extends WebTestBase {
     $this->loggedInUser = FALSE;
 
     // Change cookie file for user.
-    $this->cookieFile = file_stream_wrapper_get_instance_by_scheme('temporary')->getDirectoryPath() . '/cookie.' . $uid . '.txt';
+    $this->cookieFile = \Drupal::service('stream_wrapper_manager')->getViaScheme('temporary')->getDirectoryPath() . '/cookie.' . $uid . '.txt';
     $this->additionalCurlOptions[CURLOPT_COOKIEFILE] = $this->cookieFile;
     $this->additionalCurlOptions[CURLOPT_COOKIESESSION] = TRUE;
     $this->drupalGet('session-test/get');

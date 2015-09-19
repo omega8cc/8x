@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\Core\KeyValueStore\DatabaseStorage.
+ * Contains \Drupal\Core\KeyValueStore\DatabaseStorage.
  */
 
 namespace Drupal\Core\KeyValueStore;
@@ -10,6 +10,7 @@ namespace Drupal\Core\KeyValueStore;
 use Drupal\Component\Serialization\SerializationInterface;
 use Drupal\Core\Database\Query\Merge;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 
 /**
  * Defines a default key/value store implementation.
@@ -18,6 +19,8 @@ use Drupal\Core\Database\Connection;
  * to store key/value data.
  */
 class DatabaseStorage extends StorageBase {
+
+  use DependencySerializationTrait;
 
   /**
    * The serialization class to use.

@@ -7,7 +7,6 @@
 
 namespace Drupal\path\Form;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 
@@ -36,7 +35,7 @@ class EditForm extends PathFormBase {
   public function buildForm(array $form, FormStateInterface $form_state, $pid = NULL) {
     $form = parent::buildForm($form, $form_state, $pid);
 
-    $form['#title'] = String::checkPlain($this->path['alias']);
+    $form['#title'] = $this->path['alias'];
     $form['pid'] = array(
       '#type' => 'hidden',
       '#value' => $this->path['pid'],
@@ -58,7 +57,7 @@ class EditForm extends PathFormBase {
     ));
 
     if ($this->getRequest()->query->has('destination')) {
-      $url->setOption('query', drupal_get_destination());
+      $url->setOption('query', $this->getDestinationArray());
       $this->getRequest()->query->remove('destination');
     }
 

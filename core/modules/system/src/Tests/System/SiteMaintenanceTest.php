@@ -2,11 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\System\SiteMaintenanceTest.
+ * Contains \Drupal\system\Tests\System\SiteMaintenanceTest.
  */
 
 namespace Drupal\system\Tests\System;
 
+use Drupal\Core\Url;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -23,25 +24,30 @@ class SiteMaintenanceTest extends WebTestBase {
    */
   public static $modules = array('node');
 
-  protected $admin_user;
+  protected $adminUser;
 
   protected function setUp() {
     parent::setUp();
 
     // Configure 'node' as front page.
-    $this->config('system.site')->set('page.front', 'node')->save();
+    $this->config('system.site')->set('page.front', '/node')->save();
+    $this->config('system.performance')->set('js.preprocess', 1)->save();
 
     // Create a user allowed to access site in maintenance mode.
     $this->user = $this->drupalCreateUser(array('access site in maintenance mode'));
     // Create an administrative user.
-    $this->admin_user = $this->drupalCreateUser(array('administer site configuration', 'access site in maintenance mode'));
-    $this->drupalLogin($this->admin_user);
+    $this->adminUser = $this->drupalCreateUser(array('administer site configuration', 'access site in maintenance mode'));
+    $this->drupalLogin($this->adminUser);
   }
 
   /**
    * Verify site maintenance mode functionality.
    */
-  function testSiteMaintenance() {
+  protected function testSiteMaintenance() {
+    $this->drupalGet(Url::fromRoute('user.page'));
+    // JS should be aggregated, so drupal.js is not in the page source.
+    $links = $this->xpath('//script[contains(@src, :href)]', array(':href' => '/core/misc/drupal.js'));
+    $this->assertFalse(isset($links[0]), 'script /core/misc/drupal.js not in page');
     // Turn on maintenance mode.
     $edit = array(
       'maintenance_mode' => 1,
@@ -52,7 +58,10 @@ class SiteMaintenanceTest extends WebTestBase {
     $user_message = t('Operating in maintenance mode.');
     $offline_message = t('@site is currently under maintenance. We should be back shortly. Thank you for your patience.', array('@site' => $this->config('system.site')->get('name')));
 
-    $this->drupalGet('');
+    $this->drupalGet(Url::fromRoute('user.page'));
+    // JS should not be aggregated, so drupal.js is expected in the page source.
+    $links = $this->xpath('//script[contains(@src, :href)]', array(':href' => '/core/misc/drupal.js'));
+    $this->assertTrue(isset($links[0]), 'script /core/misc/drupal.js in page');
     $this->assertRaw($admin_message, 'Found the site maintenance mode message.');
 
     // Logout and verify that offline message is displayed.
@@ -81,7 +90,7 @@ class SiteMaintenanceTest extends WebTestBase {
 
     // Log in administrative user and configure a custom site offline message.
     $this->drupalLogout();
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $this->drupalGet('admin/config/development/maintenance');
     $this->assertNoRaw($admin_message, 'Site maintenance mode message not displayed.');
 

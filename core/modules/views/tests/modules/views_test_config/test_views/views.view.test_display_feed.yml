@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -18,7 +18,7 @@ display:
       access:
         type: perm
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       fields:
@@ -37,9 +37,8 @@ display:
           hide_empty: false
           id: title
           label: ''
-          link_to_node: true
           table: node_field_data
-          plugin_id: node
+          plugin_id: field
           entity_type: node
           entity_field: title
       filters:
@@ -94,6 +93,31 @@ display:
     display_plugin: feed
     display_title: Feed
     id: feed_1
+    position: 0
+  feed_2:
+    display_options:
+      displays: {  }
+      pager:
+        type: some
+      path: test-feed-display-fields.xml
+      row:
+        type: rss_fields
+        options:
+          title_field: title
+          link_field: title
+          description_field: title
+          creator_field: title
+          date_field: title
+          guid_field_options:
+            guid_field: title
+            guid_field_is_permalink: true
+      style:
+        type: rss
+      sitename_title: true
+      display_description: ''
+    display_plugin: feed
+    display_title: 'Feed with Fields'
+    id: feed_2
     position: 0
   page:
     display_options:

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Mail\MailTest.
+ * Contains \Drupal\system\Tests\Mail\MailTest.
  */
 
 namespace Drupal\system\Tests\Mail;
@@ -24,14 +24,6 @@ class MailTest extends WebTestBase {
    * @var array
    */
   public static $modules = array('simpletest', 'system_mail_failure_test');
-
-  /**
-   * The most recent message that was sent through the test case.
-   *
-   * We take advantage here of the fact that static variables are shared among
-   * all instance of the same class.
-   */
-  private static $sent_message;
 
   /**
    * Assert that the pluggable mail system is functional.

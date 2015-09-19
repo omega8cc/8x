@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -23,7 +23,7 @@ display:
       access:
         type: role
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       pager:

@@ -74,7 +74,7 @@ class ConfigSingleImportForm extends ConfirmFormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'config_single_import_form';
   }
 
@@ -107,7 +107,7 @@ class ConfigSingleImportForm extends ConfirmFormBase {
       $question = $this->t('Are you sure you want to update the %name @type?', $args);
     }
     else {
-      $question = $this->t('Are you sure you want to create new %name @type?', $args);
+      $question = $this->t('Are you sure you want to create a new %name @type?', $args);
     }
     return $question;
   }

@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -22,7 +22,7 @@ display:
       access:
         type: perm
       cache:
-        type: none
+        type: tag
       query:
         type: views_query
       exposed_form:
@@ -52,8 +52,7 @@ display:
             html: false
           hide_empty: false
           empty_zero: false
-          link_to_node: true
-          plugin_id: node
+          plugin_id: field
           entity_type: node
           entity_field: title
         timestamp:
@@ -161,8 +160,7 @@ display:
           decimal: .
           separator: ''
           format_plural: false
-          format_plural_singular: '1'
-          format_plural_plural: '@count'
+          format_plural_string: "1\x03@count"
           prefix: ''
           suffix: ''
           plugin_id: numeric
@@ -219,8 +217,7 @@ display:
           decimal: .
           separator: ''
           format_plural: false
-          format_plural_singular: '1'
-          format_plural_plural: '@count'
+          format_plural_string: "1\x03@count"
           prefix: ''
           suffix: ''
           plugin_id: numeric

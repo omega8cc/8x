@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugins\views\filter\Status.
+ * Contains \Drupal\node\Plugin\views\filter\Status.
  */
 
 namespace Drupal\node\Plugin\views\filter;
@@ -36,7 +36,7 @@ class Status extends FilterPluginBase {
   public function getCacheContexts() {
     $contexts = parent::getCacheContexts();
 
-    $contexts[] = 'cache.context.user';
+    $contexts[] = 'user';
 
     return $contexts;
   }

@@ -2,12 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\views\Tests\Plugin\ArgumentValidatorTest.
+ * Contains \Drupal\views\Tests\Plugin\ArgumentValidatorTest.
  */
 
 namespace Drupal\views\Tests\Plugin;
 
-use Drupal\views\Tests\ViewUnitTestBase;
+use Drupal\views\Tests\ViewKernelTestBase;
 use Drupal\views\Views;
 
 /**
@@ -15,7 +15,7 @@ use Drupal\views\Views;
  *
  * @group views
  */
-class ArgumentValidatorTest extends ViewUnitTestBase {
+class ArgumentValidatorTest extends ViewKernelTestBase {
 
   /**
    * Views used by this test.

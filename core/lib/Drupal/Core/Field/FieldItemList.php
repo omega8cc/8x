@@ -7,14 +7,12 @@
 
 namespace Drupal\Core\Field;
 
-use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Access\AccessResult;
+use Drupal\Core\Entity\FieldableEntityInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Session\AccountInterface;
-use Drupal\Core\TypedData\DataDefinitionInterface;
 use Drupal\Core\TypedData\Plugin\DataType\ItemList;
-use Drupal\Core\TypedData\TypedDataInterface;
 
 /**
  * Represents an entity field; that is, a list of field item objects.
@@ -98,6 +96,7 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
     $this->filter(function ($item) {
       return !$item->isEmpty();
     });
+    return $this;
   }
 
   /**
@@ -211,15 +210,9 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
   /**
    * {@inheritdoc}
    */
-  public function insert() {
-    $this->delegateMethod('insert');
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function update() {
-    $this->delegateMethod('update');
+  public function postSave($update) {
+    $result = $this->delegateMethod('postSave', $update);
+    return (bool) array_filter($result);
   }
 
   /**
@@ -239,13 +232,23 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
   /**
    * Calls a method on each FieldItem.
    *
+   * Any argument passed will be forwarded to the invoked method.
+   *
    * @param string $method
-   *   The name of the method.
+   *   The name of the method to be invoked.
+   *
+   * @return array
+   *   An array of results keyed by delta.
    */
   protected function delegateMethod($method) {
-    foreach ($this->list as $item) {
-      $item->{$method}();
+    $result = [];
+    $args = array_slice(func_get_args(), 1);
+    foreach ($this->list as $delta => $item) {
+      // call_user_func_array() is way slower than a direct call so we avoid
+      // using it if have no parameters.
+      $result[$delta] = $args ? call_user_func_array([$item, $method], $args) : $item->{$method}();
     }
+    return $result;
   }
 
   /**
@@ -313,7 +316,7 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
     $widget->extractFormValues($this, $element, $form_state);
     // Force a non-required field definition.
     // @see self::defaultValueWidget().
-    $this->definition->required = FALSE;
+    $this->getFieldDefinition()->setRequired(FALSE);
     $violations = $this->validate();
 
     // Assign reported errors to the correct form element.
@@ -353,8 +356,9 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
       $entity = $this->getEntity();
 
       // Force a non-required widget.
-      $this->getFieldDefinition()->required = FALSE;
-      $this->getFieldDefinition()->description = '';
+      $definition = $this->getFieldDefinition();
+      $definition->setRequired(FALSE);
+      $definition->setDescription('');
 
       // Use the widget currently configured for the 'default' form mode, or
       // fallback to the default widget for the field type.
@@ -368,6 +372,40 @@ class FieldItemList extends ItemList implements FieldItemListInterface {
     }
 
     return $form_state->get('default_value_widget');
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function equals(FieldItemListInterface $list_to_compare) {
+    $columns = $this->getFieldDefinition()->getFieldStorageDefinition()->getColumns();
+    $count1 = count($this);
+    $count2 = count($list_to_compare);
+    if ($count1 === 0 && $count2 === 0) {
+      // Both are empty we can safely assume that it did not change.
+      return TRUE;
+    }
+    if ($count1 !== $count2) {
+      // One of them is empty but not the other one so the value changed.
+      return FALSE;
+    }
+    $value1 = $this->getValue();
+    $value2 = $list_to_compare->getValue();
+    if ($value1 === $value2) {
+      return TRUE;
+    }
+    // If the values are not equal ensure a consistent order of field item
+    // properties and remove properties which will not be saved.
+    $callback = function (&$value) use ($columns) {
+      if (is_array($value)) {
+        $value = array_intersect_key($value, $columns);
+        ksort($value);
+      }
+    };
+    array_walk($value1, $callback);
+    array_walk($value2, $callback);
+
+    return $value1 == $value2;
   }
 
 }

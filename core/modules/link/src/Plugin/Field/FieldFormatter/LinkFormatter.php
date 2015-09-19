@@ -2,12 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\link\Plugin\field\formatter\LinkFormatter.
+ * Contains \Drupal\link\Plugin\Field\FieldFormatter\LinkFormatter.
  */
 
 namespace Drupal\link\Plugin\Field\FieldFormatter;
 
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Field\FieldDefinitionInterface;
@@ -189,8 +188,8 @@ class LinkFormatter extends FormatterBase implements ContainerFactoryPluginInter
 
       // If the title field value is available, use it for the link text.
       if (empty($settings['url_only']) && !empty($item->title)) {
-        // Unsanitized token replacement here because $options['html'] is FALSE
-        // by default in _l().
+        // Unsanitized token replacement here because the entire link title
+        // gets auto-escaped during link generation.
         $link_title = \Drupal::token()->replace($item->title, array($entity->getEntityTypeId() => $entity), array('sanitize' => FALSE, 'clear' => TRUE));
       }
 
@@ -201,7 +200,7 @@ class LinkFormatter extends FormatterBase implements ContainerFactoryPluginInter
 
       if (!empty($settings['url_only']) && !empty($settings['url_plain'])) {
         $element[$delta] = array(
-          '#markup' => String::checkPlain($link_title),
+          '#plain_text' => $link_title,
         );
 
         if (!empty($item->_attributes)) {

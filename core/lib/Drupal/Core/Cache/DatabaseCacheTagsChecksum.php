@@ -99,9 +99,15 @@ class DatabaseCacheTagsChecksum implements CacheTagsChecksumInterface, CacheTags
   }
 
   /**
-   * {@inheritdoc}
+   * Calculates the current checksum for a given set of tags.
+   *
+   * @param array $tags
+   *   The array of tags to calculate the checksum for.
+   *
+   * @return int
+   *   The calculated checksum.
    */
-  public function calculateChecksum(array $tags) {
+  protected function calculateChecksum(array $tags) {
     $checksum = 0;
 
     $query_tags = array_diff($tags, array_keys($this->tagCache));
@@ -169,7 +175,7 @@ class DatabaseCacheTagsChecksum implements CacheTagsChecksumInterface, CacheTags
       'fields' => array(
         'tag' => array(
           'description' => 'Namespace-prefixed tag string.',
-          'type' => 'varchar',
+          'type' => 'varchar_ascii',
           'length' => 255,
           'not null' => TRUE,
           'default' => '',

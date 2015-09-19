@@ -25,7 +25,7 @@ display:
         options:
           perm: 'access content'
       cache:
-        type: none
+        type: tag
         options: {  }
       query:
         type: views_query
@@ -97,7 +97,6 @@ display:
             html: false
           hide_empty: false
           empty_zero: false
-          link_to_node: true
           relationship: none
           group_type: group
           admin_label: ''
@@ -112,7 +111,7 @@ display:
           element_default_classes: true
           empty: ''
           hide_alter_empty: true
-          plugin_id: node
+          plugin_id: field
           entity_type: node
           entity_field: title
       filters:
@@ -177,3 +176,11 @@ display:
       empty: {  }
       relationships: {  }
       arguments: {  }
+  page_1:
+    display_plugin: page
+    id: page_1
+    display_title: Page
+    position: 2
+    display_options:
+      display_extenders: {  }
+      path: test-filter-taxonomy-index-tid

@@ -82,7 +82,7 @@ class AggregatorController extends ControllerBase {
     if ($items) {
       $build['items'] = $this->entityManager()->getViewBuilder('aggregator_item')
         ->viewMultiple($items, 'default');
-      $build['pager'] = array('#theme' => 'pager');
+      $build['pager'] = array('#type' => 'pager');
     }
     return $build;
   }
@@ -124,11 +124,21 @@ class AggregatorController extends ControllerBase {
     foreach ($feeds as $feed) {
       $row = array();
       $row[] = $feed->link();
-      $row[] = $this->dateFormatter->formatInterval($entity_manager->getStorage('aggregator_item')->getItemCount($feed), '1 item', '@count items');
+      $row[] = $this->formatPlural($entity_manager->getStorage('aggregator_item')->getItemCount($feed), '1 item', '@count items');
       $last_checked = $feed->getLastCheckedTime();
       $refresh_rate = $feed->getRefreshRate();
+
       $row[] = ($last_checked ? $this->t('@time ago', array('@time' => $this->dateFormatter->formatInterval(REQUEST_TIME - $last_checked))) : $this->t('never'));
-      $row[] = ($last_checked && $refresh_rate ? $this->t('%time left', array('%time' => $this->dateFormatter->formatInterval($last_checked + $refresh_rate - REQUEST_TIME))) : $this->t('never'));
+      if (!$last_checked && $refresh_rate) {
+        $next_update = $this->t('imminently');
+      }
+      elseif ($last_checked && $refresh_rate) {
+        $next_update = $next = $this->t('%time left', array('%time' => $this->dateFormatter->formatInterval($last_checked + $refresh_rate - REQUEST_TIME)));
+      }
+      else {
+        $next_update = $this->t('never');
+      }
+      $row[] = $next_update;
       $links['edit'] = [
         'title' => $this->t('Edit'),
         'url' => Url::fromRoute('entity.aggregator_feed.edit_form', ['aggregator_feed' => $feed->id()]),
@@ -183,11 +193,11 @@ class AggregatorController extends ControllerBase {
    * @param \Drupal\aggregator\FeedInterface $aggregator_feed
    *   The aggregator feed.
    *
-   * @return string
-   *   The feed label.
+   * @return array
+   *   The feed label as a render array.
    */
   public function feedTitle(FeedInterface $aggregator_feed) {
-    return Xss::filter($aggregator_feed->label());
+    return ['#markup' => $aggregator_feed->label(), '#allowed_tags' => Xss::getHtmlTagList()];
   }
 
 }

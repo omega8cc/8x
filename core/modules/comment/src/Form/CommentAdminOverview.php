@@ -15,7 +15,6 @@ use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
-use Drupal\Core\Url;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -85,7 +84,7 @@ class CommentAdminOverview extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'comment_admin_overview';
   }
 
@@ -167,7 +166,7 @@ class CommentAdminOverview extends FormBase {
 
     // Build a table listing the appropriate comments.
     $options = array();
-    $destination = drupal_get_destination();
+    $destination = $this->getDestinationArray();
 
     $commented_entity_ids = array();
     $commented_entities = array();
@@ -183,18 +182,12 @@ class CommentAdminOverview extends FormBase {
     foreach ($comments as $comment) {
       /** @var $commented_entity \Drupal\Core\Entity\EntityInterface */
       $commented_entity = $commented_entities[$comment->getCommentedEntityTypeId()][$comment->getCommentedEntityId()];
-      $username = array(
-        '#theme' => 'username',
-        '#account' => comment_prepare_author($comment),
-      );
-      $body = '';
-      if (!empty($comment->comment_body->value)) {
-        $body = $comment->comment_body->value;
-      }
       $comment_permalink = $comment->permalink();
-      $attributes = $comment_permalink->getOption('attributes') ?: array();
-      $attributes += array('title' => Unicode::truncate($body, 128));
-      $comment_permalink->setOption('attributes', $attributes);
+      if ($comment->hasField('comment_body') && ($body = $comment->get('comment_body')->value)) {
+        $attributes = $comment_permalink->getOption('attributes') ?: array();
+        $attributes += array('title' => Unicode::truncate($body, 128));
+        $comment_permalink->setOption('attributes', $attributes);
+      }
       $options[$comment->id()] = array(
         'title' => array('data' => array('#title' => $comment->getSubject() ?: $comment->id())),
         'subject' => array(
@@ -204,7 +197,12 @@ class CommentAdminOverview extends FormBase {
             '#url' => $comment_permalink,
           ),
         ),
-        'author' => drupal_render($username),
+        'author' => array(
+          'data' => array(
+            '#theme' => 'username',
+            '#account' => $comment->getOwner(),
+          ),
+        ),
         'posted_in' => array(
           'data' => array(
             '#type' => 'link',
@@ -213,18 +211,18 @@ class CommentAdminOverview extends FormBase {
             '#url' => $commented_entity->urlInfo(),
           ),
         ),
-        'changed' => $this->dateFormatter->format($comment->getChangedTime(), 'short'),
+        'changed' => $this->dateFormatter->format($comment->getChangedTimeAcrossTranslations(), 'short'),
       );
-      $comment_uri_options = $comment->urlInfo()->getOptions();
+      $comment_uri_options = $comment->urlInfo()->getOptions() + ['query' => $destination];
       $links = array();
       $links['edit'] = array(
         'title' => $this->t('Edit'),
-        'url' => Url::fromRoute('entity.comment.edit_form', ['comment' => $comment->id()], $comment_uri_options + ['query' => $destination]),
+        'url' => $comment->urlInfo('edit-form', $comment_uri_options),
       );
       if ($this->moduleHandler->moduleExists('content_translation') && $this->moduleHandler->invoke('content_translation', 'translate_access', array($comment))->isAllowed()) {
         $links['translate'] = array(
           'title' => $this->t('Translate'),
-          'url' => Url::fromRoute('entity.comment.content_translation_overview', ['comment' => $comment->id()], $comment_uri_options + ['query' => $destination]),
+          'url' => $comment->urlInfo('drupal:content-translation-overview', $comment_uri_options),
         );
       }
       $options[$comment->id()]['operations']['data'] = array(
@@ -240,7 +238,7 @@ class CommentAdminOverview extends FormBase {
       '#empty' => $this->t('No comments available.'),
     );
 
-    $form['pager'] = array('#theme' => 'pager');
+    $form['pager'] = array('#type' => 'pager');
 
     return $form;
   }

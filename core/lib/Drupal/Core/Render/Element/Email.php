@@ -13,6 +13,19 @@ use Drupal\Core\Render\Element;
 /**
  * Provides a form input element for entering an email address.
  *
+ * Properties:
+ * - #default_value: An RFC-compliant email address.
+ *
+ * Example usage:
+ * @code
+ * $form['email'] = array(
+ *   '#type' => 'email',
+ *   '#title' => t('Email'),
+ * );
+ * @end
+ *
+ * @see \Drupal\Core\Render\Element\Render\Textfield
+ *
  * @FormElement("email")
  */
 class Email extends FormElement {
@@ -64,7 +77,7 @@ class Email extends FormElement {
     $value = trim($element['#value']);
     $form_state->setValueForElement($element, $value);
 
-    if ($value !== '' && !valid_email_address($value)) {
+    if ($value !== '' && !\Drupal::service('email.validator')->isValid($value)) {
       $form_state->setError($element, t('The email address %mail is not valid.', array('%mail' => $value)));
     }
   }

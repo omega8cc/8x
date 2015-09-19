@@ -29,13 +29,13 @@ trait CommandWithAttachedAssetsTrait {
    * If content is a render array, it may contain attached assets to be
    * processed.
    *
-   * @return string
+   * @return string|\Drupal\Component\Utility\SafeStringInterface
    *   HTML rendered content.
    */
   protected function getRenderedContent() {
     $this->attachedAssets = new AttachedAssets();
     if (is_array($this->content)) {
-      $html = \Drupal::service('renderer')->render($this->content);
+      $html = \Drupal::service('renderer')->renderRoot($this->content);
       $this->attachedAssets = AttachedAssets::createFromRenderArray($this->content);
       return $html;
     }

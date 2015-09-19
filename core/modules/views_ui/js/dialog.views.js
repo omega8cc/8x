@@ -1,3 +1,8 @@
+/**
+ * @file
+ * Views dialog behaviors.
+ */
+
 (function ($, Drupal, drupalSettings) {
 
   "use strict";
@@ -8,7 +13,7 @@
     var $scroll = $modal.find('[data-drupal-views-scroll]');
     var offset = 0;
     var modalHeight;
-    if ($viewsOverride.length && $scroll.length) {
+    if ($scroll.length) {
       // Add a class to do some styles adjustments.
       $modal.closest('.views-ui-dialog').addClass('views-ui-dialog-scroll');
       // Let scroll element take all the height available.
@@ -25,6 +30,16 @@
     }
   }
 
+  /**
+   * Functionality for views modals.
+   *
+   * @type {Drupal~behavior}
+   *
+   * @prop {Drupal~behaviorAttach} attach
+   *   Attaches modal functionality for views.
+   * @prop {Drupal~behaviorDetach} detach
+   *   Detaches the modal functionality.
+   */
   Drupal.behaviors.viewsModalContent = {
     attach: function (context) {
       $('body').once('viewsDialog').on('dialogContentResize.viewsDialog', '.ui-dialog-content', handleDialogResize);

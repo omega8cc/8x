@@ -5,8 +5,11 @@
  * Builds placeholder replacement tokens for comment-related data.
  */
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Datetime\Entity\DateFormat;
+use Drupal\Core\Render\BubbleableMetadata;
 
 /**
  * Implements hook_token_info().
@@ -18,7 +21,7 @@ function comment_token_info() {
     'needs-data' => 'comment',
   );
 
-  // @todo Make this work per field. See http://drupal.org/node/2031903
+  // @todo Make this work per field. See https://www.drupal.org/node/2031903.
   $entity['comment-count'] = array(
     'name' => t("Comment count"),
     'description' => t("The number of comments posted on an entity."),
@@ -105,7 +108,7 @@ function comment_token_info() {
 /**
  * Implements hook_tokens().
  */
-function comment_tokens($type, $tokens, array $data = array(), array $options = array()) {
+function comment_tokens($type, $tokens, array $data, array $options, BubbleableMetadata $bubbleable_metadata) {
   $token_service = \Drupal::token();
 
   $url_options = array('absolute' => TRUE);
@@ -133,16 +136,21 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
 
         // Poster identity information for comments.
         case 'hostname':
-          $replacements[$original] = $sanitize ? String::checkPlain($comment->getHostname()) : $comment->getHostname();
+          $replacements[$original] = $sanitize ? Html::escape($comment->getHostname()) : $comment->getHostname();
           break;
 
         case 'mail':
           $mail = $comment->getAuthorEmail();
-          $replacements[$original] = $sanitize ? String::checkPlain($mail) : $mail;
+          // Add the user cacheability metadata in case the author of the comment
+          // is not the anonymous user.
+          if ($comment->getOwnerId()) {
+            $bubbleable_metadata->addCacheableDependency($comment->getOwner());
+          }
+          $replacements[$original] = $sanitize ? Html::escape($mail) : $mail;
           break;
 
         case 'homepage':
-          $replacements[$original] = $sanitize ? check_url($comment->getHomepage()) : $comment->getHomepage();
+          $replacements[$original] = $sanitize ? UrlHelper::filterBadProtocol($comment->getHomepage()) : $comment->getHomepage();
           break;
 
         case 'title':
@@ -154,7 +162,7 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
           break;
 
         case 'langcode':
-          $replacements[$original] = $sanitize ? String::checkPlain($comment->language()->getId()) : $comment->language()->getId();
+          $replacements[$original] = $sanitize ? Html::escape($comment->language()->getId()) : $comment->language()->getId();
           break;
 
         // Comment related URLs.
@@ -170,26 +178,37 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
 
         case 'author':
           $name = $comment->getAuthorName();
+          // Add the user cacheability metadata in case the author of the comment
+          // is not the anonymous user.
+          if ($comment->getOwnerId()) {
+            $bubbleable_metadata->addCacheableDependency($comment->getOwner());
+          }
           $replacements[$original] = $sanitize ? Xss::filter($name) : $name;
           break;
 
         case 'parent':
           if ($comment->hasParentComment()) {
             $parent = $comment->getParentComment();
+            $bubbleable_metadata->addCacheableDependency($parent);
             $replacements[$original] = $sanitize ? Xss::filter($parent->getSubject()) : $parent->getSubject();
           }
           break;
 
         case 'created':
+          $date_format = DateFormat::load('medium');
+          $bubbleable_metadata->addCacheableDependency($date_format);
           $replacements[$original] = format_date($comment->getCreatedTime(), 'medium', '', NULL, $langcode);
           break;
 
         case 'changed':
+          $date_format = DateFormat::load('medium');
+          $bubbleable_metadata->addCacheableDependency($date_format);
           $replacements[$original] = format_date($comment->getChangedTime(), 'medium', '', NULL, $langcode);
           break;
 
         case 'entity':
           $entity = $comment->getCommentedEntity();
+          $bubbleable_metadata->addCacheableDependency($entity);
           $title = $entity->label();
           $replacements[$original] = $sanitize ? Xss::filter($title) : $title;
           break;
@@ -199,23 +218,23 @@ function comment_tokens($type, $tokens, array $data = array(), array $options = 
     // Chained token relationships.
     if ($entity_tokens = $token_service->findwithPrefix($tokens, 'entity')) {
       $entity = $comment->getCommentedEntity();
-      $replacements += $token_service->generate($comment->getCommentedEntityTypeId(), $entity_tokens, array($comment->getCommentedEntityTypeId() => $entity), $options);
+      $replacements += $token_service->generate($comment->getCommentedEntityTypeId(), $entity_tokens, array($comment->getCommentedEntityTypeId() => $entity), $options, $bubbleable_metadata);
     }
 
     if ($date_tokens = $token_service->findwithPrefix($tokens, 'created')) {
-      $replacements += $token_service->generate('date', $date_tokens, array('date' => $comment->getCreatedTime()), $options);
+      $replacements += $token_service->generate('date', $date_tokens, array('date' => $comment->getCreatedTime()), $options, $bubbleable_metadata);
     }
 
     if ($date_tokens = $token_service->findwithPrefix($tokens, 'changed')) {
-      $replacements += $token_service->generate('date', $date_tokens, array('date' => $comment->getChangedTime()), $options);
+      $replacements += $token_service->generate('date', $date_tokens, array('date' => $comment->getChangedTime()), $options, $bubbleable_metadata);
     }
 
     if (($parent_tokens = $token_service->findwithPrefix($tokens, 'parent')) && $parent = $comment->getParentComment()) {
-      $replacements += $token_service->generate('comment', $parent_tokens, array('comment' => $parent), $options);
+      $replacements += $token_service->generate('comment', $parent_tokens, array('comment' => $parent), $options, $bubbleable_metadata);
     }
 
     if (($author_tokens = $token_service->findwithPrefix($tokens, 'author')) && $account = $comment->getOwner()) {
-      $replacements += $token_service->generate('user', $author_tokens, array('user' => $account), $options);
+      $replacements += $token_service->generate('user', $author_tokens, array('user' => $account), $options, $bubbleable_metadata);
     }
   }
   elseif ($type == 'entity' & !empty($data['entity'])) {

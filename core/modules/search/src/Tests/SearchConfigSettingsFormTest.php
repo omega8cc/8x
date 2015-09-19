@@ -58,6 +58,7 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
 
     // Enable the search block.
     $this->drupalPlaceBlock('search_form_block');
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -218,7 +219,8 @@ class SearchConfigSettingsFormTest extends SearchTestBase {
     $this->drupalGet('search');
     $elements = $this->xpath('//*[contains(@class, :class)]//a', array(':class' => 'tabs primary'));
     $this->assertIdentical((string) $elements[0]['href'], \Drupal::url('search.view_node_search'));
-    $this->assertIdentical((string) $elements[1]['href'], \Drupal::url('search.view_user_search'));
+    $this->assertIdentical((string) $elements[1]['href'], \Drupal::url('search.view_dummy_search_type'));
+    $this->assertIdentical((string) $elements[2]['href'], \Drupal::url('search.view_user_search'));
   }
 
   /**

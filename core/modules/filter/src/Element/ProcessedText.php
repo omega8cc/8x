@@ -14,6 +14,7 @@ use Drupal\Core\Render\Element\RenderElement;
 use Drupal\Core\Render\Renderer;
 use Drupal\filter\Entity\FilterFormat;
 use Drupal\filter\Plugin\FilterInterface;
+use Drupal\filter\Render\FilteredString;
 
 /**
  * Provides a processed text render element.
@@ -77,10 +78,13 @@ class ProcessedText extends RenderElement {
     if (!isset($format_id)) {
       $format_id = static::configFactory()->get('filter.settings')->get('fallback_format');
     }
-    // If the requested text format does not exist, the text cannot be filtered.
     /** @var \Drupal\filter\Entity\FilterFormat $format **/
-    if (!$format = FilterFormat::load($format_id)) {
-      static::logger('filter')->alert('Missing text format: %format.', array('%format' => $format_id));
+    $format = FilterFormat::load($format_id);
+    // If the requested text format doesn't exist or its disabled, the text
+    // cannot be filtered.
+    if (!$format || !$format->status()) {
+      $message = !$format ? 'Missing text format: %format.' : 'Disabled text format: %format.';
+      static::logger('filter')->alert($message, array('%format' => $format_id));
       $element['#markup'] = '';
       return $element;
     }
@@ -113,14 +117,20 @@ class ProcessedText extends RenderElement {
     foreach ($filters as $filter) {
       if ($filter_must_be_applied($filter)) {
         $result = $filter->process($text, $langcode);
-        $metadata = $metadata->merge($result->getBubbleableMetadata());
+        $metadata = $metadata->merge($result);
         $text = $result->getProcessedText();
       }
     }
 
-    // Filtering done, store in #markup, set the updated bubbleable rendering
-    // metadata, and set the text format's cache tag.
-    $element['#markup'] = $text;
+    // Filtering and sanitizing have been done in
+    // \Drupal\filter\Plugin\FilterInterface. $text is not guaranteed to be
+    // safe, but it has been passed through the filter system and checked with
+    // a text format, so it must be printed as is. (See the note about security
+    // in the method documentation above.)
+    $element['#markup'] = FilteredString::create($text);
+
+    // Set the updated bubbleable rendering metadata and the text format's
+    // cache tag.
     $metadata->applyTo($element);
     $element['#cache']['tags'] = Cache::mergeTags($element['#cache']['tags'], $format->getCacheTags());
 

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\taxonomy\Tests\RssTest.
+ * Contains \Drupal\taxonomy\Tests\RssTest.
  */
 
 namespace Drupal\taxonomy\Tests;
@@ -46,25 +46,14 @@ class RssTest extends TaxonomyTestBase {
     $this->vocabulary = $this->createVocabulary();
     $this->fieldName = 'taxonomy_' . $this->vocabulary->id();
 
-    $field_storage = entity_create('field_storage_config', array(
-      'field_name' => $this->fieldName,
-      'entity_type' => 'node',
-      'type' => 'taxonomy_term_reference',
-      'cardinality' => FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED,
-      'settings' => array(
-        'allowed_values' => array(
-          array(
-            'vocabulary' => $this->vocabulary->id(),
-            'parent' => 0,
-          ),
-        ),
+    $handler_settings = array(
+      'target_bundles' => array(
+        $this->vocabulary->id() => $this->vocabulary->id(),
       ),
-    ));
-    $field_storage->save();
-    entity_create('field_config', array(
-      'field_storage' => $field_storage,
-      'bundle' => 'article',
-    ))->save();
+      'auto_create' => TRUE,
+    );
+    $this->createEntityReferenceField('node', 'article', $this->fieldName, NULL, 'taxonomy_term', 'default', $handler_settings, FieldStorageDefinitionInterface::CARDINALITY_UNLIMITED);
+
     entity_get_form_display('node', 'article', 'default')
       ->setComponent($this->fieldName, array(
         'type' => 'options_select',
@@ -72,7 +61,7 @@ class RssTest extends TaxonomyTestBase {
       ->save();
     entity_get_display('node', 'article', 'default')
       ->setComponent($this->fieldName, array(
-        'type' => 'taxonomy_term_reference_link',
+        'type' => 'entity_reference_label',
       ))
       ->save();
   }
@@ -96,7 +85,7 @@ class RssTest extends TaxonomyTestBase {
     // Change the format to 'RSS category'.
     $this->drupalGet("admin/structure/types/manage/article/display/rss");
     $edit = array(
-      "fields[taxonomy_" . $this->vocabulary->id() . "][type]" => 'taxonomy_term_reference_rss_category',
+      "fields[taxonomy_" . $this->vocabulary->id() . "][type]" => 'entity_reference_rss_category',
     );
     $this->drupalPostForm(NULL, $edit, t('Save'));
 
@@ -108,14 +97,16 @@ class RssTest extends TaxonomyTestBase {
 
     // Check that the term is displayed when the RSS feed is viewed.
     $this->drupalGet('rss.xml');
-    $test_element = array(
-      'key' => 'category',
-      'value' => $term1->getName(),
-      'attributes' => array(
-        'domain' => $term1->url('canonical', array('absolute' => TRUE)),
-      ),
+    $test_element = sprintf(
+      '<category %s>%s</category>',
+      'domain="' . $term1->url('canonical', array('absolute' => TRUE)) . '"',
+      $term1->getName()
     );
-    $this->assertRaw(format_xml_elements(array($test_element)), 'Term is displayed when viewing the rss feed.');
+    $this->assertRaw($test_element, 'Term is displayed when viewing the rss feed.');
+
+    // Test that the feed icon exists for the term.
+    $this->drupalGet("taxonomy/term/{$term1->id()}");
+    $this->assertLinkByHref("taxonomy/term/{$term1->id()}/feed");
 
     // Test that the feed page exists for the term.
     $this->drupalGet("taxonomy/term/{$term1->id()}/feed");
@@ -132,12 +123,9 @@ class RssTest extends TaxonomyTestBase {
     $view->storage->save();
     // Check the article is shown in the feed.
     $node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
-    $raw_xml = format_xml_elements([[
-      'key' => 'title',
-      'value' => $node->label(),
-    ]]);
+    $raw_xml = '<title>' . $node->label() . '</title>';
     $this->drupalGet('taxonomy/term/all/feed');
-    $this->assertRaw($raw_xml);
+    $this->assertRaw($raw_xml, "Raw text '$raw_xml' is found.");
     // Unpublish the article and check that it is not shown in the feed.
     $node->setPublished(FALSE)->save();
     $this->drupalGet('taxonomy/term/all/feed');

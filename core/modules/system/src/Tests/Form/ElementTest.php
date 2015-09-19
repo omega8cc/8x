@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Form\ElementTest.
+ * Contains \Drupal\system\Tests\Form\ElementTest.
  */
 
 namespace Drupal\system\Tests\Form;
@@ -150,6 +150,9 @@ class ElementTest extends WebTestBase {
     $user = $this->drupalCreateUser(array('access autocomplete test'));
     $this->drupalLogin($user);
     $this->drupalGet('form-test/autocomplete');
+
+    // Make sure that the autocomplete library is added.
+    $this->assertRaw('core/misc/autocomplete.js');
 
     $result = $this->xpath('//input[@id="edit-autocomplete-1" and contains(@data-autocomplete-path, "form-test/autocomplete-1")]');
     $this->assertEqual(count($result), 1, 'Ensure that the user does have access to the autocompletion');

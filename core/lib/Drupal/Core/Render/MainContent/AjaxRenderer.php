@@ -71,7 +71,7 @@ class AjaxRenderer implements MainContentRendererInterface {
     // replace the element making the Ajax call. The default 'replaceWith'
     // behavior can be changed with #ajax['method'].
     $response->addCommand(new InsertCommand(NULL, $html));
-    $status_messages = array('#theme' => 'status_messages');
+    $status_messages = array('#type' => 'status_messages');
     $output = $this->drupalRenderRoot($status_messages);
     if (!empty($output)) {
       $response->addCommand(new PrependCommand(NULL, $output));
@@ -82,7 +82,7 @@ class AjaxRenderer implements MainContentRendererInterface {
   /**
    * Wraps drupal_render_root().
    *
-   * @todo: Remove as part of https://drupal.org/node/2182149
+   * @todo Remove as part of https://www.drupal.org/node/2182149.
    */
   protected function drupalRenderRoot(&$elements) {
     return drupal_render_root($elements);

@@ -7,9 +7,10 @@
 
 namespace Drupal\filter;
 
-use Drupal\Component\Utility\NestedArray;
-use Drupal\Core\Cache\Cache;
+use Drupal\Component\Utility\Html;
+use Drupal\Component\Utility\UrlHelper;
 use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\Template\Attribute;
 
 /**
  * Used to return values from a text filter plugin's processing method.
@@ -17,11 +18,14 @@ use Drupal\Core\Render\BubbleableMetadata;
  * The typical use case for a text filter plugin's processing method is to just
  * apply some filtering to the given text, but for more advanced use cases,
  * it may be necessary to also:
- * 1. declare asset libraries to be loaded;
- * 2. declare cache tags that the filtered text depends upon, so when either of
+ * - Declare asset libraries to be loaded.
+ * - Declare cache tags that the filtered text depends upon, so when either of
  *   those cache tags is invalidated, the filtered text should also be
- *   invalidated;
- * 3. apply uncacheable filtering, for example because it differs per user.
+ *   invalidated.
+ * - Declare cache context to vary by, e.g. 'language' to do language-specific
+ *   filtering.
+ * - Declare a maximum age for the filtered text.
+ * - Apply uncacheable filtering, for example because it differs per user.
  *
  * In case a filter needs one or more of these advanced use cases, it can use
  * the additional methods available.
@@ -43,20 +47,26 @@ use Drupal\Core\Render\BubbleableMetadata;
  *   $result = new FilterProcess($text);
  *
  *   // Associate assets to be attached.
- *   $result->setAssets(array(
+ *   $result->setAttachments(array(
  *     'library' => array(
  *        'filter/caption',
  *     ),
  *   ));
  *
+ *   // Associate cache contexts to vary by.
+ *   $result->setCacheContexts(['language']);
+ *
  *   // Associate cache tags to be invalidated by.
  *   $result->setCacheTags($node->getCacheTags());
+ *
+ *   // Associate a maximum age.
+ *   $result->setCacheMaxAge(300); // 5 minutes.
  *
  *   return $result;
  * }
  * @endcode
  */
-class FilterProcessResult {
+class FilterProcessResult extends BubbleableMetadata {
 
   /**
    * The processed text.
@@ -68,40 +78,6 @@ class FilterProcessResult {
   protected $processedText;
 
   /**
-   * An array of associated assets to be attached.
-   *
-   * @see drupal_process_attached()
-   *
-   * @var array
-   */
-  protected $assets;
-
-  /**
-   * The attached cache tags.
-   *
-   * @see drupal_render_collect_cache_tags()
-   *
-   * @var array
-   */
-  protected $cacheTags;
-
-  /**
-   * The associated cache contexts.
-   *
-   * @var string[]
-   */
-  protected $cacheContexts;
-
-  /**
-   * The associated #post_render_cache callbacks.
-   *
-   * @see _drupal_render_process_post_render_cache()
-   *
-   * @var array
-   */
-  protected $postRenderCacheCallbacks;
-
-  /**
    * Constructs a FilterProcessResult object.
    *
    * @param string $processed_text
@@ -109,11 +85,6 @@ class FilterProcessResult {
    */
   public function __construct($processed_text) {
     $this->processedText = $processed_text;
-
-    $this->assets = array();
-    $this->cacheTags = array();
-    $this->cacheContexts = array();
-    $this->postRenderCacheCallbacks = array();
   }
 
   /**
@@ -148,162 +119,45 @@ class FilterProcessResult {
   }
 
   /**
-   * Gets cache tags associated with the processed text.
+   * Creates a placeholder.
    *
-   * @return array
-   */
-  public function getCacheTags() {
-    return $this->cacheTags;
-  }
-
-  /**
-   * Adds cache tags associated with the processed text.
-   *
-   * @param array $cache_tags
-   *   The cache tags to be added.
-   *
-   * @return $this
-   */
-  public function addCacheTags(array $cache_tags) {
-    $this->cacheTags = Cache::mergeTags($this->cacheTags, $cache_tags);
-    return $this;
-  }
-
-  /**
-   * Sets cache tags associated with the processed text.
-   *
-   * @param array $cache_tags
-   *   The cache tags to be associated.
-   *
-   * @return $this
-   */
-  public function setCacheTags(array $cache_tags) {
-    $this->cacheTags = $cache_tags;
-    return $this;
-  }
-
-  /**
-   * Gets cache contexts associated with the processed text.
-   *
-   * @return string[]
-   */
-  public function getCacheContexts() {
-    return $this->cacheContexts;
-  }
-
-  /**
-   * Adds cache contexts associated with the processed text.
-   *
-   * @param string[] $cache_contexts
-   *   The cache contexts to be added.
-   *
-   * @return $this
-   */
-  public function addCacheContexts(array $cache_contexts) {
-    $this->cacheContexts = Cache::mergeContexts($this->cacheContexts, $cache_contexts);
-    return $this;
-  }
-
-  /**
-   * Sets cache contexts associated with the processed text.
-   *
-   * @param string[] $cache_contexts
-   *   The cache contexts to be associated.
-   *
-   * @return $this
-   */
-  public function setCacheContexts(array $cache_contexts) {
-    $this->cacheContexts = $cache_contexts;
-    return $this;
-  }
-
-  /**
-   * Gets assets associated with the processed text.
-   *
-   * @return array
-   */
-  public function getAssets() {
-    return $this->assets;
-  }
-
-  /**
-   * Adds assets associated with the processed text.
-   *
-   * @param array $assets
-   *   The associated assets to be attached.
-   *
-   * @return $this
-   */
-  public function addAssets(array $assets) {
-    $this->assets = NestedArray::mergeDeep($this->assets, $assets);
-    return $this;
-  }
-
-  /**
-   * Sets assets associated with the processed text.
-   *
-   * @param array $assets
-   *   The associated assets to be attached.
-   *
-   * @return $this
-   */
-  public function setAssets(array $assets) {
-    $this->assets = $assets;
-    return $this;
-  }
-
-  /**
-   * Gets #post_render_cache callbacks associated with the processed text.
-   *
-   * @return array
-   */
-  public function getPostRenderCacheCallbacks() {
-    return $this->postRenderCacheCallbacks;
-  }
-
-  /**
-   * Adds #post_render_cache callbacks associated with the processed text.
+   * This generates its own placeholder markup for one major reason: to not have
+   * FilterProcessResult depend on the Renderer service, because this is a value
+   * object. As a side-effect and added benefit, this makes it easier to
+   * distinguish placeholders for filtered text versus generic render system
+   * placeholders.
    *
    * @param string $callback
-   *   The #post_render_cache callback that will replace the placeholder with
-   *   its eventual markup.
-   * @param array $context
-   *   An array providing context for the #post_render_cache callback.
+   *   The #lazy_builder callback that will replace the placeholder with its
+   *   eventual markup.
+   * @param array $args
+   *   The arguments for the #lazy_builder callback.
    *
-   * @see drupal_render_cache_generate_placeholder()
-   *
-   * @return $this
+   * @return string
+   *   The placeholder markup.
    */
-  public function addPostRenderCacheCallback($callback, array $context) {
-    $this->postRenderCacheCallbacks[$callback][] = $context;
-    return $this;
-  }
+  public function createPlaceholder($callback, array $args) {
+    // Generate placeholder markup.
+    // @see \Drupal\Core\Render\Renderer::createPlaceholder()
+    $attributes = new Attribute();
+    $attributes['callback'] = $callback;
+    $attributes['arguments'] = UrlHelper::buildQuery($args);
+    $attributes['token'] = hash('sha1', serialize([$callback, $args]));
+    $placeholder_markup = Html::normalize('<drupal-filter-placeholder' . $attributes . '></drupal-filter-placeholder>');
 
-  /**
-   * Sets #post_render_cache callbacks associated with the processed text.
-   *
-   * @param array $post_render_cache_callbacks
-   *   The associated #post_render_cache callbacks to be executed.
-   *
-   * @return $this
-   */
-  public function setPostRenderCacheCallbacks(array $post_render_cache_callbacks) {
-    $this->postRenderCacheCallbacks = $post_render_cache_callbacks;
-    return $this;
-  }
+    // Add the placeholder attachment.
+    $this->addAttachments([
+      'placeholders' => [
+        $placeholder_markup => [
+          '#lazy_builder' => [$callback, $args],
+        ]
+      ],
+    ]);
 
-  /**
-   * Returns the attached asset libraries, etc. as a bubbleable metadata object.
-   *
-   * @return \Drupal\Core\Render\BubbleableMetadata
-   */
-  public function getBubbleableMetadata() {
-    return new BubbleableMetadata(
-      $this->getCacheContexts(),
-      $this->getCacheTags(),
-      $this->getAssets(),
-      $this->getPostRenderCacheCallbacks()
-    );
+    // Return the placeholder markup, so that the filter wanting to use a
+    // placeholder can actually insert the placeholder markup where it needs the
+    // placeholder to be replaced.
+    return $placeholder_markup;
   }
 
 }

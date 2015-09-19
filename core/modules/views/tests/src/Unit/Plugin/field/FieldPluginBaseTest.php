@@ -57,7 +57,6 @@ class FieldPluginBaseTest extends UnitTestCase {
     'alias' => FALSE,
     'entity' => NULL,
     'entity_type' => NULL,
-    'html' => TRUE,
     'language' => NULL,
     'query' => [],
     'set_active_class' => FALSE,
@@ -169,20 +168,12 @@ class FieldPluginBaseTest extends UnitTestCase {
    * Sets up the unrouted url assembler and the link generator.
    */
   protected function setUpUrlIntegrationServices() {
-    $config = $this->getMockBuilder('Drupal\Core\Config\ImmutableConfig')
-      ->disableOriginalConstructor()
-      ->getMock();
-    $config_factory = $this->getMock('\Drupal\Core\Config\ConfigFactoryInterface');
-    $config_factory->expects($this->any())
-      ->method('get')
-      ->willReturn($config);
-
     $this->pathProcessor = $this->getMock('Drupal\Core\PathProcessor\OutboundPathProcessorInterface');
-    $this->unroutedUrlAssembler = new UnroutedUrlAssembler($this->requestStack, $config_factory, $this->pathProcessor);
+    $this->unroutedUrlAssembler = new UnroutedUrlAssembler($this->requestStack, $this->pathProcessor);
 
     \Drupal::getContainer()->set('unrouted_url_assembler', $this->unroutedUrlAssembler);
 
-    $this->linkGenerator = new LinkGenerator($this->urlGenerator, $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface'));
+    $this->linkGenerator = new LinkGenerator($this->urlGenerator, $this->getMock('Drupal\Core\Extension\ModuleHandlerInterface'), $this->renderer);
   }
 
   /**
@@ -454,6 +445,7 @@ class FieldPluginBaseTest extends UnitTestCase {
       '#type' => 'inline_template',
       '#template' => 'base:test-path/' . explode('/', $path)[1],
       '#context' => ['foo' => 123],
+      '#post_render' => [function() {}],
     ];
 
     $this->renderer->expects($this->once())
@@ -493,12 +485,12 @@ class FieldPluginBaseTest extends UnitTestCase {
   /**
    * Sets up a test field.
    *
-   * @return \Drupal\Tests\views\Unit\Plugin\field\TestField|\PHPUnit_Framework_MockObject_MockObject
+   * @return \Drupal\Tests\views\Unit\Plugin\field\FieldPluginBaseTestField|\PHPUnit_Framework_MockObject_MockObject
    *   The test field.
    */
   protected function setupTestField(array $options = []) {
-    /** @var \Drupal\Tests\views\Unit\Plugin\field\TestField $field */
-    $field = $this->getMock('Drupal\Tests\views\Unit\Plugin\field\TestField', ['l'], [$this->configuration, $this->pluginId, $this->pluginDefinition]);
+    /** @var \Drupal\Tests\views\Unit\Plugin\field\FieldPluginBaseTestField $field */
+    $field = $this->getMock('Drupal\Tests\views\Unit\Plugin\field\FieldPluginBaseTestField', ['l'], [$this->configuration, $this->pluginId, $this->pluginDefinition]);
     $field->init($this->executable, $this->display, $options);
     $field->setLinkGenerator($this->linkGenerator);
 
@@ -507,7 +499,7 @@ class FieldPluginBaseTest extends UnitTestCase {
 
 }
 
-class TestField extends FieldPluginBase {
+class FieldPluginBaseTestField extends FieldPluginBase {
 
   public function setLinkGenerator(LinkGeneratorInterface $link_generator) {
     $this->linkGenerator = $link_generator;

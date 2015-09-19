@@ -2,17 +2,18 @@
 
 body {
   color: #3b3b3b;
+  background: #292929;
 }
 #page,
 #main-wrapper,
-.region-primary-menu .menu-item a.active,
-.region-primary-menu .menu-item .menu-item--active-trail a {
+.region-primary-menu .menu-item a.is-active,
+.region-primary-menu .menu-item--active-trail a {
   background: #ffffff;
 }
-.tabs ul.primary li a.active {
+.tabs ul.primary li a.is-active {
   background-color: #ffffff;
 }
-.tabs ul.primary li.active a {
+.tabs ul.primary li.is-active a {
   background-color: #ffffff;
   border-bottom-color: #ffffff;
 }
@@ -39,13 +40,12 @@ a:active,
   background-color: #f6f6f2;
   border-color: #f9f9f9;
 }
-#page-wrapper,
-#site-footer__wrapper {
+.site-footer {
   background: #292929;
 }
 .region-header,
 .region-header a,
-.region-header li a.active,
+.region-header li a.is-active,
 #name-and-slogan,
 .site-branding-block,
 #name-and-slogan a,
@@ -56,14 +56,14 @@ a:active,
 
 /* ---------- Color Form ----------- */
 
-[dir="rtl"] .color-form #palette {
+[dir="rtl"] .color-form .color-palette {
   margin-left: 0;
   margin-right: 20px;
 }
 [dir="rtl"] .color-form .form-item label {
   float: right;
 }
-[dir="rtl"] .color-form #palette .lock {
+[dir="rtl"] .color-form .color-palette .lock {
   right: -20px;
   left: 0;
 }

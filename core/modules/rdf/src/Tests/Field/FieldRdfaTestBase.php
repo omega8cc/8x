@@ -63,7 +63,6 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
   protected function setUp() {
     parent::setUp();
 
-    $this->installSchema('system', array('router'));
     \Drupal::service('router.builder')->rebuild();
   }
 
@@ -94,7 +93,7 @@ abstract class FieldRdfaTestBase extends FieldUnitTestBase {
       ->setComponent($this->fieldName, $formatter)
       ->save();
     $build = entity_view($this->entity, 'default');
-    $output = drupal_render($build);
+    $output = \Drupal::service('renderer')->renderRoot($build);
     $graph = new \EasyRdf_Graph($this->uri, $output, 'rdfa');
     $this->setRawContent($output);
 

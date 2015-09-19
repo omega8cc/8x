@@ -67,18 +67,18 @@ class ActiveTheme {
   protected $styleSheetsRemove;
 
   /**
-   * The stylesheets which are overridden by the theme.
-   *
-   * @var array
-   */
-  protected $styleSheetsOverride;
-
-  /**
    * The libraries provided by the theme.
    *
    * @var array
    */
   protected $libraries;
+
+  /**
+   * The regions provided by the theme.
+   *
+   * @var array
+   */
+  protected $regions;
 
   /**
    * Constructs an ActiveTheme object.
@@ -87,15 +87,26 @@ class ActiveTheme {
    *   The properties of the object, keyed by the names.
    */
   public function __construct(array $values) {
+    $values += [
+      'path' => '',
+      'engine' => 'twig',
+      'owner' => 'twig',
+      'stylesheets_remove' => [],
+      'libraries' => [],
+      'extension' => 'html.twig',
+      'base_themes' => [],
+      'regions' => [],
+    ];
+
     $this->name = $values['name'];
     $this->path = $values['path'];
     $this->engine = $values['engine'];
     $this->owner = $values['owner'];
     $this->styleSheetsRemove = $values['stylesheets_remove'];
-    $this->styleSheetsOverride = $values['stylesheets_override'];
     $this->libraries = $values['libraries'];
     $this->extension = $values['extension'];
     $this->baseThemes = $values['base_themes'];
+    $this->regions = $values['regions'];
   }
 
   /**
@@ -155,15 +166,6 @@ class ActiveTheme {
   }
 
   /**
-   * Returns the overridden stylesheets by the theme.
-   *
-   * @return mixed
-   */
-  public function getStyleSheetsOverride() {
-    return $this->styleSheetsOverride;
-  }
-
-  /**
    * Returns the removed stylesheets by the theme.
    *
    * @return mixed
@@ -182,6 +184,18 @@ class ActiveTheme {
    */
   public function getBaseThemes() {
     return $this->baseThemes;
+  }
+
+  /**
+   * The regions used by the theme.
+   *
+   * @return string[]
+   *   The list of region machine names supported by the theme.
+   *
+   * @see system_region_list()
+   */
+  public function getRegions() {
+    return array_keys($this->regions);
   }
 
 }

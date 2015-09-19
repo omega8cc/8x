@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Contains \Drupal\system\Tests\Entity\ConfigEntityImportTestBase.
+ * Contains \Drupal\system\Tests\Entity\ConfigEntityImportTest.
  */
 
 namespace Drupal\system\Tests\Entity;
 
 use Drupal\Core\Entity\EntityWithPluginCollectionInterface;
+use Drupal\image\Entity\ImageStyle;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -123,7 +124,7 @@ class ConfigEntityImportTest extends WebTestBase {
     $name = 'image.style.thumbnail';
 
     /** @var $entity \Drupal\image\Entity\ImageStyle */
-    $entity = entity_load('image_style', 'thumbnail');
+    $entity = ImageStyle::load('thumbnail');
     $plugin_collection = $entity->getPluginCollections()['effects'];
 
     $effects = $entity->get('effects');

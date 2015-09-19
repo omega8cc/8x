@@ -44,7 +44,7 @@ class ThemeTestController extends ControllerBase {
   }
 
   /**
-   * Tests template overridding based on filename.
+   * Tests template overriding based on filename.
    *
    * @return array
    *   A render array containing a theme override.
@@ -141,6 +141,27 @@ class ThemeTestController extends ControllerBase {
   public function nonHtml() {
     $theme_initialized = \Drupal::theme()->hasActiveTheme();
     return new JsonResponse(['theme_initialized' => $theme_initialized]);
+  }
+
+  /**
+   * Controller for testing preprocess functions with theme suggestions.
+   */
+  public function preprocessSuggestions() {
+    return [
+      [
+        '#theme' => 'theme_test_preprocess_suggestions',
+        '#foo' => 'suggestion',
+      ],
+      [
+        '#theme' => 'theme_test_preprocess_suggestions',
+        '#foo' => 'kitten',
+      ],
+      [
+        '#theme' => 'theme_test_preprocess_suggestions',
+        '#foo' => 'monkey',
+      ],
+      ['#theme' => 'theme_test_preprocess_suggestions__kitten__flamingo'],
+    ];
   }
 
 }

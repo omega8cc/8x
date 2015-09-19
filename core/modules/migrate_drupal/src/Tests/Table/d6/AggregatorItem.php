@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\AggregatorItem.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\AggregatorItem.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -70,6 +70,7 @@ class AggregatorItem extends DrupalDumpBase {
           'length' => '255',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("aggregator_item")->fields(array(
       'iid',
@@ -94,3 +95,4 @@ class AggregatorItem extends DrupalDumpBase {
   }
 
 }
+#70ab48fd0f8a2fca2f51df61fdef0443

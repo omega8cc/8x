@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -18,7 +18,7 @@ display:
       access:
         type: perm
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       fields:
@@ -30,7 +30,7 @@ display:
           id: title
           label: ''
           table: node_field_data
-          plugin_id: node
+          plugin_id: field
           entity_type: node
           entity_field: title
       filter_groups:

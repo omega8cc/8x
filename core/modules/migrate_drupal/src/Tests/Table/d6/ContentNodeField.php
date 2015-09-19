@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentNodeField.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentNodeField.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -45,19 +45,19 @@ class ContentNodeField extends DrupalDumpBase {
         'required' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'multiple' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'db_storage' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '1',
         ),
         'module' => array(
@@ -74,16 +74,17 @@ class ContentNodeField extends DrupalDumpBase {
         'active' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
         'locked' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_node_field")->fields(array(
       'field_name',
@@ -321,3 +322,4 @@ class ContentNodeField extends DrupalDumpBase {
   }
 
 }
+#e1fbb3a444896287af59cd6395555fbf

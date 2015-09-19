@@ -7,7 +7,7 @@
 
 namespace Drupal\menu_test;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
@@ -54,11 +54,27 @@ class TestControllers {
    */
   public function testDefaults($placeholder = NULL) {
     if ($placeholder) {
-      return ['#markup' => String::format("Sometimes there is a placeholder: '@placeholder'.", array('@placeholder' => $placeholder))];
+      return ['#markup' => SafeMarkup::format("Sometimes there is a placeholder: '@placeholder'.", array('@placeholder' => $placeholder))];
     }
     else {
-      return ['#markup' => String::format('Sometimes there is no placeholder.')];
+      return ['#markup' => 'Sometimes there is no placeholder.'];
     }
   }
 
+  /**
+   * Prints out test data with contextual links.
+   */
+  public function testContextual() {
+    return [
+      '#markup' => 'testContextual',
+      'stuff' => [
+        '#type' => 'contextual_links',
+        '#contextual_links' => [
+          'menu_test_menu' => [
+            'route_parameters' => ['bar' => 1],
+          ]
+        ]
+      ]
+    ];
+  }
 }

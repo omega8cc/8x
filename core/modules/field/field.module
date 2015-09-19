@@ -7,7 +7,6 @@
 use Drupal\Core\Config\ConfigImporter;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\DynamicallyFieldableEntityStorageInterface;
-use Drupal\Core\Extension\Extension;
 use Drupal\field\Entity\FieldConfig;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -67,7 +66,7 @@ function field_help($route_name, RouteMatchInterface $route_match) {
       $field_ui_url = \Drupal::moduleHandler()->moduleExists('field_ui') ? \Drupal::url('help.page', array('name' => 'field_ui')) : '#';
       $output = '';
       $output .= '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Field module allows custom data fields to be defined for <em>entity</em> types (see below). The Field module takes care of storing, loading, editing, and rendering field data. Most users will not interact with the Field module directly, but will instead use the <a href="!field-ui-help">Field UI module</a> user interface. Module developers can use the Field API to make new entity types "fieldable" and thus allow fields to be attached to them. For more information, see the <a href="!field">online documentation for the Field module</a>.', array('!field-ui-help' => $field_ui_url, '!field' => 'https://drupal.org/documentation/modules/field')). '</p>';
+      $output .= '<p>' . t('The Field module allows custom data fields to be defined for <em>entity</em> types (see below). The Field module takes care of storing, loading, editing, and rendering field data. Most users will not interact with the Field module directly, but will instead use the <a href="!field-ui-help">Field UI module</a> user interface. Module developers can use the Field API to make new entity types "fieldable" and thus allow fields to be attached to them. For more information, see the <a href="!field">online documentation for the Field module</a>.', array('!field-ui-help' => (\Drupal::moduleHandler()->moduleExists('field_ui')) ? \Drupal::url('help.page', array('name' => 'field_ui')) :'#', '!field' => 'https://www.drupal.org/documentation/modules/field')). '</p>';
       $output .= '<h3>' . t('Terminology') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Entities and entity types') . '</dt>';
@@ -84,7 +83,7 @@ function field_help($route_name, RouteMatchInterface $route_match) {
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Enabling field types, widgets, and formatters') . '</dt>';
-      $output .= '<dd>' . t('The Field module provides the infrastructure for fields; the field types, formatters, and widgets are provided by Drupal core or additional modules. Some of the modules are required; the optional modules can be enabled from the <a href="!modules">Extend administration page</a>. Additional fields, formatters, and widgets may be provided by contributed modules, which you can find in the <a href="!contrib">contributed module section of Drupal.org</a>.', array('!modules' => \Drupal::url('system.modules_list'), '!contrib' => 'https://drupal.org/project/modules')) . '</dd>';
+      $output .= '<dd>' . t('The Field module provides the infrastructure for fields; the field types, formatters, and widgets are provided by Drupal core or additional modules. Some of the modules are required; the optional modules can be enabled from the <a href="!modules">Extend administration page</a>. Additional fields, formatters, and widgets may be provided by contributed modules, which you can find in the <a href="!contrib">contributed module section of Drupal.org</a>.', array('!modules' => \Drupal::url('system.modules_list'), '!contrib' => 'https://www.drupal.org/project/modules')) . '</dd>';
 
       $output .= '<h3>' . t('Field, widget, and formatter information') . '</h3>';
 
@@ -92,7 +91,7 @@ function field_help($route_name, RouteMatchInterface $route_match) {
       // enabled, ordered by displayed module name (module names are not
       // translated).
       $items = array();
-      $info = system_get_info('module');
+      $modules = \Drupal::moduleHandler()->getModuleList();
       $widgets = \Drupal::service('plugin.manager.field.widget')->getDefinitions();
       $field_types = \Drupal::service('plugin.manager.field.field_type')->getUiDefinitions();
       $formatters = \Drupal::service('plugin.manager.field.formatter')->getDefinitions();
@@ -105,8 +104,8 @@ function field_help($route_name, RouteMatchInterface $route_match) {
       foreach ($providers as $provider) {
         // Skip plugins provided by core components as they do not implement
         // hook_help().
-        if (isset($info[$provider]['name'])) {
-          $display = $info[$provider]['name'];
+        if (isset($modules[$provider])) {
+          $display = \Drupal::moduleHandler()->getName($provider);
           if (\Drupal::moduleHandler()->implementsHook($provider, 'help')) {
             $items[] = \Drupal::l($display, new Url('help.page', array('name' => $provider)));
           }
@@ -122,7 +121,7 @@ function field_help($route_name, RouteMatchInterface $route_match) {
           '#theme' => 'item_list',
           '#items' => $items,
         );
-        $output .= drupal_render($item_list);
+        $output .= \Drupal::service('renderer')->renderPlain($item_list);
         $output .= '</dd>';
       }
 
@@ -143,40 +142,6 @@ function field_cron() {
   // Do a pass of purging on deleted Field API data, if any exists.
   $limit = \Drupal::config('field.settings')->get('purge_batch_size');
   field_purge_batch($limit);
-}
-
-/**
- * Implements hook_system_info_alter().
- *
- * Goes through a list of all modules that provide a field type and makes them
- * required if there are any active fields of that type.
- */
-function field_system_info_alter(&$info, Extension $file, $type) {
-  // It is not safe to call entity_load_multiple_by_properties() during
-  // maintenance mode.
-  if ($type == 'module' && !defined('MAINTENANCE_MODE')) {
-    $field_storages = entity_load_multiple_by_properties('field_storage_config', array('module' => $file->getName(), 'include_deleted' => TRUE));
-    if ($field_storages) {
-      $info['required'] = TRUE;
-
-      // Provide an explanation message (only mention pending deletions if there
-      // remains no actual, non-deleted fields)
-      $non_deleted = FALSE;
-      foreach ($field_storages as $field_storage) {
-        if (!$field_storage->isDeleted()) {
-          $non_deleted = TRUE;
-          break;
-        }
-      }
-      if ($non_deleted) {
-        $explanation = t('Fields type(s) in use');
-      }
-      else {
-        $explanation = t('Fields pending deletion');
-      }
-      $info['explanation'] = $explanation;
-    }
-  }
 }
 
 /**
@@ -227,9 +192,9 @@ function field_entity_bundle_field_info(EntityTypeInterface $entity_type, $bundl
 function field_entity_bundle_rename($entity_type, $bundle_old, $bundle_new) {
   $fields = entity_load_multiple_by_properties('field_config', array('entity_type' => $entity_type, 'bundle' => $bundle_old, 'include_deleted' => TRUE));
   foreach ($fields as $field) {
-    $id_new = $field->entity_type . '.' . $bundle_new . '.' . $field->field_name;
+    $id_new = $field->getTargetEntityTypeId() . '.' . $bundle_new . '.' . $field->getName();
     $field->set('id', $id_new);
-    $field->bundle = $bundle_new;
+    $field->set('bundle', $bundle_new);
     // Save non-deleted fields.
     if (!$field->isDeleted()) {
       $field->allowBundleRename();

@@ -58,7 +58,7 @@ function template_preprocess_admin_block_content(&$variables) {
     foreach ($variables['content'] as $key => $item) {
       $variables['content'][$key]['link'] = \Drupal::l($item['title'], $item['url']);
       if (!$variables['compact'] && isset($item['description'])) {
-        $variables['content'][$key]['description'] = Xss::filterAdmin($item['description']);
+        $variables['content'][$key]['description'] = ['#markup' => $item['description']];
       }
       else {
         $variables['content'][$key]['description'] = FALSE;
@@ -227,25 +227,31 @@ function theme_system_modules_details($variables) {
 
     $row[] = array('class' => array('checkbox'), 'data' => drupal_render($module['enable']));
 
-    // Add the module label and expand/collapse functionalty.
+    // Add the module label and expand/collapse functionality.
     $id = Html::getUniqueId('module-' . $key);
-    $col2 = '<label id="' . $id . '" for="' . $module['enable']['#id'] . '" class="module-name table-filter-text-source">' . drupal_render($module['name']) . '</label>';
-    $row[] = array('class' => array('module'), 'data' => SafeMarkup::set($col2));
+    $col2 = [
+      '#type' => 'inline_template',
+      '#template' => '<label id="{{ id }}" for="{{ enable_id }}" class="module-name table-filter-text-source">{{ module_name }}</label>',
+      '#context' => [
+        'id' => $id,
+        'enable_id' => $module['enable']['#id'],
+        'module_name' => $module['name'],
+      ],
+    ];
+    $row[] = ['class' => ['module'], 'data' => $col2];
 
     // Add the description, along with any modules it requires.
     $description = '';
     $description .= '<div class="requirements">';
     $description .= '<div class="admin-requirements">' . t('Machine name: !machine-name', array('!machine-name' => '<span dir="ltr" class="table-filter-text-source">' . $key . '</span>')) . '</div>';
-    if ($version || $requires || $required_by) {
-      if ($version) {
-        $description .= '<div class="admin-requirements">' . t('Version: !module-version', array('!module-version' => drupal_render($module['version']))) . '</div>';
-      }
-      if ($requires) {
-        $description .= '<div class="admin-requirements">' . t('Requires: !module-list', array('!module-list' => implode(', ', $module['#requires']))) . '</div>';
-      }
-      if ($required_by) {
-        $description .= '<div class="admin-requirements">' . t('Required by: !module-list', array('!module-list' => implode(', ', $module['#required_by']))) . '</div>';
-      }
+    if ($version) {
+      $description .= '<div class="admin-requirements">' . t('Version: !module-version', array('!module-version' => drupal_render($module['version']))) . '</div>';
+    }
+    if ($requires) {
+      $description .= '<div class="admin-requirements">' . t('Requires: !module-list', array('!module-list' => implode(', ', $module['#requires']))) . '</div>';
+    }
+    if ($required_by) {
+      $description .= '<div class="admin-requirements">' . t('Required by: !module-list', array('!module-list' => implode(', ', $module['#required_by']))) . '</div>';
     }
     $description .= '</div>';
     $links = '';
@@ -257,14 +263,18 @@ function theme_system_modules_details($variables) {
       $description .= $links;
       $description .= '</div>';
     }
+    $title = [
+      '#type' => 'inline_template',
+      '#template' => '<span class="text module-description">{{ module_description }}</span>',
+      '#context' => ['module_description' => $module['description']],
+    ];
     $details = array(
       '#type' => 'details',
-      '#title' => SafeMarkup::set('<span class="text"> ' . drupal_render($module['description']) . '</span>'),
+      '#title' => $title,
       '#attributes' => array('id' => $module['enable']['#id'] . '-description'),
       '#description' => $description,
     );
-    $col4 = drupal_render($details);
-    $row[] = array('class' => array('description', 'expand'), 'data' => $col4);
+    $row[] = ['class' => ['description', 'expand'], 'data' => $details];
 
     $rows[] = $module['#attributes'] + array('data' => $row);
   }
@@ -303,16 +313,22 @@ function theme_system_modules_uninstall($variables) {
   // Display table.
   $rows = array();
   foreach (Element::children($form['modules']) as $module) {
-    $disabled_message = '';
+    $disabled_header = '';
+    $disabled_reasons = '';
     // Add the modules requiring the module in question as a validation reason.
     if (!empty($form['modules'][$module]['#required_by'])) {
       $form['modules'][$module]['#validation_reasons'][] = \Drupal::translation()->translate('Required by: @modules', array('@modules' => implode(', ',$form['modules'][$module]['#required_by'])));
     }
     if (!empty($form['modules'][$module]['#validation_reasons'])) {
-      $disabled_message = \Drupal::translation()->formatPlural(count($form['modules'][$module]['#validation_reasons']),
-        'The following reason prevents @module from being uninstalled: @reasons',
-        'The following reasons prevents @module from being uninstalled: @reasons',
-        array('@module' => $form['modules'][$module]['#module_name'], '@reasons' => implode('; ', $form['modules'][$module]['#validation_reasons'])));
+      $disabled_reasons = [
+        '#theme' => 'item_list',
+        '#items' => $form['modules'][$module]['#validation_reasons'],
+      ];
+      $disabled_reasons = drupal_render($disabled_reasons);
+      $disabled_header = \Drupal::translation()->formatPlural(count($form['modules'][$module]['#validation_reasons']),
+        'The following reason prevents @module from being uninstalled:',
+        'The following reasons prevents @module from being uninstalled:',
+        array('@module' => $form['modules'][$module]['#module_name']));
     }
     $rows[] = array(
       array('data' => drupal_render($form['uninstall'][$module]), 'align' => 'center'),
@@ -326,10 +342,11 @@ function theme_system_modules_uninstall($variables) {
       array(
         'data' => array(
           '#type' => 'inline_template',
-          '#template' => '{{ module_description }} {% if disabled_message is not empty %} <div class="admin-requirements">{{ disabled_message }}</div> {% endif %}',
+          '#template' => '<span class="text module-description">{{ module_description }}</span>{% if disabled_header is not empty %}<div class="admin-requirements">{{ disabled_header }}{{ disabled_reasons }}</div>{% endif %}',
           '#context' => array(
             'module_description' => drupal_render($form['modules'][$module]['description']),
-            'disabled_message' => $disabled_message,
+            'disabled_header' => $disabled_header,
+            'disabled_reasons' => $disabled_reasons,
           ),
         ),
         'class' => array('description'),
@@ -413,7 +430,10 @@ function template_preprocess_system_themes_page(&$variables) {
       // Make sure to provide feedback on compatibility.
       $current_theme['incompatible'] = '';
       if (!empty($theme->incompatible_core)) {
-        $current_theme['incompatible'] = t('This version is not compatible with Drupal !core_version and should be replaced.', array('!core_version' => \Drupal::CORE_COMPATIBILITY));
+        $current_theme['incompatible'] = t("This theme is not compatible with Drupal @core_version. Check that the .info.yml file contains the correct 'core' value.", ['@core_version' => \Drupal::CORE_COMPATIBILITY]);
+      }
+      elseif (!empty($theme->incompatible_region)) {
+        $current_theme['incompatible'] = t("This theme is missing a 'content' region.");
       }
       elseif (!empty($theme->incompatible_php)) {
         if (substr_count($theme->info['php'], '.') < 2) {

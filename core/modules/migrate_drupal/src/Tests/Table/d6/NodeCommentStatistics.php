@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\NodeCommentStatistics.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\NodeCommentStatistics.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -57,6 +57,7 @@ class NodeCommentStatistics extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("node_comment_statistics")->fields(array(
       'nid',
@@ -81,3 +82,4 @@ class NodeCommentStatistics extends DrupalDumpBase {
   }
 
 }
+#402ff86fc05564bf2275c27f01c922af

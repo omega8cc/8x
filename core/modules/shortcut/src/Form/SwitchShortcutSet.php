@@ -7,7 +7,6 @@
 
 namespace Drupal\shortcut\Form;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
@@ -36,23 +35,13 @@ class SwitchShortcutSet extends FormBase {
   protected $shortcutSetStorage;
 
   /**
-   * The current route match.
-   *
-   * @var \Drupal\Core\Routing\RouteMatchInterface
-   */
-  protected $routeMatch;
-
-  /**
    * Constructs a SwitchShortcutSet object.
    *
    * @param \Drupal\shortcut\ShortcutSetStorageInterface $shortcut_set_storage
    *   The shortcut set storage.
-   * @param \Drupal\Core\Routing\RouteMatchInterface $route_match
-   *   The current route match.
    */
-  public function __construct(ShortcutSetStorageInterface $shortcut_set_storage, RouteMatchInterface $route_match) {
+  public function __construct(ShortcutSetStorageInterface $shortcut_set_storage) {
     $this->shortcutSetStorage = $shortcut_set_storage;
-    $this->routeMatch = $route_match;
   }
 
   /**
@@ -60,15 +49,14 @@ class SwitchShortcutSet extends FormBase {
    */
   public static function create(ContainerInterface $container) {
     return new static(
-      $container->get('entity.manager')->getStorage('shortcut_set'),
-      $container->get('current_route_match')
+      $container->get('entity.manager')->getStorage('shortcut_set')
     );
   }
 
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'shortcut_set_switch';
   }
 
@@ -82,7 +70,7 @@ class SwitchShortcutSet extends FormBase {
 
     // Prepare the list of shortcut sets.
     $options = array_map(function (ShortcutSet $set) {
-      return String::checkPlain($set->label());
+      return $set->label();
     }, $this->shortcutSetStorage->loadMultiple());
 
     $current_set = shortcut_current_displayed_set($this->user);
@@ -109,6 +97,9 @@ class SwitchShortcutSet extends FormBase {
         '#access' => $add_access,
         '#states' => array(
           'visible' => array(
+            ':input[name="set"]' => array('value' => 'new'),
+          ),
+          'required' => array(
             ':input[name="set"]' => array('value' => 'new'),
           ),
         ),
@@ -173,7 +164,7 @@ class SwitchShortcutSet extends FormBase {
     if ($form_state->getValue('set') == 'new') {
       // Check to prevent creating a shortcut set with an empty title.
       if (trim($form_state->getValue('label')) == '') {
-        $form_state->setErrorByName('new', $this->t('The new set label is required.'));
+        $form_state->setErrorByName('label', $this->t('The new set label is required.'));
       }
     }
   }
@@ -196,7 +187,7 @@ class SwitchShortcutSet extends FormBase {
       $replacements = array(
         '%user' => $this->user->label(),
         '%set_name' => $set->label(),
-        '@switch-url' => $this->url($this->routeMatch->getRouteName(), array('user' => $this->user->id())),
+        '@switch-url' => $this->url('<current>'),
       );
       if ($account_is_user) {
         // Only administrators can create new shortcut sets, so we know they have

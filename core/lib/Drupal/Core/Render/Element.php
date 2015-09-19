@@ -7,7 +7,8 @@
 
 namespace Drupal\Core\Render;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Access\AccessResultInterface;
 
 /**
  * Provides helper methods for Drupal render elements.
@@ -77,37 +78,48 @@ class Element {
     $sort = isset($elements['#sorted']) ? !$elements['#sorted'] : $sort;
 
     // Filter out properties from the element, leaving only children.
-    $children = array();
+    $count = count($elements);
+    $child_weights = array();
+    $i = 0;
     $sortable = FALSE;
     foreach ($elements as $key => $value) {
       if ($key === '' || $key[0] !== '#') {
         if (is_array($value)) {
-          $children[$key] = $value;
           if (isset($value['#weight'])) {
+            $weight = $value['#weight'];
             $sortable = TRUE;
           }
+          else {
+            $weight = 0;
+          }
+          // Supports weight with up to three digit precision and conserve
+          // the insertion order.
+          $child_weights[$key] = floor($weight * 1000) + $i / $count;
         }
         // Only trigger an error if the value is not null.
-        // @see http://drupal.org/node/1283892
+        // @see https://www.drupal.org/node/1283892
         elseif (isset($value)) {
-          trigger_error(String::format('"@key" is an invalid render array key', array('@key' => $key)), E_USER_ERROR);
+          trigger_error(SafeMarkup::format('"@key" is an invalid render array key', array('@key' => $key)), E_USER_ERROR);
         }
       }
+      $i++;
     }
+
     // Sort the children if necessary.
     if ($sort && $sortable) {
-      uasort($children, 'Drupal\Component\Utility\SortArray::sortByWeightProperty');
+      asort($child_weights);
       // Put the sorted children back into $elements in the correct order, to
       // preserve sorting if the same element is passed through
       // \Drupal\Core\Render\Element::children() twice.
-      foreach ($children as $key => $child) {
+      foreach ($child_weights as $key => $weight) {
+        $value = $elements[$key];
         unset($elements[$key]);
-        $elements[$key] = $child;
+        $elements[$key] = $value;
       }
       $elements['#sorted'] = TRUE;
     }
 
-    return array_keys($children);
+    return array_keys($child_weights);
   }
 
   /**
@@ -125,13 +137,8 @@ class Element {
     foreach (static::children($elements) as $key) {
       $child = $elements[$key];
 
-      // Skip un-accessible children.
-      if (isset($child['#access']) && !$child['#access']) {
-        continue;
-      }
-
       // Skip value and hidden elements, since they are not rendered.
-      if (isset($child['#type']) && in_array($child['#type'], array('value', 'hidden'))) {
+      if (!static::isVisibleElement($child)) {
         continue;
       }
 
@@ -139,6 +146,21 @@ class Element {
     }
 
     return array_keys($visible_children);
+  }
+
+  /**
+   * Determines if an element is visible.
+   *
+   * @param array $element
+   *   The element to check for visibility.
+   *
+   * @return bool
+   *   TRUE if the element is visible, otherwise FALSE.
+   */
+  public static function isVisibleElement($element) {
+    return (!isset($element['#type']) || !in_array($element['#type'], ['value', 'hidden', 'token']))
+      && (!isset($element['#access'])
+      || (($element['#access'] instanceof AccessResultInterface && $element['#access']->isAllowed()) || ($element['#access'] === TRUE)));
   }
 
   /**
@@ -164,6 +186,22 @@ class Element {
         $element['#attributes'][$attribute] = $element[$property];
       }
     }
+  }
+
+  /**
+   * Indicates whether the given element is empty.
+   *
+   * An element that only has #cache set is considered empty, because it will
+   * render to the empty string.
+   *
+   * @param array $elements
+   *   The element.
+   *
+   * @return bool
+   *   Whether the given element is empty.
+   */
+  public static function isEmpty(array $elements) {
+    return empty($elements) || (count($elements) === 1 && array_keys($elements) === ['#cache']);
   }
 
 }

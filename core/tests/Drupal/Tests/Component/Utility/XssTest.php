@@ -7,7 +7,7 @@
 
 namespace Drupal\Tests\Component\Utility;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\UrlHelper;
 use Drupal\Component\Utility\Xss;
 use Drupal\Tests\UnitTestCase;
@@ -433,7 +433,7 @@ class XssTest extends UnitTestCase {
       ),
     );
     // @fixme This dataset currently fails under 5.4 because of
-    //   https://drupal.org/node/1210798 . Restore after its fixed.
+    //   https://www.drupal.org/node/1210798. Restore after its fixed.
     if (version_compare(PHP_VERSION, '5.4.0', '<')) {
       $cases[] = array(
         '<img src=" &#14;  javascript:alert(0)">',
@@ -486,6 +486,37 @@ class XssTest extends UnitTestCase {
   public function testQuestionSign() {
     $value = Xss::filter('<?xml:namespace ns="urn:schemas-microsoft-com:time">');
     $this->assertTrue(stripos($value, '<?xml') === FALSE, 'HTML tag stripping evasion -- starting with a question sign (processing instructions).');
+  }
+
+  /**
+   * Check that strings in HTML attributes are are correctly processed.
+   *
+   * @covers ::attributes
+   * @dataProvider providerTestAttributes
+   */
+  public function testAttribute($value, $expected, $message, $allowed_tags = NULL) {
+    $value = Xss::filter($value, $allowed_tags);
+    $this->assertEquals($expected, $value, $message);
+  }
+
+  /**
+   * Data provider for testFilterXssAdminNotNormalized().
+   */
+  public function providerTestAttributes() {
+    return array(
+      array(
+        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt">',
+        '<img src="http://example.com/foo.jpg" title="Example: title" alt="Example: alt">',
+        'Image tag with alt and title attribute',
+        array('img')
+      ),
+      array(
+        '<img src="http://example.com/foo.jpg" data-caption="Drupal 8: The best release ever.">',
+        '<img src="http://example.com/foo.jpg" data-caption="Drupal 8: The best release ever.">',
+        'Image tag with data attribute',
+        array('img')
+      ),
+    );
   }
 
   /**
@@ -550,7 +581,7 @@ class XssTest extends UnitTestCase {
    *   (optional) The group this message belongs to. Defaults to 'Other'.
    */
   protected function assertNormalized($haystack, $needle, $message = '', $group = 'Other') {
-    $this->assertTrue(strpos(strtolower(String::decodeEntities($haystack)), $needle) !== FALSE, $message, $group);
+    $this->assertTrue(strpos(strtolower(Html::decodeEntities($haystack)), $needle) !== FALSE, $message, $group);
   }
 
   /**
@@ -572,7 +603,7 @@ class XssTest extends UnitTestCase {
    *   (optional) The group this message belongs to. Defaults to 'Other'.
    */
   protected function assertNotNormalized($haystack, $needle, $message = '', $group = 'Other') {
-    $this->assertTrue(strpos(strtolower(String::decodeEntities($haystack)), $needle) === FALSE, $message, $group);
+    $this->assertTrue(strpos(strtolower(Html::decodeEntities($haystack)), $needle) === FALSE, $message, $group);
   }
 
 }

@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentFieldImage.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentFieldImage.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -47,7 +47,7 @@ class ContentFieldImage extends DrupalDumpBase {
         'field_image_list' => array(
           'type' => 'int',
           'not null' => FALSE,
-          'length' => '4',
+          'length' => '11',
         ),
         'field_image_data' => array(
           'type' => 'text',
@@ -55,6 +55,7 @@ class ContentFieldImage extends DrupalDumpBase {
           'length' => 100,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_field_image")->fields(array(
       'vid',
@@ -85,3 +86,4 @@ class ContentFieldImage extends DrupalDumpBase {
   }
 
 }
+#2db0e7aa8c758996467e5920e6cc888b

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\FileTransfer\MockTestConnection.
+ * Contains \Drupal\system\Tests\FileTransfer\MockTestConnection.
  */
 
 namespace Drupal\system\Tests\FileTransfer;
@@ -12,8 +12,8 @@ namespace Drupal\system\Tests\FileTransfer;
  */
 class MockTestConnection {
 
-  var $commandsRun = array();
-  var $connectionString;
+  protected $commandsRun = array();
+  public $connectionString;
 
   function run($cmd) {
     $this->commandsRun[] = $cmd;

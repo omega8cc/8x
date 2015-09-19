@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Form\RebuildTest.
+ * Contains \Drupal\system\Tests\Form\RebuildTest.
  */
 
 namespace Drupal\system\Tests\Form;
@@ -26,13 +26,20 @@ class RebuildTest extends WebTestBase {
    */
   public static $modules = array('node', 'form_test');
 
+  /**
+   * A user for testing.
+   *
+   * @var \Drupal\user\UserInterface
+   */
+  protected $webUser;
+
   protected function setUp() {
     parent::setUp();
 
     $this->drupalCreateContentType(array('type' => 'page', 'name' => 'Basic page'));
 
-    $this->web_user = $this->drupalCreateUser(array('access content'));
-    $this->drupalLogin($this->web_user);
+    $this->webUser = $this->drupalCreateUser(array('access content'));
+    $this->drupalLogin($this->webUser);
   }
 
   /**
@@ -82,15 +89,15 @@ class RebuildTest extends WebTestBase {
       ->save();
 
     // Log in a user who can create 'page' nodes.
-    $this->web_user = $this->drupalCreateUser(array('create page content'));
-    $this->drupalLogin($this->web_user);
+    $this->webUser = $this->drupalCreateUser(array('create page content'));
+    $this->drupalLogin($this->webUser);
 
     // Get the form for adding a 'page' node. Submit an "add another item" Ajax
     // submission and verify it worked by ensuring the updated page has two text
     // field items in the field for which we just added an item.
     $this->drupalGet('node/add/page');
-    $this->drupalPostAjaxForm(NULL, array(), array('field_ajax_test_add_more' => t('Add another item')), 'system/ajax', array(), array(), 'page-node-form');
-    $this->assert(count($this->xpath('//div[contains(@class, "field-name-field-ajax-test")]//input[@type="text"]')) == 2, 'AJAX submission succeeded.');
+    $this->drupalPostAjaxForm(NULL, array(), array('field_ajax_test_add_more' => t('Add another item')), NULL, array(), array(), 'node-page-form');
+    $this->assert(count($this->xpath('//div[contains(@class, "field--name-field-ajax-test")]//input[@type="text"]')) == 2, 'AJAX submission succeeded.');
 
     // Submit the form with the non-Ajax "Save" button, leaving the title field
     // blank to trigger a validation error, and ensure that a validation error
@@ -102,10 +109,13 @@ class RebuildTest extends WebTestBase {
 
     // Ensure that the form contains two items in the multi-valued field, so we
     // know we're testing a form that was correctly retrieved from cache.
-    $this->assert(count($this->xpath('//form[contains(@id, "page-node-form")]//div[contains(@class, "form-item-field-ajax-test")]//input[@type="text"]')) == 2, 'Form retained its state from cache.');
+    $this->assert(count($this->xpath('//form[contains(@id, "node-page-form")]//div[contains(@class, "form-item-field-ajax-test")]//input[@type="text"]')) == 2, 'Form retained its state from cache.');
 
     // Ensure that the form's action is correct.
     $forms = $this->xpath('//form[contains(@class, "node-page-form")]');
-    $this->assert(count($forms) == 1 && $forms[0]['action'] == Url::fromRoute('node.add', ['node_type' => 'page'])->toString(), 'Re-rendered form contains the correct action value.');
+    $this->assertEqual(1, count($forms));
+    // Strip query params off the action before asserting.
+    $url = parse_url($forms[0]['action'])['path'];
+    $this->assertEqual(Url::fromRoute('node.add', ['node_type' => 'page'])->toString(), $url);
   }
 }

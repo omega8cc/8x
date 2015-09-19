@@ -7,7 +7,10 @@
 
 namespace Drupal\Core\Template;
 
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\PhpStorage\PhpStorageFactory;
+use Drupal\Core\Render\SafeString;
 
 /**
  * A class that defines a Twig environment for Drupal.
@@ -18,8 +21,27 @@ use Drupal\Core\PhpStorage\PhpStorageFactory;
  * @see core\vendor\twig\twig\lib\Twig\Environment.php
  */
 class TwigEnvironment extends \Twig_Environment {
+
+  /**
+   * The cache object used for auto-refresh via mtime.
+   *
+   * @var \Drupal\Core\Cache\CacheBackendInterface
+   */
   protected $cache_object = NULL;
+
+  /**
+   * The PhpStorage object used for storing the templates.
+   *
+   * @var \Drupal\Core\PhpStorage\PhpStorageFactory
+   */
   protected $storage = NULL;
+
+  /**
+   * The template cache filename prefix.
+   *
+   * @var string
+   */
+  protected $templateCacheFilenamePrefix;
 
   /**
    * Static cache of template classes.
@@ -34,17 +56,21 @@ class TwigEnvironment extends \Twig_Environment {
    *
    * @param string $root
    *   The app root.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cache
+   *   The cache bin.
+   * @param string $twig_extension_hash
+   *   The Twig extension hash.
    * @param \Twig_LoaderInterface $loader
    *   The Twig loader or loader chain.
    * @param array $options
    *   The options for the Twig environment.
    */
-  public function __construct($root, \Twig_LoaderInterface $loader = NULL, $options = array()) {
-    // @todo Pass as arguments from the DIC.
-    $this->cache_object = \Drupal::cache();
+  public function __construct($root, CacheBackendInterface $cache, $twig_extension_hash, \Twig_LoaderInterface $loader = NULL, $options = array()) {
+    $this->cache_object = $cache;
+    $this->templateCacheFilenamePrefix = $twig_extension_hash;
 
     // Ensure that twig.engine is loaded, given that it is needed to render a
-    // template because functions like twig_drupal_escape_filter are called.
+    // template because functions like TwigExtension::escapeFilter() are called.
     require_once $root . '/core/themes/engines/twig/twig.engine';
 
     $this->templateClasses = array();
@@ -85,6 +111,26 @@ class TwigEnvironment extends \Twig_Environment {
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function getCacheFilename($name) {
+    // We override the cache filename in order to avoid issues with not using
+    // shared filesystems. The Twig templates for example rely on available Twig
+    // extensions, so we use the twig extension hash which varies by extensions
+    // and their mtime.
+    // @see \Drupal\Core\DependencyInjection\Compiler\TwigExtensionPass
+
+    if (!$this->cache) {
+      return FALSE;
+    }
+
+    $class = substr($this->getTemplateClass($name), strlen($this->templateClassPrefix));
+
+    // The first part is what is invalidated.
+    return $this->templateCacheFilenamePrefix . '_' . basename($name) . '_' . $class;
+  }
+
+  /**
    * Implements Twig_Environment::loadTemplate().
    *
    * We need to overwrite this function to integrate with drupal_php_storage().
@@ -115,12 +161,7 @@ class TwigEnvironment extends \Twig_Environment {
     if (!class_exists($cls, FALSE)) {
       $cache_filename = $this->getCacheFilename($name);
 
-      if ($cache_filename === FALSE) {
-        $compiled_source = $this->compileSource($this->loader->getSource($name), $name);
-        eval('?' . '>' . $compiled_source);
-      }
-      else {
-
+      if ($cache_filename !== FALSE) {
         // If autoreload is on, check that the template has not been
         // modified since the last compilation.
         if ($this->isAutoReload() && !$this->isFresh($cache_filename, $name)) {
@@ -131,6 +172,10 @@ class TwigEnvironment extends \Twig_Environment {
           $this->updateCompiledTemplate($cache_filename, $name);
           $this->storage()->load($cache_filename);
         }
+      }
+      if (!class_exists($cls, FALSE)) {
+        $compiled_source = $this->compileSource($this->loader->getSource($name), $name);
+        eval('?' . '>' . $compiled_source);
       }
     }
 
@@ -193,15 +238,15 @@ class TwigEnvironment extends \Twig_Environment {
    * @param array $context
    *   An array of parameters to pass to the template.
    *
-   * @return string
-   *   The rendered inline template.
+   * @return \Drupal\Component\Utility\SafeStringInterface|string
+   *   The rendered inline template as a SafeString object.
    *
    * @see \Drupal\Core\Template\Loader\StringLoader::exists()
    */
   public function renderInline($template_string, array $context = array()) {
     // Prefix all inline templates with a special comment.
     $template_string = '{# inline_template_start #}' . $template_string;
-    return $this->loadTemplate($template_string, NULL)->render($context);
+    return SafeString::create($this->loadTemplate($template_string, NULL)->render($context));
   }
 
 }

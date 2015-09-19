@@ -10,6 +10,7 @@ namespace Drupal\node\Tests;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
 use Drupal\node\Entity\NodeType;
+use Drupal\user\Entity\User;
 
 /**
  * Tests node access functionality with multiple languages and two node access
@@ -86,7 +87,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
 
     // Load the user 1 user for later use as an admin user with permission to
     // see everything.
-    $this->adminUser = user_load(1);
+    $this->adminUser = User::load(1);
 
     // The node_access_test_language module allows individual translations of a
     // node to be marked private (not viewable by normal users), and the
@@ -110,6 +111,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => FALSE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 0;
     $node->save();
 
@@ -120,6 +122,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => TRUE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 0;
     $node->save();
 
@@ -130,6 +133,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => FALSE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 0;
     $node->save();
 
@@ -140,6 +144,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => FALSE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 1;
     $node->save();
 
@@ -150,6 +155,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => FALSE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 1;
     $node->save();
 
@@ -160,6 +166,7 @@ class NodeAccessLanguageAwareCombinationTest extends NodeTestBase {
       'private' => TRUE,
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 1;
     $node->save();
 

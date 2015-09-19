@@ -2,13 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\views\Tests\Handler\SortDateTest.
+ * Contains \Drupal\views\Tests\Handler\SortDateTest.
  */
 
 namespace Drupal\views\Tests\Handler;
 
-use Drupal\Component\Utility\String;
-use Drupal\views\Tests\ViewUnitTestBase;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\views\Tests\ViewKernelTestBase;
 use Drupal\views\Views;
 
 /**
@@ -16,7 +16,7 @@ use Drupal\views\Views;
  *
  * @group views
  */
-class SortDateTest extends ViewUnitTestBase {
+class SortDateTest extends ViewKernelTestBase {
 
   /**
    * Views used by this test.
@@ -198,7 +198,7 @@ class SortDateTest extends ViewUnitTestBase {
         $this->assertEqual(count($this->dataSet()), count($view->result), 'The number of returned rows match.');
         $this->assertIdenticalResultset($view, $this->expectedResultSet($granularity, $reverse), array(
           'views_test_data_name' => 'name',
-        ), String::format('Result is returned correctly when ordering by granularity @granularity, @reverse.', array('@granularity' => $granularity, '@reverse' => $reverse ? 'reverse' : 'forward')));
+        ), SafeMarkup::format('Result is returned correctly when ordering by granularity @granularity, @reverse.', array('@granularity' => $granularity, '@reverse' => $reverse ? 'reverse' : 'forward')));
         $view->destroy();
         unset($view);
       }

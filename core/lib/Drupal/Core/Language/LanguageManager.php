@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\Language;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\StringTranslation\TranslationWrapper;
@@ -69,7 +69,7 @@ class LanguageManager implements LanguageManagerInterface {
    * @see \Drupal\Core\StringTranslation\TranslationInterface()
    */
   protected function t($string, array $args = array(), array $options = array()) {
-    return $this->translation ? $this->translation->translate($string, $args, $options) : String::format($string, $args);
+    return $this->translation ? $this->translation->translate($string, $args, $options) : SafeMarkup::format($string, $args);
   }
 
   /**
@@ -87,28 +87,43 @@ class LanguageManager implements LanguageManagerInterface {
   }
 
   /**
-   * {@inheritdoc}
+   * Returns information about all defined language types.
+   *
+   * Defines the three core language types:
+   * - Interface language is the only configurable language type in core. It is
+   *   used by t() as the default language if none is specified.
+   * - Content language is by default non-configurable and inherits the
+   *   interface language negotiated value. It is used by the Field API to
+   *   determine the display language for fields if no explicit value is
+   *   specified.
+   * - URL language is by default non-configurable and is determined through the
+   *   URL language negotiation method or the URL fallback language negotiation
+   *   method if no language can be detected. It is used by l() as the default
+   *   language if none is specified.
+   *
+   * @return array
+   *   An associative array of language type information arrays keyed by
+   *   language type machine name, in the format of
+   *   hook_language_types_info().
    */
   public function getDefinedLanguageTypesInfo() {
-    // This needs to have the same return value as
-    // language_language_type_info(), so that even if the Language module is
-    // not defined, users of this information, such as the Views module, can
-    // access names and descriptions of the default language types.
-    return array(
+    $this->definedLanguageTypesInfo = array(
       LanguageInterface::TYPE_INTERFACE => array(
-        'name' => $this->t('User interface text'),
-        'description' => $this->t('Order of language detection methods for user interface text. If a translation of user interface text is available in the detected language, it will be displayed.'),
+        'name' => new TranslationWrapper('Interface text'),
+        'description' => new TranslationWrapper('Order of language detection methods for interface text. If a translation of interface text is available in the detected language, it will be displayed.'),
         'locked' => TRUE,
       ),
       LanguageInterface::TYPE_CONTENT => array(
-        'name' => $this->t('Content'),
-        'description' => $this->t('Order of language detection methods for content. If a version of content is available in the detected language, it will be displayed.'),
+        'name' => new TranslationWrapper('Content'),
+        'description' => new TranslationWrapper('Order of language detection methods for content. If a version of content is available in the detected language, it will be displayed.'),
         'locked' => TRUE,
       ),
       LanguageInterface::TYPE_URL => array(
         'locked' => TRUE,
       ),
     );
+
+    return $this->definedLanguageTypesInfo;
   }
 
   /**
@@ -192,6 +207,7 @@ class LanguageManager implements LanguageManagerInterface {
     $locked_language = array(
       'default' => FALSE,
       'locked' => TRUE,
+      'direction' => LanguageInterface::DIRECTION_LTR,
     );
     // This is called very early while initializing the language system. Prevent
     // early t() calls by using the TranslationWrapper.
@@ -233,27 +249,16 @@ class LanguageManager implements LanguageManagerInterface {
   }
 
   /**
-   * Some common languages with their English and native names.
-   *
-   * Language codes are defined by the W3C language tags document for
-   * interoperability. Language codes typically have a language and, optionally,
-   * a script or regional variant name. See:
-   * http://www.w3.org/International/articles/language-tags/ for more
-   * information.
-   *
-   * This list is based on languages available from localize.drupal.org. See
-   * http://localize.drupal.org/issues for information on how to add languages
-   * there.
-   *
-   * The "Left-to-right marker" comments and the enclosed UTF-8 markers are to
-   * make otherwise strange looking PHP syntax natural (to not be displayed in
-   * right to left). See http://drupal.org/node/128866#comment-528929.
-   *
-   * @return array
-   *   An array of language code to language name information.
-   *   Language name information itself is an array of English and native names.
+   * @inheritdoc
    */
   public static function getStandardLanguageList() {
+    // This list is based on languages available from localize.drupal.org. See
+    // http://localize.drupal.org/issues for information on how to add languages
+    // there.
+    //
+    // The "Left-to-right marker" comments and the enclosed UTF-8 markers are to
+    // make otherwise strange looking PHP syntax natural (to not be displayed in
+    // right to left). See https://www.drupal.org/node/128866#comment-528929.
     return array(
       'af' => array('Afrikaans', 'Afrikaans'),
       'am' => array('Amharic', 'አማርኛ'),
@@ -318,8 +323,8 @@ class LanguageManager implements LanguageManagerInterface {
       'my' => array('Burmese', 'ဗမာစကား'),
       'ne' => array('Nepali', 'नेपाली'),
       'nl' => array('Dutch', 'Nederlands'),
-      'nb' => array('Norwegian Bokmål', 'Bokmål'),
-      'nn' => array('Norwegian Nynorsk', 'Nynorsk'),
+      'nb' => array('Norwegian Bokmål', 'Norsk, bokmål'),
+      'nn' => array('Norwegian Nynorsk', 'Norsk, nynorsk'),
       'oc' => array('Occitan', 'Occitan'),
       'pa' => array('Punjabi', 'ਪੰਜਾਬੀ'),
       'pl' => array('Polish', 'Polski'),

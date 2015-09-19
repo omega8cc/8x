@@ -2,13 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\file\Tests\FilePrivateTest.
+ * Contains \Drupal\file\Tests\FilePrivateTest.
  */
 
 namespace Drupal\file\Tests;
 
 use Drupal\Core\Entity\Plugin\Validation\Constraint\ReferenceAccessConstraint;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\file\Entity\File;
 use Drupal\node\Entity\NodeType;
 
@@ -45,6 +45,7 @@ class FilePrivateTest extends FileFieldTestBase {
     $test_file = $this->getTestFile('text');
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name, TRUE, array('private' => TRUE));
     \Drupal::entityManager()->getStorage('node')->resetCache(array($nid));
+    /* @var \Drupal\node\NodeInterface $node */
     $node = $node_storage->load($nid);
     $node_file = File::load($node->{$field_name}->target_id);
     // Ensure the file can be viewed.
@@ -62,14 +63,15 @@ class FilePrivateTest extends FileFieldTestBase {
     $no_access_field_name = 'field_no_view_access';
     $this->createFileField($no_access_field_name, 'node', $type_name, array('uri_scheme' => 'private'));
     // Test with the field that should deny access through field access.
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin($this->adminUser);
     $nid = $this->uploadNodeFile($test_file, $no_access_field_name, $type_name, TRUE, array('private' => TRUE));
     \Drupal::entityManager()->getStorage('node')->resetCache(array($nid));
     $node = $node_storage->load($nid);
     $node_file = File::load($node->{$no_access_field_name}->target_id);
 
     // Ensure the file cannot be downloaded.
-    $this->drupalGet(file_create_url($node_file->getFileUri()));
+    $file_url = file_create_url($node_file->getFileUri());
+    $this->drupalGet($file_url);
     $this->assertResponse(403, 'Confirmed that access is denied for the file without view field access permission.');
 
     // Attempt to reuse the file when editing a node.
@@ -83,7 +85,7 @@ class FilePrivateTest extends FileFieldTestBase {
     $this->assertUrl('node/' . $new_node->id() .'/edit');
     // Check that we got the expected constraint form error.
     $constraint = new ReferenceAccessConstraint();
-    $this->assertRaw(String::format($constraint->message, array('%type' => 'file', '%id' => $node_file->id())));
+    $this->assertRaw(SafeMarkup::format($constraint->message, array('%type' => 'file', '%id' => $node_file->id())));
     // Attempt to reuse the existing file when creating a new node, and confirm
     // that access is still denied.
     $edit = array();
@@ -93,6 +95,25 @@ class FilePrivateTest extends FileFieldTestBase {
     $new_node = $this->drupalGetNodeByTitle($edit['title[0][value]']);
     $this->assertTrue(empty($new_node), 'Node was not created.');
     $this->assertUrl('node/add/' . $type_name);
-    $this->assertRaw(String::format($constraint->message, array('%type' => 'file', '%id' => $node_file->id())));
+    $this->assertRaw(SafeMarkup::format($constraint->message, array('%type' => 'file', '%id' => $node_file->id())));
+
+    // Now make file_test_file_download() return everything.
+    \Drupal::state()->set('file_test.allow_all', TRUE);
+    // Delete the node.
+    $node->delete();
+    // Ensure the file can still be downloaded by the owner.
+    $this->drupalGet($file_url);
+    $this->assertResponse(200, 'Confirmed that the owner still has access to the temporary file.');
+
+    // Ensure the file cannot be downloaded by an anonymous user.
+    $this->drupalLogout();
+    $this->drupalGet($file_url);
+    $this->assertResponse(403, 'Confirmed that access is denied for an anonymous user to the temporary file.');
+
+    // Ensure the file cannot be downloaded by another user.
+    $account = $this->drupalCreateUser();
+    $this->drupalLogin($account);
+    $this->drupalGet($file_url);
+    $this->assertResponse(403, 'Confirmed that access is denied for another user to the temporary file.');
   }
 }

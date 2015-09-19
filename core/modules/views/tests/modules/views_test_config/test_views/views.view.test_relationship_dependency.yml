@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -19,7 +19,7 @@ display:
       access:
         type: perm
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       fields:

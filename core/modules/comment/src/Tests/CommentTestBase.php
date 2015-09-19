@@ -27,7 +27,7 @@ abstract class CommentTestBase extends WebTestBase {
    *
    * @var array
    */
-  public static $modules = array('comment', 'node', 'history', 'field_ui', 'datetime');
+  public static $modules = ['block', 'comment', 'node', 'history', 'field_ui', 'datetime'];
 
   /**
    * An administrative user with permission to configure comment settings.
@@ -86,6 +86,7 @@ abstract class CommentTestBase extends WebTestBase {
 
     // Create a test node authored by the web user.
     $this->node = $this->drupalCreateNode(array('type' => 'article', 'promote' => 1, 'uid' => $this->webUser->id()));
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -117,7 +118,7 @@ abstract class CommentTestBase extends WebTestBase {
     else {
       $field = FieldConfig::loadByName('node', 'article', $field_name);
     }
-    $preview_mode = $field->settings['preview'];
+    $preview_mode = $field->getSetting('preview');
 
     // Must get the page before we test for fields.
     if ($entity !== NULL) {
@@ -179,10 +180,10 @@ abstract class CommentTestBase extends WebTestBase {
    *
    * @param \Drupal\comment\CommentInterface $comment
    *   The comment object.
-   * @param boolean $reply
+   * @param bool $reply
    *   Boolean indicating whether the comment is a reply to another comment.
    *
-   * @return boolean
+   * @return bool
    *   Boolean indicating whether the comment was found.
    */
   function commentExists(CommentInterface $comment = NULL, $reply = FALSE) {
@@ -314,7 +315,7 @@ abstract class CommentTestBase extends WebTestBase {
    */
   public function setCommentSettings($name, $value, $message, $field_name = 'comment') {
     $field = FieldConfig::loadByName('node', 'article', $field_name);
-    $field->settings[$name] = $value;
+    $field->setSetting($name, $value);
     $field->save();
     // Display status message.
     $this->pass($message);
@@ -323,7 +324,7 @@ abstract class CommentTestBase extends WebTestBase {
   /**
    * Checks whether the commenter's contact information is displayed.
    *
-   * @return boolean
+   * @return bool
    *   Contact info is available.
    */
   function commentContactInfoAvailable() {
@@ -337,7 +338,7 @@ abstract class CommentTestBase extends WebTestBase {
    *   Comment to perform operation on.
    * @param string $operation
    *   Operation to perform.
-   * @param boolean $aproval
+   * @param bool $approval
    *   Operation is found on approval page.
    */
   function performCommentOperation(CommentInterface $comment, $operation, $approval = FALSE) {

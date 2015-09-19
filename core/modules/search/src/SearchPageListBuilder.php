@@ -80,7 +80,7 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'search_admin_settings';
   }
 
@@ -121,7 +121,7 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
    */
   public function buildRow(EntityInterface $entity) {
     /** @var $entity \Drupal\search\SearchPageInterface */
-    $row['label'] = $this->getLabel($entity);
+    $row['label'] = $entity->label();
     $row['url']['#markup'] = 'search/' . $entity->getPath();
     // If the search page is active, link to it.
     if ($entity->status()) {
@@ -260,11 +260,6 @@ class SearchPageListBuilder extends DraggableListBuilder implements FormInterfac
       '#attributes' => array(
         'class' => array('container-inline'),
       ),
-      '#attached' => [
-        'library' => [
-          'search/admin',
-        ],
-      ],
     );
     // In order to prevent validation errors for the parent form, this cannot be
     // required, see self::validateAddSearchPage().

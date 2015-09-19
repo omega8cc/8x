@@ -50,6 +50,11 @@ abstract class MTimeProtectedFileStorageBase extends PhpStorageTestBase {
 
   /**
    * Tests basic load/save/delete operations.
+   *
+   * @covers ::load
+   * @covers ::save
+   * @covers ::delete
+   * @covers ::exists
    */
   public function testCRUD() {
     $php = new $this->storageClass($this->settings);
@@ -119,6 +124,7 @@ abstract class MTimeProtectedFileStorageBase extends PhpStorageTestBase {
       $this->assertSame($php->load($name), $this->expected[$i]);
       $this->assertSame($GLOBALS['hacked'], $this->expected[$i]);
     }
+    unset($GLOBALS['hacked']);
   }
 
 }

@@ -7,7 +7,6 @@
 
 namespace Drupal\Core\EventSubscriber;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Routing\RouteBuildEvent;
 use Drupal\Core\Routing\RouteSubscriberBase;
 use Symfony\Cmf\Component\Routing\RouteObjectInterface;
@@ -25,7 +24,6 @@ class SpecialAttributesRouteSubscriber extends RouteSubscriberBase {
     $special_variables = array(
       'system_path',
       '_legacy',
-      '_authentication_provider',
       '_raw_variables',
       RouteObjectInterface::ROUTE_OBJECT,
       RouteObjectInterface::ROUTE_NAME,
@@ -46,14 +44,10 @@ class SpecialAttributesRouteSubscriber extends RouteSubscriberBase {
    *
    * @param \Drupal\Core\Routing\RouteBuildEvent $event
    *   The route build event.
-   *
-   * @return bool
-   *   Returns TRUE if the variables were successfully replaced, otherwise
-   *   FALSE.
    */
   public function onAlterRoutes(RouteBuildEvent $event) {
     $collection = $event->getRouteCollection();
-    return $this->alterRoutes($collection);
+    $this->alterRoutes($collection);
   }
 
 }

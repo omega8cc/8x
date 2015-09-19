@@ -17,8 +17,6 @@ use Drupal\Core\Url;
  * @param array $variables
  *   An associative array containing:
  *   - data: An array of data about each project's status.
- *
- * @ingroup themeable
  */
 function template_preprocess_update_report(&$variables) {
   $data = $variables['data'];
@@ -41,24 +39,12 @@ function template_preprocess_update_report(&$variables) {
     $variables['no_updates_message'] = _update_no_data();
   }
 
-  $status = array();
-
-  // Create an array of status values keyed by module or theme name, since
-  // we'll need this while generating the report if we have to cross reference
-  // anything (e.g. subthemes which have base themes missing an update).
-  foreach ($data as $project) {
-    foreach ($project['includes'] as $key => $name) {
-      $status[$key] = $project['status'];
-    }
-  }
-
   $rows = array();
 
   foreach ($data as $project) {
     $project_status = array(
       '#theme' =>  'update_project_status',
       '#project' => $project,
-      '#includes_status' => $status,
     );
 
     // Build project rows.
@@ -76,22 +62,20 @@ function template_preprocess_update_report(&$variables) {
     // Add project status class attribute to the table row.
     switch ($project['status']) {
       case UPDATE_CURRENT:
-        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('ok'));
+        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('color-success'));
         break;
       case UPDATE_UNKNOWN:
       case UPDATE_FETCH_PENDING:
       case UPDATE_NOT_FETCHED:
-        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('unknown'));
-        break;
       case UPDATE_NOT_SECURE:
       case UPDATE_REVOKED:
       case UPDATE_NOT_SUPPORTED:
-        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('error'));
+        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('color-error'));
         break;
       case UPDATE_NOT_CHECKED:
       case UPDATE_NOT_CURRENT:
       default:
-        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('warning'));
+        $rows[$project['project_type']][$row_key]['#attributes'] = array('class' => array('color-warning'));
         break;
     }
   }
@@ -124,16 +108,10 @@ function template_preprocess_update_report(&$variables) {
  * @param array $variables
  *   An associative array containing:
  *   - project: An array of information about the project.
- *   - includes_status: An array of sub-project statuses where the keys are the
- *     shortnames of each project and the values are UPDATE_* integer constants
- *     as defined in update.module.
- *
- * @ingroup themeable
  */
 function template_preprocess_update_project_status(&$variables) {
   // Storing by reference because we are sorting the project values.
   $project = &$variables['project'];
-  $includes_status = $variables['includes_status'];
 
   // Set the project title and URL.
   $variables['title'] = (isset($project['title'])) ? $project['title'] : $project['name'];
@@ -160,11 +138,11 @@ function template_preprocess_update_project_status(&$variables) {
         && count($project['security updates']) == 1
         && $project['security updates'][0]['version'] === $project['recommended']
       ) {
-        $security_class[] = 'version-recommended';
-        $security_class[] = 'version-recommended-strong';
+        $security_class[] = 'project-update__version--recommended';
+        $security_class[] = 'project-update__version---strong';
       }
       else {
-        $version_class[] = 'version-recommended';
+        $version_class[] = 'project-update__version--recommended';
         // Apply an extra class if we're displaying both a recommended
         // version and anything else for an extra visual hint.
         if ($project['recommended'] !== $project['latest_version']
@@ -176,7 +154,7 @@ function template_preprocess_update_project_status(&$variables) {
           || (isset($project['security updates'][0])
             && $project['recommended'] !== $project['security updates'][0])
         ) {
-          $version_class[] = 'version-recommended-strong';
+          $version_class[] = 'project-update__version--recommended-strong';
         }
         $versions_inner[] = array(
           '#theme' => 'update_version',
@@ -250,45 +228,13 @@ function template_preprocess_update_project_status(&$variables) {
       $extra_item = array();
       $extra_item['attributes'] = new Attribute();
       $extra_item['label'] = $value['label'];
-      $extra_item['data'] = drupal_placeholder($value['data']);
+      $extra_item['data'] = [
+        '#prefix' => '<em>',
+        '#markup' => $value['data'],
+        '#suffix' => '</em>'
+      ];
       $variables['extras'][] = $extra_item;
     }
-  }
-
-  if (!empty($project['base_themes'])) {
-    asort($project['base_themes']);
-    $base_themes = array();
-    foreach ($project['base_themes'] as $base_key => $base_theme) {
-      switch ($includes_status[$base_key]) {
-        case UPDATE_NOT_SECURE:
-          $base_status_label = t('Security update required!');
-          break;
-        case UPDATE_REVOKED:
-          $base_status_label = t('Revoked!');
-          break;
-        case UPDATE_NOT_SUPPORTED:
-          $base_status_label = t('Not supported!');
-          break;
-        default:
-          $base_status_label = '';
-      }
-
-      if ($base_status_label) {
-        $base_themes[] = t('%base_theme (!base_label)', array(
-          '%base_theme' => $base_theme,
-          '!base_label' => $base_status_label,
-        ));
-      }
-      else {
-        $base_themes[] = drupal_placeholder($base_theme);
-      }
-    }
-    $variables['base_themes'] = $base_themes;
-  }
-
-  if (!empty($project['sub_themes'])) {
-    sort($project['sub_themes']);
-    $variables['sub_themes'] = $project['sub_themes'];
   }
 
   // Set the project status details.
@@ -328,7 +274,7 @@ function template_preprocess_update_project_status(&$variables) {
     case UPDATE_NOT_SECURE:
     case UPDATE_REVOKED:
     case UPDATE_NOT_SUPPORTED:
-      $uri = 'core/misc/icons/ea2800/error.svg';
+      $uri = 'core/misc/icons/e32700/error.svg';
       $text = t('Error');
       break;
     case UPDATE_NOT_CHECKED:

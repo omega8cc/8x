@@ -12,6 +12,7 @@ use Drupal\Core\Access\CheckProviderInterface;
 use Drupal\Core\Controller\ControllerResolverInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Lock\LockBackendInterface;
+use Drupal\Core\DestructableInterface;
 use Symfony\Component\EventDispatcher\Event;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\Routing\RouteCollection;
@@ -20,7 +21,7 @@ use Symfony\Component\Routing\Route;
 /**
  * Managing class for rebuilding the router table.
  */
-class RouteBuilder implements RouteBuilderInterface {
+class RouteBuilder implements RouteBuilderInterface, DestructableInterface {
 
   /**
    * The dumper to which we should send collected routes.
@@ -44,25 +45,11 @@ class RouteBuilder implements RouteBuilderInterface {
   protected $dispatcher;
 
   /**
-   * The yaml discovery used to find all the .routing.yml files.
-   *
-   * @var \Drupal\Component\Discovery\YamlDiscovery
-   */
-  protected $yamlDiscovery;
-
-  /**
    * The module handler.
    *
    * @var \Drupal\Core\Extension\ModuleHandlerInterface
    */
   protected $moduleHandler;
-
-  /**
-   * The route builder indicator.
-   *
-   * @var \Drupal\Core\Routing\RouteBuilderIndicatorInterface
-   */
-  protected $routeBuilderIndicator;
 
   /**
    * The controller resolver.
@@ -79,11 +66,18 @@ class RouteBuilder implements RouteBuilderInterface {
   protected $routeCollection;
 
   /**
-   * Flag that indiciates if we are currently rebuilding the routes.
+   * Flag that indicates if we are currently rebuilding the routes.
    *
    * @var bool
    */
   protected $building = FALSE;
+
+  /**
+   * Flag that indicates if we should rebuild at the end of the request.
+   *
+   * @var bool
+   */
+  protected $rebuildNeeded = FALSE;
 
   /**
    * The check provider.
@@ -107,17 +101,21 @@ class RouteBuilder implements RouteBuilderInterface {
    *   The controller resolver.
    * @param \Drupal\Core\Access\CheckProviderInterface $check_provider
    *   The check provider.
-   * @param \Drupal\Core\Routing\RouteBuilderIndicatorInterface $route_build_indicator
-   *   The route build indicator.
    */
-  public function __construct(MatcherDumperInterface $dumper, LockBackendInterface $lock, EventDispatcherInterface $dispatcher, ModuleHandlerInterface $module_handler, ControllerResolverInterface $controller_resolver, CheckProviderInterface $check_provider, RouteBuilderIndicatorInterface $route_build_indicator = NULL) {
+  public function __construct(MatcherDumperInterface $dumper, LockBackendInterface $lock, EventDispatcherInterface $dispatcher, ModuleHandlerInterface $module_handler, ControllerResolverInterface $controller_resolver, CheckProviderInterface $check_provider) {
     $this->dumper = $dumper;
     $this->lock = $lock;
     $this->dispatcher = $dispatcher;
     $this->moduleHandler = $module_handler;
     $this->controllerResolver = $controller_resolver;
-    $this->routeBuilderIndicator = $route_build_indicator;
     $this->checkProvider = $check_provider;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function setRebuildNeeded() {
+    $this->rebuildNeeded = TRUE;
   }
 
   /**
@@ -139,7 +137,6 @@ class RouteBuilder implements RouteBuilderInterface {
     $this->building = TRUE;
 
     $collection = new RouteCollection();
-    $this->routeCollection = $collection;
     foreach ($this->getRouteDefinitions() as $routes) {
       // The top-level 'routes_callback' is a list of methods in controller
       // syntax, see \Drupal\Core\Controller\ControllerResolver. These methods
@@ -171,12 +168,15 @@ class RouteBuilder implements RouteBuilderInterface {
           'defaults' => array(),
           'requirements' => array(),
           'options' => array(),
+          'host' => NULL,
+          'schemes' => array(),
+          'methods' => array(),
+          'condition' => '',
         );
 
-        $route = new Route($route_info['path'], $route_info['defaults'], $route_info['requirements'], $route_info['options']);
+        $route = new Route($route_info['path'], $route_info['defaults'], $route_info['requirements'], $route_info['options'], $route_info['host'], $route_info['schemes'], $route_info['methods'], $route_info['condition']);
         $collection->add($name, $route);
       }
-
     }
 
     // DYNAMIC is supposed to be used to add new routes based upon all the
@@ -193,12 +193,11 @@ class RouteBuilder implements RouteBuilderInterface {
     $this->dumper->addRoutes($collection);
     $this->dumper->dump();
 
-    $this->routeBuilderIndicator->setRebuildDone();
     $this->lock->release('router_rebuild');
     $this->dispatcher->dispatch(RoutingEvents::FINISHED, new Event());
     $this->building = FALSE;
 
-    $this->routeCollection = NULL;
+    $this->rebuildNeeded = FALSE;
 
     return TRUE;
   }
@@ -207,7 +206,7 @@ class RouteBuilder implements RouteBuilderInterface {
    * {@inheritdoc}
    */
   public function rebuildIfNeeded() {
-    if ($this->routeBuilderIndicator->isRebuildNeeded()) {
+    if ($this->rebuildNeeded) {
       return $this->rebuild();
     }
     return FALSE;
@@ -216,8 +215,11 @@ class RouteBuilder implements RouteBuilderInterface {
   /**
    * {@inheritdoc}
    */
-  public function setRebuildNeeded() {
-    $this->routeBuilderIndicator->setRebuildNeeded();
+  public function destruct() {
+    // Rebuild routes only once at the end of the request lifecycle to not
+    // trigger multiple rebuilds and also make the page more responsive for the
+    // user.
+    $this->rebuildIfNeeded();
   }
 
   /**
@@ -227,10 +229,10 @@ class RouteBuilder implements RouteBuilderInterface {
    *   The defined routes, keyed by provider.
    */
   protected function getRouteDefinitions() {
-    if (!isset($this->yamlDiscovery)) {
-      $this->yamlDiscovery = new YamlDiscovery('routing', $this->moduleHandler->getModuleDirectories());
-    }
-    return $this->yamlDiscovery->findAll();
+    // Always instantiate a new YamlDiscovery object so that we always search on
+    // the up-to-date list of modules.
+    $discovery = new YamlDiscovery('routing', $this->moduleHandler->getModuleDirectories());
+    return $discovery->findAll();
   }
 
 }

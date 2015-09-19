@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies: {  }
 id: test_view_argument_validate_user
@@ -25,7 +25,7 @@ display:
             type: 'entity:user'
           plugin_id: 'null'
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       pager:

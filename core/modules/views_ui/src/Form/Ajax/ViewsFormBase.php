@@ -12,6 +12,8 @@ use Drupal\Core\Ajax\OpenModalDialogCommand;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormState;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\Render\RenderContext;
 use Drupal\views_ui\ViewUI;
 use Drupal\views\ViewEntityInterface;
 use Drupal\views\Ajax;
@@ -191,6 +193,9 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
    *   #markup array.
    */
   protected function ajaxFormWrapper($form_class, FormStateInterface &$form_state) {
+    /** @var \Drupal\Core\Render\RendererInterface $renderer */
+    $renderer = \Drupal::service('renderer');
+
     // This won't override settings already in.
     if (!$form_state->has('rerender')) {
       $form_state->set('rerender', FALSE);
@@ -202,8 +207,21 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
     }
     $form_state->disableCache();
 
-    $form = \Drupal::formBuilder()->buildForm($form_class, $form_state);
-    $output = drupal_render($form);
+    // Builds the form in a render context in order to ensure that cacheable
+    // metadata is bubbled up.
+    $render_context = new RenderContext();
+    $callable = function () use ($form_class, &$form_state) {
+      return \Drupal::formBuilder()->buildForm($form_class, $form_state);
+    };
+    $form = $renderer->executeInRenderContext($render_context, $callable);
+
+    if (!$render_context->isEmpty()) {
+      BubbleableMetadata::createFromRenderArray($form)
+        ->merge($render_context->pop())
+        ->applyTo($form);
+    }
+    $output = $renderer->renderRoot($form);
+
     drupal_process_attached($form);
 
     // These forms have the title built in, so set the title here:
@@ -220,15 +238,15 @@ abstract class ViewsFormBase extends FormBase implements ViewsFormInterface {
       $response->setAttachments($form['#attached']);
 
       $display = '';
-      $status_messages = array('#theme' => 'status_messages');
-      if ($messages = drupal_render($status_messages)) {
+      $status_messages = array('#type' => 'status_messages');
+      if ($messages = $renderer->renderRoot($status_messages)) {
         $display = '<div class="views-messages">' . $messages . '</div>';
       }
       $display .= $output;
 
       $options = array(
         'dialogClass' => 'views-ui-dialog',
-        'width' => '50%',
+        'width' => '75%',
       );
 
       $response->addCommand(new OpenModalDialogCommand($title, $display, $options));

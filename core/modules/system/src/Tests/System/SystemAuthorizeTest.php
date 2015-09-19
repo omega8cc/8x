@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\System\SystemAuthorizeTest.
+ * Contains \Drupal\system\Tests\System\SystemAuthorizeTest.
  */
 
 namespace Drupal\system\Tests\System;
@@ -27,8 +27,7 @@ class SystemAuthorizeTest extends WebTestBase {
     parent::setUp();
 
     // Create an administrator user.
-    $this->admin_user = $this->drupalCreateUser(array('administer software updates'));
-    $this->drupalLogin($this->admin_user);
+    $this->drupalLogin ($this->drupalCreateUser(array('administer software updates')));
   }
 
   /**

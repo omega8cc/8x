@@ -7,7 +7,6 @@
 
 namespace Drupal\locale\Form;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
@@ -59,7 +58,7 @@ class TranslationStatusForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'locale_translation_status_form';
   }
 
@@ -82,7 +81,7 @@ class TranslationStatusForm extends FormBase {
 
       // Build data options for the select table.
       foreach ($updates as $langcode => $update) {
-        $title = String::checkPlain($languages[$langcode]->getName());
+        $title = $languages[$langcode]->getName();
         $locale_translation_update_info = array('#theme' => 'locale_translation_update_info');
         foreach (array('updates', 'not_found') as $update_status) {
           if (isset($update[$update_status])) {
@@ -94,12 +93,12 @@ class TranslationStatusForm extends FormBase {
             'class' => array('label'),
             'data' => array(
               '#title' => $title,
-              '#markup' => $title,
+              '#plain_text' => $title,
             ),
           ),
           'status' => array(
             'class' => array('description', 'priority-low'),
-            'data' => drupal_render($locale_translation_update_info),
+            'data' => $locale_translation_update_info,
           ),
         );
         if (!empty($update['not_found'])) {
@@ -193,8 +192,9 @@ class TranslationStatusForm extends FormBase {
     $updates = array();
 
     // @todo Calling locale_translation_build_projects() is an expensive way to
-    //   get a module name. In follow-up issue http://drupal.org/node/1842362
-    //   the project name will be stored to display use, like here.
+    //   get a module name. In follow-up issue
+    //   https://www.drupal.org/node/1842362 the project name will be stored to
+    //   display use, like here.
     $this->moduleHandler->loadInclude('locale', 'compare.inc');
     $project_data = locale_translation_build_projects();
 

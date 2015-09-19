@@ -219,6 +219,7 @@ class MenuTest extends MenuWebTestBase {
 
     // Confirm that the custom menu block is available.
     $this->drupalGet('admin/structure/block/list/' . $this->config('system.theme')->get('default'));
+    $this->clickLinkPartialName('Place block');
     $this->assertText($label);
 
     // Enable the block.
@@ -242,9 +243,10 @@ class MenuTest extends MenuWebTestBase {
     $this->assertResponse(200);
     $this->assertRaw(t('The menu %title has been deleted.', array('%title' => $label)), 'Custom menu was deleted');
     $this->assertNull(Menu::load($menu_name), 'Custom menu was deleted');
-    // Test if all menu links associated to the menu were removed from database.
+    // Test if all menu links associated with the menu were removed from
+    // database.
     $result = entity_load_multiple_by_properties('menu_link_content', array('menu_name' => $menu_name));
-    $this->assertFalse($result, 'All menu links associated to the custom menu were deleted.');
+    $this->assertFalse($result, 'All menu links associated with the custom menu were deleted.');
 
     // Make sure there's no delete button on system menus.
     $this->drupalGet('admin/structure/menu/manage/main');
@@ -289,7 +291,7 @@ class MenuTest extends MenuWebTestBase {
     $node5 = $this->drupalCreateNode(array(
       'type' => 'article',
       'path' => array(
-        'alias' => 'node5',
+        'alias' => '/node5',
       ),
     ));
 
@@ -450,8 +452,8 @@ class MenuTest extends MenuWebTestBase {
     $this->assertMenuLink($item1->getPluginId(), array('enabled' => 1));
 
     // Add an external link.
-    $item7 = $this->addMenuLink('', 'http://drupal.org', $menu_name);
-    $this->assertMenuLink($item7->getPluginId(), array('url' => 'http://drupal.org'));
+    $item7 = $this->addMenuLink('', 'https://www.drupal.org', $menu_name);
+    $this->assertMenuLink($item7->getPluginId(), array('url' => 'https://www.drupal.org'));
 
     // Add <front> menu item.
     $item8 = $this->addMenuLink('', '/', $menu_name);
@@ -532,6 +534,7 @@ class MenuTest extends MenuWebTestBase {
     // Make sure menu shows up with new name in block addition.
     $default_theme = $this->config('system.theme')->get('default');
     $this->drupalget('admin/structure/block/list/' . $default_theme);
+    $this->clickLinkPartialName('Place block');
     $this->assertText($edit['label']);
   }
 
@@ -555,6 +558,9 @@ class MenuTest extends MenuWebTestBase {
     $this->drupalLogin($this->adminUser);
     $this->drupalGet('admin/structure/menu/manage/' . $item->getMenuName());
     $this->assertNoText($item->getTitle(), "Menu link pointing to unpublished node is only visible to users with 'bypass node access' permission");
+    // The cache contexts associated with the (in)accessible menu links are
+    // bubbled. See DefaultMenuLinkTreeManipulators::menuLinkCheckAccess().
+    $this->assertCacheContext('user.permissions');
   }
 
   /**
@@ -567,7 +573,7 @@ class MenuTest extends MenuWebTestBase {
     $block = $this->drupalPlaceBlock('system_menu_block:' . $custom_menu->id(), array('label' => 'Custom menu', 'provider' => 'system'));
     $this->drupalGet('test-page');
 
-    $id = 'block:block=' . $block->id() . ':|menu:menu=' . $custom_menu->id() . ':';
+    $id = 'block:block=' . $block->id() . ':langcode=en|menu:menu=' . $custom_menu->id() . ':langcode=en';
     // @see \Drupal\contextual\Tests\ContextualDynamicContextTest:assertContextualLinkPlaceHolder()
     $this->assertRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
 
@@ -578,12 +584,6 @@ class MenuTest extends MenuWebTestBase {
     $this->assertResponse(200);
     $json = Json::decode($response);
     $this->assertIdentical($json[$id], '<ul class="contextual-links"><li class="block-configure"><a href="' . base_path() . 'admin/structure/block/manage/' . $block->id() . '">Configure block</a></li><li class="entitymenuedit-form"><a href="' . base_path() . 'admin/structure/menu/manage/' . $custom_menu->id() . '">Edit menu</a></li></ul>');
-
-    // Test the contextual links are available when block caching is enabled.
-    $this->drupalPostForm('admin/structure/block/manage/' . $block->id(), ['settings[cache][max_age]' => Cache::PERMANENT], t('Save block'));
-    $this->drupalGet('test-page');
-    $id = 'block:block=' . $block->id() . ':|menu:menu=' . $custom_menu->id() . ':';
-    $this->assertRaw('<div data-contextual-id="'. $id . '"></div>', format_string('Contextual link placeholder with id @id exists.', array('@id' => $id)));
   }
 
   /**
@@ -870,13 +870,13 @@ class MenuTest extends MenuWebTestBase {
     $admin = $this->drupalCreateUser(array('administer menu'));
     $this->drupalLogin($admin);
     // Just check access to the callback overall, the POST data is irrelevant.
-    $this->drupalGetAJAX('admin/structure/menu/parents');
+    $this->drupalGetAjax('admin/structure/menu/parents');
     $this->assertResponse(200);
 
     // Do standard user tests.
     // Login the user.
     $this->drupalLogin($this->authenticatedUser);
-    $this->drupalGetAJAX('admin/structure/menu/parents');
+    $this->drupalGetAjax('admin/structure/menu/parents');
     $this->assertResponse(403);
   }
 

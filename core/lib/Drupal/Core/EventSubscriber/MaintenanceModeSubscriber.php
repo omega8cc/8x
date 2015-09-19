@@ -7,7 +7,7 @@
 
 namespace Drupal\Core\EventSubscriber;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Component\Utility\Xss;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Render\BareHtmlPageRendererInterface;
@@ -18,7 +18,6 @@ use Drupal\Core\Site\MaintenanceModeInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Event\GetResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -98,15 +97,17 @@ class MaintenanceModeSubscriber implements EventSubscriberInterface {
   public function onKernelRequestMaintenance(GetResponseEvent $event) {
     $route_match = RouteMatch::createFromRequest($event->getRequest());
     if ($this->maintenanceMode->applies($route_match)) {
+      // Don't cache maintenance mode pages.
+      \Drupal::service('page_cache_kill_switch')->trigger();
       if (!$this->maintenanceMode->exempt($this->account)) {
         // Deliver the 503 page if the site is in maintenance mode and the
         // logged in user is not allowed to bypass it.
         drupal_maintenance_theme();
-        $content = Xss::filterAdmin(String::format($this->config->get('system.maintenance')->get('message'), array(
+        $content = Xss::filterAdmin(SafeMarkup::format($this->config->get('system.maintenance')->get('message'), array(
           '@site' => $this->config->get('system.site')->get('name'),
         )));
-        $output = $this->bareHtmlPageRenderer->renderBarePage(['#markup' => $content], $this->t('Site under maintenance'), 'maintenance_page');
-        $response = new Response($output, 503);
+        $response = $this->bareHtmlPageRenderer->renderBarePage(['#markup' => $content], $this->t('Site under maintenance'), 'maintenance_page');
+        $response->setStatusCode(503);
         $event->setResponse($response);
       }
       else {

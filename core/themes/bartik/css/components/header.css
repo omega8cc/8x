@@ -2,6 +2,26 @@
 #header {
   font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
+.header .section {
+  position: relative;
+}
+.region-header {
+  float: right; /* LTR */
+  margin: .5em 5px .75em;
+}
+[dir="rtl"] .region-header {
+  float: left;
+}
+@media all and (min-width: 461px) and (max-width: 900px) {
+  .region-header {
+    margin: .5em 5px .75em;
+  }
+}
+@media all and (min-width: 901px) {
+  .region-header {
+    margin: 1em 5px 1.5em;
+  }
+}
 #logo,
 .site-logo {
   float: left; /* LTR */
@@ -100,7 +120,7 @@ h1.site-name {
   overflow: hidden;
   height: 1px;
 }
-.region-header .block .content {
+.header .block .content {
   margin: 0;
   padding: 0;
 }
@@ -227,6 +247,9 @@ h1.site-name {
 .region-header .block-locale ul li {
   display: inline;
   padding: 0 0.5em;
+}
+[role*=banner] a {
+  border-bottom: none;
 }
 
 [dir="rtl"] #logo,

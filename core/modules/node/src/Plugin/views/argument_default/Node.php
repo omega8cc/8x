@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugin\views\argument_default\Node.
+ * Contains \Drupal\node\Plugin\views\argument_default\Node.
  */
 
 namespace Drupal\node\Plugin\views\argument_default;
@@ -83,7 +83,7 @@ class Node extends ArgumentDefaultPluginBase implements CacheablePluginInterface
    * {@inheritdoc}
    */
   public function getCacheContexts() {
-    return ['cache.context.url'];
+    return ['url'];
   }
 
 }

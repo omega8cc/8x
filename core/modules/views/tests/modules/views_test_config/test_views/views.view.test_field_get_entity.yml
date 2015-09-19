@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies:
   module:
@@ -19,7 +19,7 @@ display:
       access:
         type: perm
       cache:
-        type: none
+        type: tag
       exposed_form:
         type: basic
       fields:
@@ -27,7 +27,7 @@ display:
           field: cid
           id: cid
           table: comment_field_data
-          plugin_id: comment
+          plugin_id: field
           entity_type: comment
           entity_field: cid
         nid:
@@ -35,7 +35,7 @@ display:
           id: nid
           table: node_field_data
           relationship: node
-          plugin_id: node
+          plugin_id: field
           entity_type: node
           entity_field: nid
         uid:

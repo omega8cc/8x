@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\taxonomy\Plugin\views\argument_default\Tid.
+ * Contains \Drupal\taxonomy\Plugin\views\argument_default\Tid.
  */
 
 namespace Drupal\taxonomy\Plugin\views\argument_default;
@@ -187,10 +187,11 @@ class Tid extends ArgumentDefaultPluginBase implements CacheablePluginInterface 
       if (($node = $this->routeMatch->getParameter('node')) && $node instanceof NodeInterface) {
         $taxonomy = array();
         foreach ($node->getFieldDefinitions() as $field) {
-          if ($field->getType() == 'taxonomy_term_reference') {
+          if ($field->getType() == 'entity_reference' && $field->getSetting('target_type') == 'taxonomy_term') {
             foreach ($node->get($field->getName()) as $item) {
-              $allowed_values = $field->getSetting('allowed_values');
-              $taxonomy[$item->target_id] = $allowed_values[0]['vocabulary'];
+              if (($handler_settings = $field->getSetting('handler_settings')) && isset($handler_settings['target_bundles'])) {
+                $taxonomy[$item->target_id] = reset($handler_settings['target_bundles']);
+              }
             }
           }
         }
@@ -210,13 +211,6 @@ class Tid extends ArgumentDefaultPluginBase implements CacheablePluginInterface 
         }
       }
     }
-
-    // If the current page is a view that takes tid as an argument,
-    // find the tid argument and return it.
-    $views_page = views_get_page_view();
-    if ($views_page && isset($views_page->argument['tid'])) {
-      return $views_page->argument['tid']->argument;
-    }
   }
 
   /**
@@ -230,7 +224,7 @@ class Tid extends ArgumentDefaultPluginBase implements CacheablePluginInterface 
    * {@inheritdoc}
    */
   public function getCacheContexts() {
-    return ['cache.context.url'];
+    return ['url'];
   }
 
   /**

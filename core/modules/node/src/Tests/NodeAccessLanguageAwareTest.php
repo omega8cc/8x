@@ -9,6 +9,7 @@ namespace Drupal\node\Tests;
 
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\language\Entity\ConfigurableLanguage;
+use Drupal\user\Entity\User;
 
 /**
  * Tests node_access and db_select() with node_access tag functionality with
@@ -79,7 +80,7 @@ class NodeAccessLanguageAwareTest extends NodeTestBase {
 
     // Load the user 1 user for later use as an admin user with permission to
     // see everything.
-    $this->adminUser = user_load(1);
+    $this->adminUser = User::load(1);
 
     // Add Hungarian and Catalan.
     ConfigurableLanguage::createFromLangcode('hu')->save();
@@ -103,6 +104,7 @@ class NodeAccessLanguageAwareTest extends NodeTestBase {
       'field_private' => array(array('value' => 0)),
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 0;
     $node->save();
 
@@ -112,6 +114,7 @@ class NodeAccessLanguageAwareTest extends NodeTestBase {
       'field_private' => array(array('value' => 0)),
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 1;
     $node->save();
 
@@ -121,6 +124,7 @@ class NodeAccessLanguageAwareTest extends NodeTestBase {
       'field_private' => array(array('value' => 1)),
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 0;
     $node->save();
 
@@ -130,6 +134,7 @@ class NodeAccessLanguageAwareTest extends NodeTestBase {
       'field_private' => array(array('value' => 1)),
     ));
     $translation = $node->getTranslation('ca');
+    $translation->title->value = $this->randomString();
     $translation->field_private->value = 1;
     $node->save();
 

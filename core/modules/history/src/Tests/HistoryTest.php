@@ -27,7 +27,7 @@ class HistoryTest extends WebTestBase {
   /**
    * The main user for testing.
    *
-   * @var objec
+   * @var object
    */
   protected $user;
 
@@ -117,6 +117,7 @@ class HistoryTest extends WebTestBase {
 
     // View the node.
     $this->drupalGet('node/' . $nid);
+    $this->assertCacheContext('user.roles:authenticated');
     // JavaScript present to record the node read.
     $settings = $this->getDrupalSettings();
     $libraries = explode(',', $settings['ajaxPageState']['libraries']);

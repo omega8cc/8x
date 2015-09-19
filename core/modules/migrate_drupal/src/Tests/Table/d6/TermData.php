@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\TermData.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\TermData.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -52,10 +52,11 @@ class TermData extends DrupalDumpBase {
         'weight' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '4',
+          'length' => '11',
           'default' => '0',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("term_data")->fields(array(
       'tid',
@@ -104,3 +105,4 @@ class TermData extends DrupalDumpBase {
   }
 
 }
+#5bd3c3673e6cc04e09db9b3d3f601c73

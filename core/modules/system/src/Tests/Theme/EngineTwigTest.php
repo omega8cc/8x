@@ -56,6 +56,13 @@ class EngineTwigTest extends WebTestBase {
       'url (as route) absolute despite option: ' . $url_generator->generateFromRoute('user.register', array(), array('absolute' => TRUE)),
       'url (as route) absolute with fragment: ' . $url_generator->generateFromRoute('user.register', array(), array('absolute' => TRUE, 'fragment' => 'bottom')),
     );
+
+    // Verify that url() has the ability to bubble cacheability metadata:
+    // absolute URLs should bubble the 'url.site' cache context. (This only
+    // needs to test that cacheability metadata is bubbled *at all*; detailed
+    // tests for *which* cacheability metadata is bubbled live elsewhere.)
+    $this->assertCacheContext('url.site');
+
     // Make sure we got something.
     $content = $this->getRawContent();
     $this->assertFalse(empty($content), 'Page content is not empty');
@@ -70,11 +77,22 @@ class EngineTwigTest extends WebTestBase {
   public function testTwigLinkGenerator() {
     $this->drupalGet('twig-theme-test/link-generator');
 
+     /** @var \Drupal\Core\Utility\LinkGenerator $link_generator */
     $link_generator = $this->container->get('link_generator');
 
     $expected = [
-      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register')),
+      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register', [], ['absolute' => TRUE])),
+      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register', [], ['absolute' => TRUE, 'attributes' => ['foo' => 'bar']])),
+      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register', [], ['attributes' => ['foo' => 'bar', 'id' => 'kitten']])),
+      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register', [], ['attributes' => ['id' => 'kitten']])),
+      'link via the linkgenerator: ' . $link_generator->generate('register', new Url('user.register', [], ['attributes' => ['class' => ['llama', 'kitten', 'panda']]])),
     ];
+
+    // Verify that link() has the ability to bubble cacheability metadata:
+    // absolute URLs should bubble the 'url.site' cache context. (This only
+    // needs to test that cacheability metadata is bubbled *at all*; detailed
+    // tests for *which* cacheability metadata is bubbled live elsewhere.)
+    $this->assertCacheContext('url.site');
 
     $content = $this->getRawContent();
     $this->assertFalse(empty($content), 'Page content is not empty');
@@ -109,6 +127,14 @@ class EngineTwigTest extends WebTestBase {
     $this->drupalGet('/twig-theme-test/file-url');
     $filepath = file_create_url('core/modules/system/tests/modules/twig_theme_test/twig_theme_test.js');
     $this->assertRaw('<div>file_url: ' . $filepath . '</div>');
+  }
+
+  /**
+   * Tests the attach of asset libraries.
+   */
+  public function testTwigAttachLibrary() {
+    $this->drupalGet('/twig-theme-test/attach-library');
+    $this->assertRaw('ckeditor.js');
   }
 
 }

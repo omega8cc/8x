@@ -5,8 +5,11 @@
  * This alters the existing CKEditor image2 widget plugin, which is already
  * altered by the Drupal Image plugin, to:
  * - allow for the data-caption and data-align attributes to be set
- * - mimic the upcasting behavior of the caption_filter filter
+ * - mimic the upcasting behavior of the caption_filter filter.
+ *
+ * @ignore
  */
+
 (function (CKEDITOR) {
 
   "use strict";
@@ -49,7 +52,7 @@
 
         // Override requiredContent & allowedContent.
         widgetDefinition.requiredContent = 'img[alt,src,width,height,data-entity-type,data-entity-uuid,data-align,data-caption]';
-        widgetDefinition.allowedContent.img.attributes += ',data-align,data-caption';
+        widgetDefinition.allowedContent.img.attributes += ',!data-align,!data-caption';
 
         // Override allowedContent setting for the 'caption' nested editable.
         // This must match what caption_filter enforces.
@@ -210,7 +213,8 @@
             }
           };
         };
-      }, null, null, 20); // Low priority to ensure drupalimage's event handler runs first.
+      // Low priority to ensure drupalimage's event handler runs first.
+      }, null, null, 20);
     }
   });
 
@@ -220,9 +224,13 @@
    * Function will check first the passed element itself and then all its
    * children in DFS order.
    *
-   * @param CKEDITOR.htmlParser.element element
-   * @param String name
-   * @return CKEDITOR.htmlParser.element
+   * @param {CKEDITOR.htmlParser.element} element
+   *   The element to search.
+   * @param {string} name
+   *   The element name to search for.
+   *
+   * @return {?CKEDITOR.htmlParser.element}
+   *   The found element, or null.
    */
   function findElementByName(element, name) {
     if (element.name === name) {
@@ -233,7 +241,8 @@
     element.forEach(function (el) {
       if (el.name === name) {
         found = el;
-        return false; // Stop here.
+        // Stop here.
+        return false;
       }
     }, CKEDITOR.NODE_ELEMENT);
     return found;

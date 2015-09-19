@@ -50,7 +50,7 @@ class ExportForm extends FormBase {
   /**
    * {@inheritdoc}
    */
-  public function getFormID() {
+  public function getFormId() {
     return 'locale_translate_export_form';
   }
 
@@ -61,7 +61,7 @@ class ExportForm extends FormBase {
     $languages = $this->languageManager->getLanguages();
     $language_options = array();
     foreach ($languages as $langcode => $language) {
-      if ($langcode != 'en' || locale_translate_english()) {
+      if (locale_is_translatable($langcode)) {
         $language_options[$langcode] = $language->getName();
       }
     }

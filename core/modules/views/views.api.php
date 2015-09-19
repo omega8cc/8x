@@ -6,7 +6,9 @@
  */
 
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\views\Plugin\views\cache\CachePluginBase;
 use Drupal\views\Plugin\views\PluginBase;
+use Drupal\views\ViewExecutable;
 
 /**
  * @defgroup views_overview Views overview
@@ -28,20 +30,22 @@ use Drupal\views\Plugin\views\PluginBase;
  *   entity, create a class implementing
  *   \Drupal\views\EntityViewsDataInterface and reference this in the
  *   "views_data" annotation in the entity class. You can autogenerate big parts
- *   of the ingration if you extend the \Drupal\views\EntityViewsData base
+ *   of the integration if you extend the \Drupal\views\EntityViewsData base
  *   class. See the @link entity_api Entity API topic @endlink for more
  *   information about entities.
  * - Implement hooks: A few operations in Views can be influenced by hooks.
- *   See the @link Views hooks topic @endlink for a list.
+ *   See the @link views_hooks Views hooks topic @endlink for a list.
  * - Theming: See the @link views_templates Views templates topic @endlink
  *   for more information.
  *
  * @see \Drupal\views\ViewExecutable
+ * @see \Drupal\views\Views
  * @}
  */
 
 /**
  * @defgroup views_plugins Views plugins
+ * @{
  * Overview of views plugins
  *
  * Views plugins are objects that are used to build and render the view.
@@ -57,16 +61,20 @@ use Drupal\views\Plugin\views\PluginBase;
  * @todo Document specific options on the appropriate plugin base classes.
  * @todo Add examples.
  *
+ * @ingroup views_overview
  * @see \Drupal\views\Plugin\views\PluginBase
  * @see \Drupal\views\Plugin\views\HandlerBase
  * @see plugin_api
  * @see annotation
+ * @}
  */
 
 /**
  * @defgroup views_hooks Views hooks
  * @{
  * Hooks that allow other modules to implement the Views API.
+ * @ingroup views_overview
+ * @}
  */
 
 /**
@@ -617,7 +625,8 @@ function hook_views_query_substitutions(ViewExecutable $view) {
  *
  * @return array
  *   An associative array where each key is a string to be replaced, and the
- *   corresponding value is its replacement.
+ *   corresponding value is its replacement. The value will be escaped unless it
+ *   is already marked safe.
  */
 function hook_views_form_substitutions() {
   return array(
@@ -662,7 +671,7 @@ function hook_views_pre_view(ViewExecutable $view, $display_id, array &$args) {
  * @see \Drupal\views\ViewExecutable
  */
 function hook_views_pre_build(ViewExecutable $view) {
-  // Because of some unexplicable business logic, we should remove all
+  // Because of some inexplicable business logic, we should remove all
   // attachments from all views on Mondays.
   // (This alter could be done later in the execution process as well.)
   if (date('D') == 'Mon') {
@@ -790,12 +799,12 @@ function hook_views_pre_render(ViewExecutable $view) {
  *   The view object about to be processed.
  * @param string $output
  *   A flat string with the rendered output of the view.
- * @param CacheBackendInterface $cache
+ * @param \Drupal\views\Plugin\views\cache\CachePluginBase $cache
  *   The cache settings.
  *
  * @see \Drupal\views\ViewExecutable
  */
-function hook_views_post_render(ViewExecutable $view, &$output, CacheBackendInterface $cache) {
+function hook_views_post_render(ViewExecutable $view, &$output, CachePluginBase $cache) {
   // When using full pager, disable any time-based caching if there are fewer
   // than 10 results.
   if ($view->pager instanceof Drupal\views\Plugin\views\pager\Full && $cache instanceof Drupal\views\Plugin\views\cache\Time && count($view->result) < 10) {

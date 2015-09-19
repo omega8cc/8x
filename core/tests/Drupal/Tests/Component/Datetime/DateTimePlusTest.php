@@ -238,7 +238,7 @@ class DateTimePlusTest extends UnitTestCase {
    */
   public function testDateTimezoneWithDateTimeObject() {
     // Create a date object with another date object.
-    $input = new DateTimePlus('now', 'Pacific/Midway');
+    $input = new \DateTime('now', new \DateTimeZone('Pacific/Midway'));
     $timezone = NULL;
     $expected_timezone = 'Pacific/Midway';
     $message = 'DateTimePlus uses the specified timezone if provided.';
@@ -375,7 +375,7 @@ class DateTimePlusTest extends UnitTestCase {
       array(array('year' => 2010, 'month' => 2, 'day' => 28, 'hour' => 80, 'minute' => 0, 'second' => 0), 'America/Chicago'),
       // Test for invalid minute from date array.
       array(array('year' => 2010, 'month' => 7, 'day' => 8, 'hour' => 8, 'minute' => 88, 'second' => 0), 'America/Chicago'),
-      // Regression test for https://drupal.org/node/2084455
+      // Regression test for https://www.drupal.org/node/2084455.
       array(array('hour' => 59, 'minute' => 1,'second' => 1), 'America/Chicago'),
     );
   }
@@ -388,7 +388,7 @@ class DateTimePlusTest extends UnitTestCase {
    *   - 'date' - Date string or object for DateTimePlus.
    *   - 'timezone' - Timezone string for DateTimePlus.
    *   - 'expected' - Expected return from DateTimePlus::getTimezone()::getName().
-   '   - 'message' - Message to display on test failure.
+   *   - 'message' - Message to display on test failure.
    *
    * @see testDateTimezone
    */

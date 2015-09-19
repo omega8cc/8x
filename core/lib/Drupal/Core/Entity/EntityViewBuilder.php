@@ -117,14 +117,10 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
    * {@inheritdoc}
    */
   public function viewMultiple(array $entities = array(), $view_mode = 'full', $langcode = NULL) {
-    if (!isset($langcode)) {
-      $langcode = $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId();
-    }
-
     $build_list = array(
       '#sorted' => TRUE,
       '#pre_render' => array(array($this, 'buildMultiple')),
-      '#langcode' => $langcode,
+      '#langcode' => $langcode ?: $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId(),
     );
     $weight = 0;
     foreach ($entities as $key => $entity) {
@@ -133,9 +129,10 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
       $entity = $this->entityManager->getTranslationFromContext($entity, $langcode);
 
       // Set build defaults.
-      $build_list[$key] = $this->getBuildDefaults($entity, $view_mode, $langcode);
+      $entity_langcode = $entity->language()->getId();
+      $build_list[$key] = $this->getBuildDefaults($entity, $view_mode, $entity_langcode);
       $entityType = $this->entityTypeId;
-      $this->moduleHandler()->alter(array($entityType . '_build_defaults', 'entity_build_defaults'), $build_list[$key], $entity, $view_mode, $langcode);
+      $this->moduleHandler()->alter(array($entityType . '_build_defaults', 'entity_build_defaults'), $build_list[$key], $entity, $view_mode, $entity_langcode);
 
       $build_list[$key]['#weight'] = $weight++;
     }
@@ -169,10 +166,8 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
       // Collect cache defaults for this entity.
       '#cache' => array(
         'tags' => Cache::mergeTags($this->getCacheTags(), $entity->getCacheTags()),
-        'contexts' => [
-          'theme',
-          'user.roles',
-        ],
+        'contexts' => $entity->getCacheContexts(),
+        'max-age' => $entity->getCacheMaxAge(),
       ),
     );
 
@@ -276,9 +271,9 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
         $this->alterBuild($build_list[$key], $entity, $display, $view_mode, $langcode);
 
         // Assign the weights configured in the display.
-        // @todo: Once https://drupal.org/node/1875974 provides the missing API,
-        //   only do it for 'extra fields', since other components have been
-        //   taken care of in EntityViewDisplay::buildMultiple().
+        // @todo: Once https://www.drupal.org/node/1875974 provides the missing
+        //   API, only do it for 'extra fields', since other components have
+        //   been taken care of in EntityViewDisplay::buildMultiple().
         foreach ($display->getComponents() as $name => $options) {
           if (isset($build_list[$key][$name])) {
             $build_list[$key][$name]['#weight'] = $options['weight'];
@@ -370,7 +365,8 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
     if (isset($entities)) {
       $tags = [];
       foreach ($entities as $entity) {
-        $tags = Cache::mergeTags($tags, $entity->getCacheTags(), $entity->getEntityType()->getListCacheTags());
+        $tags = Cache::mergeTags($tags, $entity->getCacheTags());
+        $tags = Cache::mergeTags($tags, $entity->getEntityType()->getListCacheTags());
       }
       Cache::invalidateTags($tags);
     }
@@ -380,7 +376,7 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
   }
 
   /**
-   * Returns TRUE if the view mode is cacheable.
+   * Determines whether the view mode is cacheable.
    *
    * @param string $view_mode
    *   Name of the view mode that should be rendered.
@@ -439,7 +435,7 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
   }
 
   /**
-   * Returns an EntityViewDisplay for rendering an individual field.
+   * Gets an EntityViewDisplay for rendering an individual field.
    *
    * @param \Drupal\Core\Entity\EntityInterface $entity
    *   The entity.
@@ -469,7 +465,7 @@ class EntityViewBuilder extends EntityHandlerBase implements EntityHandlerInterf
       // series of fields individually for cases such as views tables.
       $entity_type_id = $entity->getEntityTypeId();
       $bundle = $entity->bundle();
-      $key = $entity_type_id . ':' . $bundle . ':' . $field_name . ':' . crc32(serialize($display_options));
+      $key = $entity_type_id . ':' . $bundle . ':' . $field_name . ':' . hash('crc32b', serialize($display_options));
       if (!isset($this->singleFieldDisplays[$key])) {
         $this->singleFieldDisplays[$key] = EntityViewDisplay::create(array(
           'targetEntityType' => $entity_type_id,

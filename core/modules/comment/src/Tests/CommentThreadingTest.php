@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\comment\Tests\CommentThreadingTest.
+ * Contains \Drupal\comment\Tests\CommentThreadingTest.
  */
 
 namespace Drupal\comment\Tests;
@@ -127,7 +127,7 @@ class CommentThreadingTest extends CommentTestBase {
   /**
    * Asserts that the link to the specified parent comment is present.
    *
-   * @parm int $cid
+   * @param int $cid
    *   The comment ID to check.
    * @param int $pid
    *   The expected parent comment ID.
@@ -154,7 +154,7 @@ class CommentThreadingTest extends CommentTestBase {
   /**
    * Asserts that the specified comment does not have a link to a parent.
    *
-   * @parm int $cid
+   * @param int $cid
    *   The comment ID to check.
    */
   protected function assertNoParentLink($cid) {

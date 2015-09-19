@@ -22,12 +22,13 @@
  * Help block (provided by the core Help module), if the block is displayed on
  * that page. The module overview help information is displayed by the Help
  * module. It can be accessed from the page at admin/help or from the Extend
- * Extend page.
+ * Extend page. If a module implements hook_help() the help system expects
+ * module overview help to be provided.
  *
  * For detailed usage examples of:
  * - Module overview help, see content_translation_help(). Module overview
  *   help should follow
- *   @link https://drupal.org/node/632280 the standard help template. @endlink
+ *   @link https://www.drupal.org/node/632280 the standard help template. @endlink
  * - Page-specific help using only routes, see book_help().
  * - Page-specific help using routes and $request, see block_help().
  *

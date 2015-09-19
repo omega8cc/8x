@@ -1,4 +1,4 @@
-langcode: und
+langcode: en
 status: true
 dependencies: {  }
 id: test_field_classes
@@ -14,7 +14,7 @@ display:
       access:
         type: none
       cache:
-        type: none
+        type: tag
       fields:
         id:
           id: id

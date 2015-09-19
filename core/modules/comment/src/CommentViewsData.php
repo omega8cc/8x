@@ -27,13 +27,10 @@ class CommentViewsData extends EntityViewsData {
 
     $data['comment_field_data']['subject']['title'] = t('Title');
     $data['comment_field_data']['subject']['help'] = t('The title of the comment.');
-    $data['comment_field_data']['subject']['field']['id'] = 'comment';
-
-    $data['comment_field_data']['cid']['field']['id'] = 'comment';
 
     $data['comment_field_data']['name']['title'] = t('Author');
     $data['comment_field_data']['name']['help'] = t("The name of the comment's author. Can be rendered as a link to the author's homepage.");
-    $data['comment_field_data']['name']['field']['id'] = 'comment_username';
+    $data['comment_field_data']['name']['field']['default_formatter'] = 'comment_username';
 
     $data['comment_field_data']['homepage']['title'] = t("Author's website");
     $data['comment_field_data']['homepage']['help'] = t("The website address of the comment's author. Can be rendered as a link. Will be empty if the author is a registered user.");
@@ -102,35 +99,8 @@ class CommentViewsData extends EntityViewsData {
 
     $data['comment_field_data']['status']['title'] = t('Approved status');
     $data['comment_field_data']['status']['help'] = t('Whether the comment is approved (or still in the moderation queue).');
-    $data['comment_field_data']['status']['field']['output formats'] = array(
-      'approved-not-approved' => array(t('Approved'), t('Not Approved')),
-    );
     $data['comment_field_data']['status']['filter']['label'] = t('Approved comment status');
     $data['comment_field_data']['status']['filter']['type'] = 'yes-no';
-
-    $data['comment']['view_comment'] = array(
-      'field' => array(
-        'title' => t('Link to comment'),
-        'help' => t('Provide a simple link to view the comment.'),
-        'id' => 'comment_link',
-      ),
-    );
-
-    $data['comment']['edit_comment'] = array(
-      'field' => array(
-        'title' => t('Link to edit comment'),
-        'help' => t('Provide a simple link to edit the comment.'),
-        'id' => 'comment_link_edit',
-      ),
-    );
-
-    $data['comment']['delete_comment'] = array(
-      'field' => array(
-        'title' => t('Link to delete comment'),
-        'help' => t('Provide a simple link to delete the comment.'),
-        'id' => 'comment_link_delete',
-      ),
-    );
 
     $data['comment']['approve_comment'] = array(
       'field' => array(
@@ -160,23 +130,6 @@ class CommentViewsData extends EntityViewsData {
     );
     unset($data['comment_field_data']['thread']['filter']);
     unset($data['comment_field_data']['thread']['argument']);
-
-    $data['comment_field_data']['field_name'] = array(
-      'title' => t('Comment field name'),
-      'help' => t('The Field name from which the comment originated.'),
-      'field' => array(
-        'id' => 'standard',
-      ),
-      'filter' => array(
-        'id' => 'string',
-      ),
-      'argument' => array(
-        'id' => 'string',
-      ),
-      'sort' => array(
-        'id' => 'standard',
-      ),
-    );
 
     $entities_types = \Drupal::entityManager()->getDefinitions();
 
@@ -212,22 +165,11 @@ class CommentViewsData extends EntityViewsData {
     $data['comment_field_data']['uid']['relationship']['title'] = t('Author');
     $data['comment_field_data']['uid']['relationship']['help'] = t("The User ID of the comment's author.");
     $data['comment_field_data']['uid']['relationship']['label'] = t('author');
-    $data['comment_field_data']['uid']['field']['id'] = 'user';
 
     $data['comment_field_data']['pid']['title'] = t('Parent CID');
     $data['comment_field_data']['pid']['relationship']['title'] = t('Parent comment');
     $data['comment_field_data']['pid']['relationship']['help'] = t('The parent comment');
     $data['comment_field_data']['pid']['relationship']['label'] = t('parent');
-
-    if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
-      $data['comment']['translation_link'] = array(
-        'title' => t('Translation link'),
-        'help' => t('Provide a link to the translations overview for comments.'),
-        'field' => array(
-          'id' => 'content_translation_link',
-        ),
-      );
-    }
 
     // Define the base group of this table. Fields that don't have a group defined
     // will go into this field by default.

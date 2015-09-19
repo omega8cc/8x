@@ -8,23 +8,30 @@
 namespace Drupal\Core\Render\MainContent;
 
 use Drupal\Component\Plugin\PluginManagerInterface;
-use Drupal\Component\Utility\NestedArray;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Controller\TitleResolverInterface;
 use Drupal\Core\Display\PageVariantInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Render\BubbleableMetadata;
+use Drupal\Core\Render\HtmlResponse;
 use Drupal\Core\Render\PageDisplayVariantSelectionEvent;
-use Drupal\Core\Render\Renderer;
+use Drupal\Core\Render\RenderCacheInterface;
+use Drupal\Core\Render\RenderContext;
 use Drupal\Core\Render\RendererInterface;
 use Drupal\Core\Render\RenderEvents;
 use Drupal\Core\Routing\RouteMatchInterface;
-use Symfony\Component\DependencyInjection\ContainerAwareTrait;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Default main content renderer for HTML requests.
+ *
+ * For attachment handling of HTML responses:
+ * @see template_preprocess_html()
+ * @see \Drupal\Core\Render\AttachmentsResponseProcessorInterface
+ * @see \Drupal\Core\Render\BareHtmlPageRenderer
+ * @see \Drupal\Core\Render\HtmlResponse
+ * @see \Drupal\Core\Render\HtmlResponseAttachmentsProcessor
  */
 class HtmlRenderer implements MainContentRendererInterface {
 
@@ -48,7 +55,6 @@ class HtmlRenderer implements MainContentRendererInterface {
    * @var \Symfony\Component\EventDispatcher\EventDispatcherInterface
    */
   protected $eventDispatcher;
-
   /**
    * The module handler.
    *
@@ -64,6 +70,22 @@ class HtmlRenderer implements MainContentRendererInterface {
   protected $renderer;
 
   /**
+   * The render cache service.
+   *
+   * @var \Drupal\Core\Render\RenderCacheInterface
+   */
+  protected $renderCache;
+
+  /**
+   * The renderer configuration array.
+   *
+   * @see sites/default/default.services.yml
+   *
+   * @var array
+   */
+  protected $rendererConfig;
+
+  /**
    * Constructs a new HtmlRenderer.
    *
    * @param \Drupal\Core\Controller\TitleResolverInterface $title_resolver
@@ -76,13 +98,19 @@ class HtmlRenderer implements MainContentRendererInterface {
    *   The module handler.
    * @param \Drupal\Core\Render\RendererInterface $renderer
    *   The renderer service.
+   * @param \Drupal\Core\Render\RenderCacheInterface $render_cache
+   *   The render cache service.
+   * @param array $renderer_config
+   *   The renderer configuration array.
    */
-  public function __construct(TitleResolverInterface $title_resolver, PluginManagerInterface $display_variant_manager, EventDispatcherInterface $event_dispatcher, ModuleHandlerInterface $module_handler, RendererInterface $renderer) {
+  public function __construct(TitleResolverInterface $title_resolver, PluginManagerInterface $display_variant_manager, EventDispatcherInterface $event_dispatcher, ModuleHandlerInterface $module_handler, RendererInterface $renderer, RenderCacheInterface $render_cache, array $renderer_config) {
     $this->titleResolver = $title_resolver;
     $this->displayVariantManager = $display_variant_manager;
     $this->eventDispatcher = $event_dispatcher;
     $this->moduleHandler = $module_handler;
     $this->renderer = $renderer;
+    $this->renderCache = $render_cache;
+    $this->rendererConfig = $renderer_config;
   }
 
   /**
@@ -106,46 +134,43 @@ class HtmlRenderer implements MainContentRendererInterface {
       '#type' => 'html',
       'page' => $page,
     ];
-    $html += element_info('html');
 
     // The special page regions will appear directly in html.html.twig, not in
     // page.html.twig, hence add them here, just before rendering html.html.twig.
     $this->buildPageTopAndBottom($html);
 
-    // The three parts of rendered markup in html.html.twig (page_top, page and
-    // page_bottom) must be rendered with drupal_render_root(), so that their
-    // #post_render_cache callbacks are executed (which may attach additional
-    // assets).
-    // html.html.twig must be able to render the final list of attached assets,
-    // and hence may not execute any #post_render_cache_callbacks (because they
-    // might add yet more assets to be attached), and therefore it must be
-    // rendered with drupal_render(), not drupal_render_root().
-    $this->renderer->render($html['page'], TRUE);
-    if (isset($html['page_top'])) {
-      $this->renderer->render($html['page_top'], TRUE);
-    }
-    if (isset($html['page_bottom'])) {
-      $this->renderer->render($html['page_bottom'], TRUE);
-    }
-    $content = $this->renderer->render($html);
+    // Render, but don't replace placeholders yet, because that happens later in
+    // the render pipeline. To not replace placeholders yet, we use
+    // RendererInterface::render() instead of RendererInterface::renderRoot().
+    // @see \Drupal\Core\Render\HtmlResponseAttachmentsProcessor.
+    $render_context = new RenderContext();
+    $this->renderer->executeInRenderContext($render_context, function() use (&$html) {
+      // RendererInterface::render() renders the $html render array and updates
+      // it in place. We don't care about the return value (which is just
+      // $html['#markup']), but about the resulting render array.
+      // @todo Simplify this when https://www.drupal.org/node/2495001 lands.
+      $this->renderer->render($html);
+    });
+    // RendererInterface::render() always causes bubbleable metadata to be
+    // stored in the render context, no need to check it conditionally.
+    $bubbleable_metadata = $render_context->pop();
+    $bubbleable_metadata->applyTo($html);
+    $content = $this->renderCache->getCacheableRenderArray($html);
 
-    // Store the cache tags associated with this page in a X-Drupal-Cache-Tags
-    // header. Also associate the "rendered" cache tag. This allows us to
-    // invalidate the entire render cache, regardless of the cache bin.
-    $cache_tags = Cache::mergeTags(
-      isset($html['page_top']) ? $html['page_top']['#cache']['tags'] : [],
-      $html['page']['#cache']['tags'],
-      isset($html['page_bottom']) ? $html['page_bottom']['#cache']['tags'] : [],
-      ['rendered']
-    );
+    // Also associate the required cache contexts.
+    // (Because we use ::render() above and not ::renderRoot(), we manually must
+    // ensure the HTML response varies by the required cache contexts.)
+    $content['#cache']['contexts'] = Cache::mergeContexts($content['#cache']['contexts'], $this->rendererConfig['required_cache_contexts']);
 
-    // Set the generator in the HTTP header.
-    list($version) = explode('.', \Drupal::VERSION, 2);
+    // Also associate the "rendered" cache tag. This allows us to invalidate the
+    // entire render cache, regardless of the cache bin.
+    $content['#cache']['tags'][] = 'rendered';
 
-    return new Response($content, 200,[
-      'X-Drupal-Cache-Tags' => implode(' ', $cache_tags),
-      'X-Generator' => 'Drupal ' . $version . ' (http://drupal.org)'
+    $response = new HtmlResponse($content, 200, [
+      'Content-Type' => 'text/html; charset=UTF-8',
     ]);
+
+    return $response;
   }
 
   /**
@@ -184,13 +209,21 @@ class HtmlRenderer implements MainContentRendererInterface {
 
       // We must render the main content now already, because it might provide a
       // title. We set its $is_root_call parameter to FALSE, to ensure
-      // #post_render_cache callbacks are not yet applied. This is essentially
-      // "pre-rendering" the main content, the "full rendering" will happen in
+      // placeholders are not yet replaced. This is essentially "pre-rendering"
+      // the main content, the "full rendering" will happen in
       // ::renderResponse().
       // @todo Remove this once https://www.drupal.org/node/2359901 lands.
       if (!empty($main_content)) {
-        $this->renderer->render($main_content, FALSE);
-        $main_content = $this->renderer->getCacheableRenderArray($main_content) + [
+        $this->renderer->executeInRenderContext(new RenderContext(), function() use (&$main_content) {
+          if (isset($main_content['#cache']['keys'])) {
+            // Retain #title, otherwise, dynamically generated titles would be
+            // missing for controllers whose entire returned render array is
+            // render cached.
+            $main_content['#cache_properties'][] = '#title';
+          }
+          return $this->renderer->render($main_content, FALSE);
+        });
+        $main_content = $this->renderCache->getCacheableRenderArray($main_content) + [
           '#title' => isset($main_content['#title']) ? $main_content['#title'] : NULL
         ];
       }
@@ -200,7 +233,9 @@ class HtmlRenderer implements MainContentRendererInterface {
       if (!$page_display instanceof PageVariantInterface) {
         throw new \LogicException('Cannot render the main content for this page because the provided display variant does not implement PageVariantInterface.');
       }
-      $page_display->setMainContent($main_content);
+      $page_display
+        ->setMainContent($main_content)
+        ->setConfiguration($event->getPluginConfiguration());
 
       // Generate a #type => page render array using the page display variant,
       // the page display will build the content for the various page regions.
@@ -212,8 +247,8 @@ class HtmlRenderer implements MainContentRendererInterface {
 
     // $page is now fully built. Find all non-empty page regions, and add a
     // theme wrapper function that allows them to be consistently themed.
-    $regions = system_region_list(\Drupal::theme()->getActiveTheme()->getName());
-    foreach (array_keys($regions) as $region) {
+    $regions = \Drupal::theme()->getActiveTheme()->getRegions();
+    foreach ($regions as $region) {
       if (!empty($page[$region])) {
         $page[$region]['#theme_wrappers'][] = 'region';
         $page[$region]['#region'] = $region;
@@ -251,19 +286,19 @@ class HtmlRenderer implements MainContentRendererInterface {
       $function = $module . '_page_attachments';
       $function($attachments);
     }
-    if (array_diff(array_keys($attachments), ['#attached', '#post_render_cache']) !== []) {
-      throw new \LogicException('Only #attached and #post_render_cache may be set in hook_page_attachments().');
+    if (array_diff(array_keys($attachments), ['#attached', '#cache']) !== []) {
+      throw new \LogicException('Only #attached and #cache may be set in hook_page_attachments().');
     }
 
     // Modules and themes can alter page attachments.
     $this->moduleHandler->alter('page_attachments', $attachments);
     \Drupal::theme()->alter('page_attachments', $attachments);
-    if (array_diff(array_keys($attachments), ['#attached', '#post_render_cache']) !== []) {
-      throw new \LogicException('Only #attached and #post_render_cache may be set in hook_page_attachments_alter().');
+    if (array_diff(array_keys($attachments), ['#attached', '#cache']) !== []) {
+      throw new \LogicException('Only #attached and #cache may be set in hook_page_attachments_alter().');
     }
 
     // Merge the attachments onto the $page render array.
-    $page = Renderer::mergeBubbleableMetadata($page, $attachments);
+    $page = $this->renderer->mergeBubbleableMetadata($page, $attachments);
   }
 
   /**

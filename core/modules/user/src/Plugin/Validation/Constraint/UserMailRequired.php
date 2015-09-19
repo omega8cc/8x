@@ -7,7 +7,7 @@
 
 namespace Drupal\user\Plugin\Validation\Constraint;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Symfony\Component\Validator\Constraint;
 use Symfony\Component\Validator\ConstraintValidatorInterface;
 use Symfony\Component\Validator\ExecutionContextInterface;
@@ -19,7 +19,7 @@ use Symfony\Component\Validator\ExecutionContextInterface;
  * and the user performing the edit has 'administer users' permission.
  * This allows users without email address to be edited and deleted.
  *
- * @Plugin(
+ * @Constraint(
  *   id = "UserMailRequired",
  *   label = @Translation("User email required", context = "Validation")
  * )
@@ -28,6 +28,9 @@ class UserMailRequired extends Constraint implements ConstraintValidatorInterfac
 
   /**
    * Violation message. Use the same message as FormValidator.
+   *
+   * Note that the name argument is not sanitized so that translators only have
+   * one string to translate. The name is sanitized in self::validate().
    *
    * @var string
    */
@@ -58,7 +61,7 @@ class UserMailRequired extends Constraint implements ConstraintValidatorInterfac
   public function validate($items, Constraint $constraint) {
     /** @var \Drupal\Core\Field\FieldItemListInterface $items */
     /** @var \Drupal\user\UserInterface $account */
-    $account = $this->context->getMetadata()->getTypedData()->getEntity();
+    $account = $items->getEntity();
     $existing_value = NULL;
     if ($account->id()) {
       $account_unchanged = \Drupal::entityManager()
@@ -70,7 +73,7 @@ class UserMailRequired extends Constraint implements ConstraintValidatorInterfac
     $required = !(!$existing_value && \Drupal::currentUser()->hasPermission('administer users'));
 
     if ($required && (!isset($items) || $items->isEmpty())) {
-      $this->context->addViolation($this->message, array('!name' => String::placeholder($account->getFieldDefinition('mail')->getLabel())));
+      $this->context->addViolation($this->message, ['!name' => Html::escape($account->getFieldDefinition('mail')->getLabel())]);
     }
   }
 

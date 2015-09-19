@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\node\Tests\PageEditTest.
+ * Contains \Drupal\node\Tests\PageEditTest.
  */
 
 namespace Drupal\node\Tests;
@@ -16,11 +16,19 @@ class PageEditTest extends NodeTestBase {
   protected $webUser;
   protected $adminUser;
 
+  /**
+   * Modules to enable.
+   *
+   * @var string[]
+   */
+  public static $modules = ['block', 'node', 'datetime'];
+
   protected function setUp() {
     parent::setUp();
 
     $this->webUser = $this->drupalCreateUser(array('edit own page content', 'create page content'));
     $this->adminUser = $this->drupalCreateUser(array('bypass node access', 'administer nodes'));
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -117,7 +125,11 @@ class PageEditTest extends NodeTestBase {
     $this->drupalPostForm('node/' . $node->id() . '/edit', $edit, t('Save and keep published'));
     $node_storage->resetCache(array($node->id()));
     $node = $node_storage->load($node->id());
-    $this->assertIdentical($node->getOwnerId(), '0', 'Node authored by anonymous user.');
+    $uid = $node->getOwnerId();
+    // Most SQL database drivers stringify fetches but entities are not
+    // necessarily stored in a SQL database. At the same time, NULL/FALSE/""
+    // won't do.
+    $this->assertTrue($uid === 0 || $uid === '0', 'Node authored by anonymous user.');
 
     // Change the authored by field to another user's name (that is not
     // logged in).

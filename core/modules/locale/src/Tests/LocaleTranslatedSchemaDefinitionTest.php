@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\locale\Tests\LocaleTranslatedSchemaDefinitionTest.
+ * Contains \Drupal\locale\Tests\LocaleTranslatedSchemaDefinitionTest.
  */
 
 namespace Drupal\locale\Tests;
@@ -30,7 +30,7 @@ class LocaleTranslatedSchemaDefinitionTest extends WebTestBase {
   protected function setUp() {
     parent::setUp();
     ConfigurableLanguage::createFromLangcode('fr')->save();
-    $this->config('system.site')->set('langcode', 'fr')->save();
+    $this->config('system.site')->set('default_langcode', 'fr')->save();
     // Make sure new entity type definitions are processed.
     \Drupal::service('entity.definition_update_manager')->applyUpdates();
     // Clear all caches so that the base field definition, its cache in the

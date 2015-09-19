@@ -2,12 +2,11 @@
 
 /**
  * @file
- * Definition of Drupal\node\NodeForm.
+ * Contains \Drupal\node\NodeForm.
  */
 
 namespace Drupal\node;
 
-use Drupal\Component\Utility\Html;
 use Drupal\Core\Entity\ContentEntityForm;
 use Drupal\Core\Entity\EntityManagerInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -89,7 +88,7 @@ class NodeForm extends ContentEntityForm {
       // Rebuild the form.
       $form_state->setRebuild();
       $this->entity = $preview->getFormObject()->getEntity();
-      unset($this->entity->in_preview);
+      $this->entity->in_preview = NULL;
 
       // Remove the stale temp store entry for existing nodes.
       if (!$this->entity->isNew()) {
@@ -107,11 +106,6 @@ class NodeForm extends ContentEntityForm {
     }
 
     $current_user = $this->currentUser();
-
-    // Override the default CSS class name, since the user-defined node type
-    // name in 'TYPE-node-form' potentially clashes with third-party class
-    // names.
-    $form['#attributes']['class'][0] = Html::getClass('node-' . $node->getType() . '-form');
 
     // Changed must be sent to the client, for later overwrite error checking.
     $form['changed'] = array(
@@ -209,7 +203,30 @@ class NodeForm extends ContentEntityForm {
 
     $form['#attached']['library'][] = 'node/form';
 
+    $form['#entity_builders']['update_status'] = [$this, 'updateStatus'];
+
     return $form;
+  }
+
+  /**
+   * Entity builder updating the node status with the submitted value.
+   *
+   * @param string $entity_type_id
+   *   The entity type identifier.
+   * @param \Drupal\node\NodeInterface $node
+   *   The node updated with the submitted values.
+   * @param array $form
+   *   The complete form array.
+   * @param \Drupal\Core\Form\FormStateInterface $form_state
+   *   The current state of the form.
+   *
+   * @see \Drupal\node\NodeForm::form()
+   */
+  function updateStatus($entity_type_id, NodeInterface $node, array $form, FormStateInterface $form_state) {
+    $element = $form_state->getTriggeringElement();
+    if (isset($element['#published_status'])) {
+      $node->setPublished($element['#published_status']);
+    }
   }
 
   /**
@@ -237,6 +254,8 @@ class NodeForm extends ContentEntityForm {
 
       // Add a "Publish" button.
       $element['publish'] = $element['submit'];
+      // If the "Publish" button is clicked, we want to update the status to "published".
+      $element['publish']['#published_status'] = TRUE;
       $element['publish']['#dropbutton'] = 'save';
       if ($node->isNew()) {
         $element['publish']['#value'] = t('Save and publish');
@@ -245,10 +264,11 @@ class NodeForm extends ContentEntityForm {
         $element['publish']['#value'] = $node->isPublished() ? t('Save and keep published') : t('Save and publish');
       }
       $element['publish']['#weight'] = 0;
-      array_unshift($element['publish']['#submit'], '::publish');
 
       // Add a "Unpublish" button.
       $element['unpublish'] = $element['submit'];
+      // If the "Unpublish" button is clicked, we want to update the status to "unpublished".
+      $element['unpublish']['#published_status'] = FALSE;
       $element['unpublish']['#dropbutton'] = 'save';
       if ($node->isNew()) {
         $element['unpublish']['#value'] = t('Save as unpublished');
@@ -257,7 +277,6 @@ class NodeForm extends ContentEntityForm {
         $element['unpublish']['#value'] = !$node->isPublished() ? t('Save and keep unpublished') : t('Save and unpublish');
       }
       $element['unpublish']['#weight'] = 10;
-      array_unshift($element['unpublish']['#submit'], '::unpublish');
 
       // If already published, the 'publish' button is primary.
       if ($node->isPublished()) {
@@ -278,7 +297,6 @@ class NodeForm extends ContentEntityForm {
       '#access' => $preview_mode != DRUPAL_DISABLED && ($node->access('create') || $node->access('update')),
       '#value' => t('Preview'),
       '#weight' => 20,
-      '#validate' => array('::validate'),
       '#submit' => array('::submitForm', '::preview'),
     );
 
@@ -286,19 +304,6 @@ class NodeForm extends ContentEntityForm {
     $element['delete']['#weight'] = 100;
 
     return $element;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function validate(array $form, FormStateInterface $form_state) {
-    $node = parent::validate($form, $form_state);
-
-    if ($node->id() && (node_last_changed($node->id(), $this->getFormLangcode($form_state)) > $node->getChangedTime())) {
-      $form_state->setErrorByName('changed', $this->t('The content on this page has either been modified by another user, or you have already submitted modifications using this form. As a result, your changes cannot be saved.'));
-    }
-
-    return $node;
   }
 
   /**
@@ -343,34 +348,6 @@ class NodeForm extends ContentEntityForm {
       'node_preview' => $this->entity->uuid(),
       'view_mode_id' => 'default',
     ));
-  }
-
-  /**
-   * Form submission handler for the 'publish' action.
-   *
-   * @param $form
-   *   An associative array containing the structure of the form.
-   * @param $form_state
-   *   The current state of the form.
-   */
-  public function publish(array $form, FormStateInterface $form_state) {
-    $node = $this->entity;
-    $node->setPublished(TRUE);
-    return $node;
-  }
-
-  /**
-   * Form submission handler for the 'unpublish' action.
-   *
-   * @param $form
-   *   An associative array containing the structure of the form.
-   * @param $form_state
-   *   The current state of the form.
-   */
-  public function unpublish(array $form, FormStateInterface $form_state) {
-    $node = $this->entity;
-    $node->setPublished(FALSE);
-    return $node;
   }
 
   /**

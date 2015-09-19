@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\search\Plugin\views\argument\Search.
+ * Contains \Drupal\search\Plugin\views\argument\Search.
  */
 
 namespace Drupal\search\Plugin\views\argument;
@@ -93,34 +93,34 @@ class Search extends ArgumentPluginBase {
       $join = Views::pluginManager('join')->createInstance('standard', $definition);
       $search_total = $this->query->addRelationship('search_total', $join, $search_index);
 
-      $this->search_score = $this->query->addField('', "SUM($search_index.score * $search_total.count)", 'score', array('aggregate' => TRUE));
+      // Add the search score field to the query.
+      $this->search_score = $this->query->addField('', "$search_index.score * $search_total.count", 'score', array('function' => 'sum'));
 
+      // Add the conditions set up by the search query to the views query.
       $search_condition->condition("$search_index.type", $this->searchType);
-
-      if (!$this->searchQuery->simple()) {
-        $search_dataset = $this->query->addTable('search_dataset');
-        $conditions = $this->searchQuery->conditions();
-        $condition_conditions =& $conditions->conditions();
-        foreach ($condition_conditions  as $key => &$condition) {
-          // Make sure we just look at real conditions.
-          if (is_numeric($key)) {
-            // Replace the conditions with the table alias of views.
-            $this->searchQuery->conditionReplaceString('d.', "$search_dataset.", $condition);
-          }
+      $search_dataset = $this->query->addTable('node_search_dataset');
+      $conditions = $this->searchQuery->conditions();
+      $condition_conditions =& $conditions->conditions();
+      foreach ($condition_conditions  as $key => &$condition) {
+        // Make sure we just look at real conditions.
+        if (is_numeric($key)) {
+          // Replace the conditions with the table alias of views.
+          $this->searchQuery->conditionReplaceString('d.', "$search_dataset.", $condition);
         }
-        $search_conditions =& $search_condition->conditions();
-        $search_conditions = array_merge($search_conditions, $condition_conditions);
       }
-      else {
-        // Stores each condition, so and/or on the filter level will still work.
-        $or = db_or();
-        foreach ($words as $word) {
-          $or->condition("$search_index.word", $word);
-        }
+      $search_conditions =& $search_condition->conditions();
+      $search_conditions = array_merge($search_conditions, $condition_conditions);
 
-        $search_condition->condition($or);
+      // Add the keyword conditions, as is done in
+      // SearchQuery::prepareAndNormalize(), but simplified because we are
+      // only concerned with relevance ranking so we do not need to normalize.
+      $or = db_or();
+      foreach ($words as $word) {
+        $or->condition("$search_index.word", $word);
       }
+      $search_condition->condition($or);
 
+      // Add the GROUP BY and HAVING expressions to the query.
       $this->query->addWhere(0, $search_condition);
       $this->query->addGroupBy("$search_index.sid");
       $matches = $this->searchQuery->matches();

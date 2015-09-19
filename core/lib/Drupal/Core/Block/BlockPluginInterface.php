@@ -8,7 +8,7 @@
 namespace Drupal\Core\Block;
 
 use Drupal\Component\Plugin\DerivativeInspectionInterface;
-use Drupal\Core\Cache\CacheableInterface;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Component\Plugin\PluginInspectionInterface;
 use Drupal\Component\Plugin\ConfigurablePluginInterface;
 use Drupal\Core\Form\FormStateInterface;
@@ -25,13 +25,13 @@ use Drupal\Core\Session\AccountInterface;
  *
  * @ingroup block_api
  */
-interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormInterface, PluginInspectionInterface, CacheableInterface, DerivativeInspectionInterface {
+interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormInterface, PluginInspectionInterface, CacheableDependencyInterface, DerivativeInspectionInterface {
 
   /**
    * Returns the user-facing block label.
    *
    * @todo Provide other specific label-related methods in
-   *   https://drupal.org/node/2025649.
+   *   https://www.drupal.org/node/2025649.
    *
    * @return string
    *   The block label.
@@ -63,6 +63,11 @@ interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormIn
   /**
    * Builds and returns the renderable array for this block plugin.
    *
+   * If a block should not be rendered because it has no content, then this
+   * method must also ensure to return no content: it must then only return an
+   * empty array, or an empty array with #cache set (with cacheability metadata
+   * indicating the circumstances for it being empty).
+   *
    * @return array
    *   A renderable array representing the content of the block.
    *
@@ -79,7 +84,7 @@ interface BlockPluginInterface extends ConfigurablePluginInterface, PluginFormIn
    *   The value to set for the provided key.
    *
    * @todo This doesn't belong here. Move this into a new base class in
-   *   http://drupal.org/node/1764380.
+   *   https://www.drupal.org/node/1764380.
    * @todo This does not set a value in \Drupal::config(), so the name is confusing.
    *
    * @see \Drupal\Component\Plugin\PluginBase::$configuration

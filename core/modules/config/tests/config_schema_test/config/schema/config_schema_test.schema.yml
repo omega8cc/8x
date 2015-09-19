@@ -1,7 +1,7 @@
 # Schema for the configuration files of the Configuration Schema Test module.
 
 config_schema_test.someschema:
-  type: mapping
+  type: config_object
   label: 'Schema test data'
   mapping:
     testitem:
@@ -11,7 +11,7 @@ config_schema_test.someschema:
 
 config_schema_test.someschema.with_parents:
   label: 'Schema test data with parenting'
-  type: mapping
+  type: config_object
   mapping:
     one_level:
       label: 'Parenting one level up'
@@ -64,8 +64,8 @@ config_schema_test.someschema.with_parents.key_3:
   type: string
 
 config_schema_test.someschema.somemodule.*.*:
-  type: mapping
-  label: 'Schema multiple filesytem marker test'
+  type: config_object
+  label: 'Schema multiple filesystem marker test'
   mapping:
     testid:
       type: string
@@ -75,7 +75,7 @@ config_schema_test.someschema.somemodule.*.*:
       label: 'Description'
 
 config_schema_test.wildcard_fallback.*:
-  type: mapping
+  type: config_object
   label: 'Schema wildcard fallback test'
   mapping:
     testid:
@@ -86,7 +86,7 @@ config_schema_test.wildcard_fallback.*:
       label: 'Description'
 
 config_schema_test.schema_data_types:
-  type: mapping
+  type: config_object
   label: 'Config test schema'
   mapping:
     config_schema_test_integer:
@@ -119,22 +119,18 @@ config_schema_test.schema_data_types:
     sequence:
       type: sequence
       sequence:
+        type: boolean
+    sequence_bc:
+      type: sequence
+      sequence:
         - type: boolean
-
-config_schema_test.schema_in_install:
-  label: 'Schema test data with parenting'
-  type: mapping
-  mapping:
-    integer:
-      type: integer
-      label: 'Integer'
 
 config_schema_test_integer:
   type: integer
   label: 'Config test integer'
 
 config_schema_test.ignore:
-  type: mapping
+  type: config_object
   label: 'Ignore test'
   mapping:
     label:
@@ -151,21 +147,21 @@ config_schema_test.ignore:
       label: 'Weight'
 
 config_schema_test.plugin_types:
-  type: mapping
+  type: config_object
   mapping:
     tests:
       type: sequence
       sequence:
-        - type: test.plugin_types.[plugin_id]
+        type: test.plugin_types.[plugin_id]
     test_with_parents:
       type: sequence
       sequence:
-        - type: mapping
-          mapping:
-            plugin_id:
-              type: string
-            settings:
-              type: test_with_parents.plugin_types.[%parent.plugin_id]
+        type: mapping
+        mapping:
+          plugin_id:
+            type: string
+          settings:
+            type: test_with_parents.plugin_types.[%parent.plugin_id]
 
 test.plugin_types:
   type: mapping

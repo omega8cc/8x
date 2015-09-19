@@ -8,9 +8,10 @@
 namespace Drupal\rdf\Tests;
 
 use Drupal\Core\Url;
+use Drupal\image\Entity\ImageStyle;
+use Drupal\node\Entity\NodeType;
 use Drupal\node\NodeInterface;
 use Drupal\simpletest\WebTestBase;
-use Drupal\node\Entity\NodeType;
 
 /**
  * Tests the RDF mappings and RDFa markup of the standard profile.
@@ -106,6 +107,10 @@ class StandardProfileTest extends WebTestBase {
   protected function setUp() {
     parent::setUp();
 
+    // Use Classy theme for testing markup output.
+    \Drupal::service('theme_handler')->install(['classy']);
+    $this->config('system.theme')->set('default', 'classy')->save();
+
     $this->baseUri = \Drupal::url('<front>', [], ['absolute' => TRUE]);
 
     // Create two test users.
@@ -165,7 +170,7 @@ class StandardProfileTest extends WebTestBase {
     // Set URIs.
     // Image.
     $image_file = $this->article->get('field_image')->entity;
-    $this->imageUri = entity_load('image_style', 'large')->buildUrl($image_file->getFileUri());
+    $this->imageUri = ImageStyle::load('large')->buildUrl($image_file->getFileUri());
     // Term.
     $this->termUri = $this->term->url('canonical', array('absolute' => TRUE));
     // Article.
@@ -224,7 +229,7 @@ class StandardProfileTest extends WebTestBase {
     // @todo Once the image points to the original instead of the processed
     //   image, move this to testArticleProperties().
     $image_file = $this->article->get('field_image')->entity;
-    $image_uri = entity_load('image_style', 'medium')->buildUrl($image_file->getFileUri());
+    $image_uri = ImageStyle::load('medium')->buildUrl($image_file->getFileUri());
     $expected_value = array(
       'type' => 'uri',
       'value' => $image_uri,
@@ -328,7 +333,7 @@ class StandardProfileTest extends WebTestBase {
     $this->assertTrue($graph->hasProperty($this->termUri, 'http://schema.org/name', $expected_value), "Term name was found (schema:name) on term page.");
 
     // @todo Add test for term description once it is a field:
-    //   https://drupal.org/node/569434
+    //   https://www.drupal.org/node/569434.
   }
 
   /**
@@ -355,7 +360,7 @@ class StandardProfileTest extends WebTestBase {
     // Created date.
     $expected_value = array(
       'type' => 'literal',
-      'value' => date_iso8601($node->get('created')->value),
+      'value' => format_date($node->get('created')->value, 'custom', 'c', 'UTC'),
       'lang' => 'en',
     );
     $this->assertTrue($graph->hasProperty($uri, 'http://schema.org/dateCreated', $expected_value), "$message_prefix created date was found (schema:dateCreated) in teaser.");
@@ -403,7 +408,7 @@ class StandardProfileTest extends WebTestBase {
     $this->assertTrue($graph->hasProperty($this->articleUri, 'http://schema.org/about', $expected_value), "$message_prefix tag was found (schema:about).");
 
     // Tag type.
-    // @todo enable with https://drupal.org/node/2072791
+    // @todo Enable with https://www.drupal.org/node/2072791.
     //$this->assertEqual($graph->type($this->termUri), 'schema:Thing', 'Tag type was found (schema:Thing).');
 
     // Tag name.
@@ -412,7 +417,7 @@ class StandardProfileTest extends WebTestBase {
       'value' => $this->term->getName(),
       'lang' => 'en',
     );
-    // @todo enable with https://drupal.org/node/2072791
+    // @todo Enable with https://www.drupal.org/node/2072791.
     //$this->assertTrue($graph->hasProperty($this->termUri, 'http://schema.org/name', $expected_value), "$message_prefix name was found (schema:name).");
   }
 
@@ -444,7 +449,7 @@ class StandardProfileTest extends WebTestBase {
     // Comment created date.
     $expected_value = array(
       'type' => 'literal',
-      'value' => date_iso8601($this->articleComment->get('created')->value),
+      'value' => format_date($this->articleComment->get('created')->value, 'custom', 'c', 'UTC'),
       'lang' => 'en',
     );
     $this->assertTrue($graph->hasProperty($this->articleCommentUri, 'http://schema.org/dateCreated', $expected_value), 'Article comment created date was found (schema:dateCreated).');

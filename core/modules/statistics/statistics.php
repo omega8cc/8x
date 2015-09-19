@@ -8,9 +8,9 @@
 use Drupal\Core\DrupalKernel;
 use Symfony\Component\HttpFoundation\Request;
 
-chdir(dirname(dirname(dirname(dirname($_SERVER['SCRIPT_FILENAME'])))));
+chdir('../../..');
 
-$autoloader = require_once getcwd() . '/vendor/autoload.php';
+$autoloader = require_once 'autoload.php';
 
 $kernel = DrupalKernel::createFromRequest(Request::createFromGlobals(), $autoloader, 'prod');
 $kernel->boot();

@@ -15,10 +15,10 @@ use Drupal\views\ViewExecutable;
  * Defines a base class for Views testing in the full web test environment.
  *
  * Use this base test class if you need to emulate a full Drupal installation.
- * When possible, ViewUnitTestBase should be used instead. Both base classes
+ * When possible, ViewKernelTestBase should be used instead. Both base classes
  * include the same methods.
  *
- * @see \Drupal\views\Tests\ViewUnitTestBase
+ * @see \Drupal\views\Tests\ViewKernelTestBase
  * @see \Drupal\simpletest\WebTestBase
  */
 abstract class ViewTestBase extends WebTestBase {
@@ -103,7 +103,7 @@ abstract class ViewTestBase extends WebTestBase {
    *   message is provided, the message will indicate the button label.
    *
    * @return bool
-   *   TRUE if the asserion was successful, or FALSE on failure.
+   *   TRUE if the assertion was successful, or FALSE on failure.
    */
   protected function helperButtonHasLabel($id, $expected_label, $message = 'Label has the expected value: %label.') {
     return $this->assertFieldById($id, $expected_label, t($message, array('%label' => $expected_label)));

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\search\SearchQuery.
+ * Contains \Drupal\search\SearchQuery.
  *
  * Search query extender and helper functions.
  */
@@ -196,9 +196,9 @@ class SearchQuery extends SelectExtender {
   /**
    * Sets the search query expression.
    *
-   * @param $expression
+   * @param string $expression
    *   A search string, which can contain keywords and options.
-   * @param $type
+   * @param string $type
    *   The search type. This maps to {search_index}.type in the database.
    *
    * @return $this
@@ -464,7 +464,7 @@ class SearchQuery extends SelectExtender {
   }
 
   /**
-   * {@inhertidoc}
+   * {@inheritdoc}
    */
   public function preExecute(SelectInterface $query = NULL) {
     if (!$this->executedPrepare) {
@@ -486,10 +486,10 @@ class SearchQuery extends SelectExtender {
    * used. However, if at least one call to addScore() has taken place, the
    * keyword relevance score is not automatically added.
    *
-   * Also note that if you call orderBy() directly on the query, search scores
-   * will not automatically be used to order search results. Your orderBy()
-   * expression can reference 'calculated_score', which will be the total
-   * calculated score value.
+   * Note that you must use this method to add ordering to your searches, and
+   * not call orderBy() directly, when using the SearchQuery extender. This is
+   * because of the two-pass system the SearchQuery class uses to normalize
+   * scores.
    *
    * @param string $score
    *   The score expression, which should evaluate to a number between 0 and 1.
@@ -508,8 +508,12 @@ class SearchQuery extends SelectExtender {
     if ($multiply) {
       $i = count($this->multiply);
       // Modify the score expression so it is multiplied by the multiplier,
-      // with a divisor to renormalize.
-      $score = "(CAST (:multiply_$i AS DECIMAL(10,4))) * COALESCE(($score), 0) / (CAST (:total_$i AS DECIMAL(10,4)))";
+      // with a divisor to renormalize. Note that the ROUND here is necessary
+      // for PostgreSQL and SQLite in order to ensure that the :multiply_* and
+      // :total_* arguments are treated as a numeric type, because the
+      // PostgreSQL PDO driver sometimes puts values in as strings instead of
+      // numbers in complex expressions like this.
+      $score = "(ROUND(:multiply_$i, 4)) * COALESCE(($score), 0) / (ROUND(:total_$i, 4))";
       // Add an argument for the multiplier. The :total_$i argument is taken
       // care of in the execute() method, which is when the total divisor is
       // calculated.
@@ -524,7 +528,7 @@ class SearchQuery extends SelectExtender {
     // in the execute() method we can add arguments.
     while (($pos = strpos($score, 'i.relevance')) !== FALSE) {
       $pieces = explode('i.relevance', $score, 2);
-      $score = implode('((CAST (:normalization_' . $this->relevance_count . ' AS DECIMAL(10,4))) * i.score * t.count)', $pieces);
+      $score = implode('((ROUND(:normalization_' . $this->relevance_count . ', 4)) * i.score * t.count)', $pieces);
       $this->relevance_count++;
     }
 
@@ -543,7 +547,7 @@ class SearchQuery extends SelectExtender {
    * Error and warning conditions can apply. Call getStatus() after calling
    * this method to retrieve them.
    *
-   * @return
+   * @return \Drupal\Core\Database\StatementInterface|null
    *   A query result set containing the results of the query.
    */
   public function execute() {

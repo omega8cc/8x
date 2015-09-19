@@ -2,10 +2,12 @@
 
 /**
  * @file
- * Definition of Drupal\file\Tests\SaveUploadTest.
+ * Contains \Drupal\file\Tests\SaveUploadTest.
  */
 
 namespace Drupal\file\Tests;
+
+use Drupal\file\Entity\File;
 
 /**
  * Tests the file_save_upload() function.
@@ -22,6 +24,8 @@ class SaveUploadTest extends FileManagedTestBase {
 
   /**
    * An image file path for uploading.
+   *
+   * @var \Drupal\file\FileInterface
    */
   protected $image;
 
@@ -35,6 +39,13 @@ class SaveUploadTest extends FileManagedTestBase {
    */
   protected $maxFidBefore;
 
+  /**
+   * Extension of the image filename.
+   *
+   * @var string
+   */
+  protected $imageExtension;
+
   protected function setUp() {
     parent::setUp();
     $account = $this->drupalCreateUser(array('access site reports'));
@@ -43,7 +54,7 @@ class SaveUploadTest extends FileManagedTestBase {
     $image_files = $this->drupalGetTestFiles('image');
     $this->image = entity_create('file', (array) current($image_files));
 
-    list(, $this->image_extension) = explode('.', $this->image->getFilename());
+    list(, $this->imageExtension) = explode('.', $this->image->getFilename());
     $this->assertTrue(is_file($this->image->getFileUri()), "The image file we're going to upload exists.");
 
     $this->phpfile = current($this->drupalGetTestFiles('php'));
@@ -72,7 +83,7 @@ class SaveUploadTest extends FileManagedTestBase {
   function testNormal() {
     $max_fid_after = db_query('SELECT MAX(fid) AS fid FROM {file_managed}')->fetchField();
     $this->assertTrue($max_fid_after > $this->maxFidBefore, 'A new file was created.');
-    $file1 = file_load($max_fid_after);
+    $file1 = File::load($max_fid_after);
     $this->assertTrue($file1, 'Loaded the file.');
     // MIME type of the uploaded image may be either image/jpeg or image/png.
     $this->assertEqual(substr($file1->getMimeType(), 0, 5), 'image', 'A MIME type was set.');
@@ -91,13 +102,13 @@ class SaveUploadTest extends FileManagedTestBase {
     // Check that the correct hooks were called.
     $this->assertFileHooksCalled(array('validate', 'insert'));
 
-    $file2 = file_load($max_fid_after);
+    $file2 = File::load($max_fid_after);
     $this->assertTrue($file2, 'Loaded the file');
     // MIME type of the uploaded image may be either image/jpeg or image/png.
     $this->assertEqual(substr($file2->getMimeType(), 0, 5), 'image', 'A MIME type was set.');
 
-    // Load both files using file_load_multiple().
-    $files = file_load_multiple(array($file1->id(), $file2->id()));
+    // Load both files using File::loadMultiple().
+    $files = File::loadMultiple(array($file1->id(), $file2->id()));
     $this->assertTrue(isset($files[$file1->id()]), 'File was loaded successfully');
     $this->assertTrue(isset($files[$file2->id()]), 'File was loaded successfully');
 
@@ -142,7 +153,7 @@ class SaveUploadTest extends FileManagedTestBase {
     // Reset the hook counters.
     file_test_reset();
 
-    $extensions = 'foo ' . $this->image_extension;
+    $extensions = 'foo ' . $this->imageExtension;
     // Now tell file_save_upload() to allow the extension of our test image.
     $edit = array(
       'file_test_replace' => FILE_EXISTS_REPLACE,
@@ -225,12 +236,12 @@ class SaveUploadTest extends FileManagedTestBase {
   function testHandleFileMunge() {
     // Ensure insecure uploads are disabled for this test.
     $this->config('system.file')->set('allow_insecure_uploads', 0)->save();
-    $this->image = file_move($this->image, $this->image->getFileUri() . '.foo.' . $this->image_extension);
+    $this->image = file_move($this->image, $this->image->getFileUri() . '.foo.' . $this->imageExtension);
 
     // Reset the hook counters to get rid of the 'move' we just called.
     file_test_reset();
 
-    $extensions = $this->image_extension;
+    $extensions = $this->imageExtension;
     $edit = array(
       'files[file_test_upload]' => drupal_realpath($this->image->getFileUri()),
       'extensions' => $extensions,
@@ -238,7 +249,7 @@ class SaveUploadTest extends FileManagedTestBase {
 
     $munged_filename = $this->image->getFilename();
     $munged_filename = substr($munged_filename, 0, strrpos($munged_filename, '.'));
-    $munged_filename .= '_.' . $this->image_extension;
+    $munged_filename .= '_.' . $this->imageExtension;
 
     $this->drupalPostForm('file-test/upload', $edit, t('Submit'));
     $this->assertResponse(200, 'Received a 200 response for posted test file.');

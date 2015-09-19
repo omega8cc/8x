@@ -7,9 +7,8 @@
 
 namespace Drupal\Core\Utility;
 
-use Drupal\Component\Utility\String;
-use Drupal\Component\Utility\Xss;
 use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Component\Utility\Xss;
 use Drupal\Core\Database\DatabaseExceptionWrapper;
 
 /**
@@ -34,13 +33,13 @@ class Error {
   /**
    * Decodes an exception and retrieves the correct caller.
    *
-   * @param \Exception $exception
+   * @param \Exception|\Throwable $exception
    *   The exception object that was thrown.
    *
    * @return array
    *   An error in the format expected by _drupal_log_error().
    */
-  public static function decodeException(\Exception $exception) {
+  public static function decodeException($exception) {
     $message = $exception->getMessage();
 
     $backtrace = $exception->getTrace();
@@ -71,7 +70,7 @@ class Error {
       '%type' => get_class($exception),
       // The standard PHP exception handler considers that the exception message
       // is plain-text. We mimic this behavior here.
-      '!message' => String::checkPlain($message),
+      '@message' => $message,
       '%function' => $caller['function'],
       '%file' => $caller['file'],
       '%line' => $caller['line'],
@@ -83,27 +82,26 @@ class Error {
   /**
    * Renders an exception error message without further exceptions.
    *
-   * @param \Exception $exception
+   * @param \Exception|\Throwable $exception
    *   The exception object that was thrown.
    *
    * @return string
    *   An error message.
    */
-  public static function renderExceptionSafe(\Exception $exception) {
+  public static function renderExceptionSafe($exception) {
     $decode = static::decodeException($exception);
     $backtrace = $decode['backtrace'];
     unset($decode['backtrace']);
     // Remove 'main()'.
     array_shift($backtrace);
 
-    $output = String::format('%type: !message in %function (line %line of %file).', $decode);
     // Even though it is possible that this method is called on a public-facing
     // site, it is only called when the exception handler itself threw an
     // exception, which normally means that a code change caused the system to
     // no longer function correctly (as opposed to a user-triggered error), so
     // we assume that it is safe to include a verbose backtrace.
-    $output .= '<pre>' . static::formatBacktrace($backtrace) . '</pre>';
-    return SafeMarkup::set($output);
+    $decode['@backtrace'] = Error::formatBacktrace($backtrace);
+    return SafeMarkup::format('%type: @message in %function (line %line of %file). <pre class="backtrace">@backtrace</pre>', $decode);
   }
 
   /**

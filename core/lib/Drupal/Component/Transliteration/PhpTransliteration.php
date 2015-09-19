@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of \Drupal\Component\Transliteration\PhpTransliteration.
+ * Contains \Drupal\Component\Transliteration\PhpTransliteration.
  *
  * Some parts of this code were derived from the MediaWiki project's UtfNormal
  * class, Copyright © 2004 Brion Vibber <brion@pobox.com>,
@@ -73,6 +73,37 @@ class PhpTransliteration implements TransliterationInterface {
    */
   public function __construct($data_directory = NULL) {
     $this->dataDirectory = (isset($data_directory)) ? $data_directory : __DIR__ . '/data';
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function removeDiacritics($string) {
+    $result = '';
+
+    foreach (preg_split('//u', $string, 0, PREG_SPLIT_NO_EMPTY) as $character) {
+      $code = self::ordUTF8($character);
+
+      // These two Unicode ranges include the accented US-ASCII letters, with a
+      // few characters that aren't accented letters mixed in. So define the
+      // ranges and the excluded characters.
+      $range1 = $code > 0x00bf && $code < 0x017f;
+      $exclusions_range1 = array(0x00d0, 0x00d7, 0x00f0, 0x00f7, 0x0138, 0x014a, 0x014b);
+      $range2 = $code > 0x01cc && $code < 0x0250;
+      $exclusions_range2 = array(0x01DD, 0x01f7, 0x021c, 0x021d, 0x0220, 0x0221, 0x0241, 0x0242, 0x0245);
+
+      $replacement = $character;
+      if (($range1 && !in_array($code, $exclusions_range1)) || ($range2 && !in_array($code, $exclusions_range2))) {
+        $to_add = $this->lookupReplacement($code, 'xyz');
+        if(strlen($to_add) === 1) {
+          $replacement = $to_add;
+        }
+      }
+
+      $result .= $replacement;
+    }
+
+    return $result;
   }
 
   /**
@@ -152,7 +183,8 @@ class PhpTransliteration implements TransliterationInterface {
    *
    * @return string
    *   US-ASCII replacement character. If it has a mapping, it is returned;
-   *   otherwise, $unknown_character is returned.
+   *   otherwise, $unknown_character is returned. The replacement can contain
+   *   multiple characters.
    */
   protected function replace($code, $langcode, $unknown_character) {
     if ($code < 0x80) {
@@ -168,6 +200,24 @@ class PhpTransliteration implements TransliterationInterface {
       return $this->languageOverrides[$langcode][$code];
     }
 
+    return $this->lookupReplacement($code, $unknown_character);
+  }
+
+  /**
+   * Look up the generic replacement for a UTF-8 character code.
+   *
+   * @param $code
+   *   The UTF-8 character code.
+   * @param string $unknown_character
+   *   (optional) The character to substitute for characters without entries in
+   *   the replacement tables.
+   *
+   * @return string
+   *   US-ASCII replacement characters. If it has a mapping, it is returned;
+   *   otherwise, $unknown_character is returned. The replacement can contain
+   *   multiple characters.
+   */
+  protected function lookupReplacement($code, $unknown_character = '?') {
     // See if there is a generic mapping for this character.
     $bank = $code >> 8;
     if (!isset($this->genericMap[$bank])) {
@@ -193,7 +243,7 @@ class PhpTransliteration implements TransliterationInterface {
   protected function readLanguageOverrides($langcode) {
     // Figure out the file name to use by sanitizing the language code,
     // just in case.
-    $file = $this->dataDirectory . '/' . preg_replace('[^a-zA-Z\-]', '', $langcode) . '.php';
+    $file = $this->dataDirectory . '/' . preg_replace('/[^a-zA-Z\-]/', '', $langcode) . '.php';
 
     // Read in this file, which should set up a variable called $overrides,
     // which will be local to this function.

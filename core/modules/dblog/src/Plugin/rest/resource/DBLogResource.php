@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\rest\Plugin\rest\resource\DBLogResource.
+ * Contains \Drupal\dblog\Plugin\rest\resource\DBLogResource.
  */
 
 namespace Drupal\dblog\Plugin\rest\resource;
@@ -29,6 +29,9 @@ class DBLogResource extends ResourceBase {
    * Responds to GET requests.
    *
    * Returns a watchdog log entry for the specified ID.
+   *
+   * @param int $id
+   *   The ID of the watchdog log entry.
    *
    * @return \Drupal\rest\ResourceResponse
    *   The response containing the log entry.

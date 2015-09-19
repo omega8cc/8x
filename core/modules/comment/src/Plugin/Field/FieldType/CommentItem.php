@@ -9,6 +9,7 @@ namespace Drupal\comment\Plugin\Field\FieldType;
 
 use Drupal\comment\CommentManagerInterface;
 use Drupal\comment\Entity\CommentType;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Render\Element;
@@ -172,7 +173,7 @@ class CommentItem extends FieldItemBase implements CommentItemInterface {
     $element = array();
 
     // @todo Inject entity storage once typed-data supports container injection.
-    // See https://drupal.org/node/2053415 for more details.
+    //   See https://www.drupal.org/node/2053415 for more details.
     $comment_types = CommentType::loadMultiple();
     $options = array();
     $entity_type = $this->getEntity()->getEntityTypeId();
@@ -191,6 +192,20 @@ class CommentItem extends FieldItemBase implements CommentItemInterface {
       '#disabled' => $has_data,
     );
     return $element;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function generateSampleValue(FieldDefinitionInterface $field_definition) {
+    $statuses = [
+      CommentItemInterface::HIDDEN,
+      CommentItemInterface::CLOSED,
+      CommentItemInterface::OPEN,
+    ];
+    return [
+      'status' => $statuses[mt_rand(0, count($statuses) - 1)],
+    ];
   }
 
 }

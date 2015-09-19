@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Database\SelectPagerDefaultTest.
+ * Contains \Drupal\system\Tests\Database\SelectPagerDefaultTest.
  */
 
 namespace Drupal\system\Tests\Database;
@@ -127,7 +127,7 @@ class SelectPagerDefaultTest extends DatabaseWebTestBase {
   }
 
   /**
-   * Confirms that every pager gets a valid, non-overlaping element ID.
+   * Confirms that every pager gets a valid, non-overlapping element ID.
    */
   function testElementNumbers() {
 

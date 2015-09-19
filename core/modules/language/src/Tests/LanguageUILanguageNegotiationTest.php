@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\language\Tests\LanguageUILanguageNegotiationTest.
+ * Contains \Drupal\language\Tests\LanguageUILanguageNegotiationTest.
  */
 
 namespace Drupal\language\Tests;
@@ -23,30 +23,22 @@ use Drupal\language\LanguageNegotiatorInterface;
 use Drupal\block\Entity\Block;
 
 /**
- * Tests UI language switching.
+ * Tests the language UI for language switching.
  *
- * 1. URL (PATH) > DEFAULT
- *    UI Language base on URL prefix, browser language preference has no
- *    influence:
- *      admin/config
- *        UI in site default language
- *      zh-hans/admin/config
- *        UI in Chinese
- *      blah-blah/admin/config
- *        404
- * 2. URL (PATH) > BROWSER > DEFAULT
- *        admin/config
- *          UI in user's browser language preference if the site has that
- *          language added, if not, the default language
- *        zh-hans/admin/config
- *          UI in Chinese
- *        blah-blah/admin/config
- *          404
- * 3. URL (DOMAIN) > DEFAULT
- *        http://example.com/admin/config
- *          UI language in site default
- *        http://example.cn/admin/config
- *          UI language in Chinese
+ * The uses cases that get tested, are:
+ * - URL (path) > default: Test that the URL prefix setting gets precedence over
+ *   the default language. The browser language preference does not have any
+ *   influence.
+ * - URL (path) > browser > default: Test that the URL prefix setting gets
+ *   precedence over the browser language preference, which in turn gets
+ *   precedence over the default language.
+ * - URL (domain) > default: Tests that the URL domain setting gets precedence
+ *   over the default language.
+ *
+ * The paths that are used for each of these, are:
+ * - admin/config: Tests the UI using the precedence rules.
+ * - zh-hans/admin/config: Tests the UI in Chinese.
+ * - blah-blah/admin/config: Tests the 404 page.
  *
  * @group language
  */
@@ -93,7 +85,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // be some bug.
     $default_language = \Drupal::languageManager()->getDefaultLanguage();
     ConfigurableLanguage::createFromLangcode($langcode_browser_fallback)->save();
-    $this->config('system.site')->set('langcode', $langcode_browser_fallback)->save();
+    $this->config('system.site')->set('default_langcode', $langcode_browser_fallback)->save();
     ConfigurableLanguage::createFromLangcode($langcode)->save();
 
     // We will look for this string in the admin/config screen to see if the
@@ -106,7 +98,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     // Now the t()'ed string is in db so switch the language back to default.
     // This will rebuild the container so we need to rebuild the container in
     // the test environment.
-    $this->config('system.site')->set('langcode', $default_language->getId())->save();
+    $this->config('system.site')->set('default_langcode', $default_language->getId())->save();
     $this->config('language.negotiation')->set('url.prefixes.en', '')->save();
     $this->rebuildContainer();
 
@@ -275,7 +267,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       'expect' => $language_string,
       'expected_method_id' => LanguageNegotiationUser::METHOD_ID,
       'http_header' => array(),
-      'message' => 'USER > DEFAULT: defined prefereed user language setting, the UI language is based on user setting',
+      'message' => 'USER > DEFAULT: defined preferred user language setting, the UI language is based on user setting',
     );
     $this->runTest($test);
 
@@ -317,7 +309,7 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
       'expect' => $language_string,
       'expected_method_id' => LanguageNegotiationUserAdmin::METHOD_ID,
       'http_header' => array(),
-      'message' => 'USER ADMIN > DEFAULT: defined prefereed user admin language setting, the UI language is based on user setting',
+      'message' => 'USER ADMIN > DEFAULT: defined preferred user admin language setting, the UI language is based on user setting',
     );
     $this->runTest($test);
 
@@ -409,8 +401,8 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
 
     // Check that the language switcher active link matches the given browser
     // language.
-    $args = array(':id' => 'block-test-language-block', ':url' => base_path() . $GLOBALS['script_path'] . $langcode_browser_fallback);
-    $fields = $this->xpath('//div[@id=:id]//a[@class="language-link active" and starts-with(@href, :url)]', $args);
+    $args = array(':id' => 'block-test-language-block', ':url' => \Drupal::url('<front>') . $langcode_browser_fallback);
+    $fields = $this->xpath('//div[@id=:id]//a[@class="language-link is-active" and starts-with(@href, :url)]', $args);
     $this->assertTrue($fields[0] == $languages[$langcode_browser_fallback]->getName(), 'The browser language is the URL active language');
 
     // Check that URLs are rewritten using the given browser language.
@@ -457,6 +449,15 @@ class LanguageUILanguageNegotiationTest extends WebTestBase {
     $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
     $this->assertText('The configuration options have been saved', 'Domain configuration is saved.');
     $this->rebuildContainer();
+
+    // Try to use an invalid domain.
+    $edit = [
+      'language_negotiation_url_part' => LanguageNegotiationUrl::CONFIG_DOMAIN,
+      'domain[en]' => $base_url_host,
+      'domain[it]' => 'it.example.com/',
+    ];
+    $this->drupalPostForm('admin/config/regional/language/detection/url', $edit, t('Save configuration'));
+    $this->assertRaw(t('The domain for %language may only contain the domain name, not a trailing slash, protocol and/or port.', ['%language' => 'Italian']));
 
     // Build the link we're going to test.
     $link = 'it.example.com' . rtrim(base_path(), '/') . '/admin';

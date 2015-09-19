@@ -2,11 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\comment\Tests\CommentBlockTest.
+ * Contains \Drupal\comment\Tests\CommentBlockTest.
  */
 
 namespace Drupal\comment\Tests;
-use Drupal\Component\Utility\String;
+
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests comment block functionality.
@@ -57,10 +59,10 @@ class CommentBlockTest extends CommentTestBase {
     // Test that a user without the 'access comments' permission cannot see the
     // block.
     $this->drupalLogout();
-    user_role_revoke_permissions(DRUPAL_ANONYMOUS_RID, array('access comments'));
+    user_role_revoke_permissions(RoleInterface::ANONYMOUS_ID, array('access comments'));
     $this->drupalGet('');
     $this->assertNoText(t('Recent comments'));
-    user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access comments'));
+    user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array('access comments'));
 
     // Test that a user with the 'access comments' permission can see the
     // block.
@@ -71,11 +73,11 @@ class CommentBlockTest extends CommentTestBase {
     // Test the only the 10 latest comments are shown and in the proper order.
     $this->assertNoText($comments[10]->getSubject(), 'Comment 11 not found in block.');
     for ($i = 0; $i < 10; $i++) {
-      $this->assertText($comments[$i]->getSubject(), String::format('Comment @number found in block.', array('@number' => 10 - $i)));
+      $this->assertText($comments[$i]->getSubject(), SafeMarkup::format('Comment @number found in block.', array('@number' => 10 - $i)));
       if ($i > 1) {
         $previous_position = $position;
         $position = strpos($this->getRawContent(), $comments[$i]->getSubject());
-        $this->assertTrue($position > $previous_position, String::format('Comment @a appears after comment @b', array('@a' => 10 - $i, '@b' => 11 - $i)));
+        $this->assertTrue($position > $previous_position, SafeMarkup::format('Comment @a appears after comment @b', array('@a' => 10 - $i, '@b' => 11 - $i)));
       }
       $position = strpos($this->getRawContent(), $comments[$i]->getSubject());
     }

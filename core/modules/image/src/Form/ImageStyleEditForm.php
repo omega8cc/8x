@@ -12,7 +12,6 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 use Drupal\image\ConfigurableImageEffectInterface;
 use Drupal\image\ImageEffectManager;
-use Drupal\Component\Utility\String;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -99,7 +98,7 @@ class ImageStyleEditForm extends ImageStyleFormBase {
         '#tree' => FALSE,
         'data' => array(
           'label' => array(
-            '#markup' => String::checkPlain($effect->label()),
+            '#plain_text' => $effect->label(),
           ),
         ),
       );

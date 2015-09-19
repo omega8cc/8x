@@ -139,9 +139,6 @@ body.toolbar-tray-open.toolbar-fixed.toolbar-vertical .toolbar-oriented {
   display: none;
   z-index: 501;
 }
-.toolar .toolbar-tray > .toolbar-lining {
-  position: relative;
-}
 .toolbar-oriented .toolbar-tray-vertical {
   left: -100%; /* LTR */
   position: absolute;
@@ -173,6 +170,11 @@ body.toolbar-tray-open.toolbar-fixed.toolbar-vertical .toolbar-oriented {
   left: auto;
   right: 0;
 }
+/* Layer the links just above the toolbar-tray. */
+.toolbar .toolbar-bar .toolbar-tab > .toolbar-icon{
+  position: relative;
+  z-index: 502;
+}
 /* Hide secondary menus when the tray is horizontal. */
 .toolbar-oriented .toolbar-tray-horizontal .menu-item ul {
   display: none;
@@ -186,21 +188,21 @@ body.toolbar-fixed .toolbar .toolbar-tray-horizontal {
 /* When the configured standard breakpoint is active and the tray is in a
  * vertical position, the tray does not scroll with the page. The contents of
  * the tray scroll within the confines of the viewport. */
-.toolbar .toolbar-tray-vertical.active,
+.toolbar .toolbar-tray-vertical.is-active,
 body.toolbar-fixed .toolbar .toolbar-tray-vertical {
   height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
   position: fixed;
 }
-.toolbar .toolbar-tray.active {
+.toolbar .toolbar-tray.is-active {
   display: block;
 }
 /* Bring the tray into the viewport. By default it is just off-screen. */
-.toolbar-oriented .toolbar-tray-vertical.active {
+.toolbar-oriented .toolbar-tray-vertical.is-active {
   left: 0; /* LTR */
 }
-[dir="rtl"] .toolbar-oriented .toolbar-tray-vertical.active {
+[dir="rtl"] .toolbar-oriented .toolbar-tray-vertical.is-active {
   left: auto;
   right: 0;
 }

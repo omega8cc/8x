@@ -15,27 +15,31 @@ use Composer\Autoload\ClassLoader;
 /**
  * Rebuilds all caches even when Drupal itself does not work.
  *
- * @param \Composer\Autoload\ClassLoader $classloader
- *   The classloader.
+ * @param \Composer\Autoload\ClassLoader $class_loader
+ *   The class loader.
  * @param \Symfony\Component\HttpFoundation\Request $request
  *   The current request.
  *
  * @see rebuild.php
  */
-function drupal_rebuild(ClassLoader $classloader, Request $request) {
+function drupal_rebuild(ClassLoader $class_loader, Request $request) {
   // Remove Drupal's error and exception handlers; they rely on a working
   // service container and other subsystems and will only cause a fatal error
   // that hides the actual error.
   restore_error_handler();
   restore_exception_handler();
 
-  // Force kernel to rebuild container.
-  PhpStorageFactory::get('service_container')->deleteAll();
+  // Force kernel to rebuild php cache.
   PhpStorageFactory::get('twig')->deleteAll();
 
   // Bootstrap up to where caches exist and clear them.
-  $kernel = new DrupalKernel('prod', $classloader);
+  $kernel = new DrupalKernel('prod', $class_loader);
   $kernel->setSitePath(DrupalKernel::findSitePath($request));
+
+  // Invalidate the container.
+  $kernel->invalidateContainer();
+
+  // Prepare a NULL request.
   $kernel->prepareLegacyRequest($request);
 
   foreach (Cache::getBins() as $bin) {

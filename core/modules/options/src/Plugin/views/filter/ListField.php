@@ -2,12 +2,12 @@
 
 /**
  * @file
- * Contains \Drupal\field\Plugin\views\filter\ListField.
+ * Contains \Drupal\options\Plugin\views\filter\ListField.
  */
 
 namespace Drupal\options\Plugin\views\filter;
 
-use Drupal\field\Views\FieldAPIHandlerTrait;
+use Drupal\views\FieldAPIHandlerTrait;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\Plugin\views\filter\ManyToOne;
 use Drupal\views\ViewExecutable;

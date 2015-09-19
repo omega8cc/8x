@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\Variable.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\Variable.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -37,6 +37,7 @@ class Variable extends DrupalDumpBase {
           'length' => 100,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("variable")->fields(array(
       'name',
@@ -87,9 +88,6 @@ class Variable extends DrupalDumpBase {
     ))->values(array(
       'name' => 'book_child_type',
       'value' => 's:4:"book";',
-    ))->values(array(
-      'name' => 'cache',
-      'value' => 'i:1;',
     ))->values(array(
       'name' => 'cache_lifetime',
       'value' => 'i:0;',
@@ -173,6 +171,9 @@ class Variable extends DrupalDumpBase {
       'value' => 's:1:"1";',
     ))->values(array(
       'name' => 'comment_subject_field_story',
+      'value' => 's:1:"0";',
+    ))->values(array(
+      'name' => 'configurable_timezones',
       'value' => 's:1:"0";',
     ))->values(array(
       'name' => 'contact_default_status',
@@ -382,6 +383,12 @@ class Variable extends DrupalDumpBase {
       'name' => 'date_api_version',
       'value' => 's:3:"5.2";',
     ))->values(array(
+      'name' => 'date_default_timezone',
+      'value' => 's:4:"3600";',
+    ))->values(array(
+      'name' => 'date_first_day',
+      'value' => 's:1:"4";',
+    ))->values(array(
       'name' => 'date_format_long',
       'value' => 's:24:"\L\O\N\G l, F j, Y - H:i";',
     ))->values(array(
@@ -477,9 +484,6 @@ class Variable extends DrupalDumpBase {
     ))->values(array(
       'name' => 'image_toolkit',
       'value' => 's:2:"gd";',
-    ))->values(array(
-      'name' => 'javascript_parsed',
-      'value' => 'a:0:{}',
     ))->values(array(
       'name' => 'locale_cache_strings',
       'value' => 'i:1;',
@@ -691,6 +695,12 @@ class Variable extends DrupalDumpBase {
       'name' => 'user_mail_register_no_approval_required_subject',
       'value' => 's:38:"Account details for !username at !site";',
     ))->values(array(
+      'name' => 'user_mail_register_pending_approval_body',
+      'value' => "s:267:\"!username,\n\nThank you for registering at !site. Your application for an account is currently pending approval. Once it has been approved, you will receive another email containing information about how to log in, set your password, and other details.\n\n\n--  !site team\";",
+    ))->values(array(
+      'name' => 'user_mail_register_pending_approval_subject',
+      'value' => 's:63:"Account details for !username at !site (pending admin approval)";',
+    ))->values(array(
       'name' => 'user_mail_status_activated_body',
       'value' => "s:419:\"!username,\n\nYour account at !site has been activated.\n\nYou may now log in by clicking on this link or copying and pasting it in your browser:\n\n!login_url\n\nThis is a one-time login, so it can be used only once.\n\nAfter logging in, you will be redirected to !edit_uri so you can change your password.\n\nOnce you have set your own password, you will be able to log in to !login_uri in the future using:\n\nusername: !username\n\";",
     ))->values(array(
@@ -715,12 +725,6 @@ class Variable extends DrupalDumpBase {
       'name' => 'user_mail_status_deleted_subject',
       'value' => 's:48:"Account details for !username at !site (deleted)";',
     ))->values(array(
-      'name' => 'user_mail_user_mail_register_pending_approval_body',
-      'value' => "s:267:\"!username,\n\nThank you for registering at !site. Your application for an account is currently pending approval. Once it has been approved, you will receive another email containing information about how to log in, set your password, and other details.\n\n\n--  !site team\";",
-    ))->values(array(
-      'name' => 'user_mail_user_mail_register_pending_approval_subject',
-      'value' => 's:63:"Account details for !username at !site (pending admin approval)";',
-    ))->values(array(
       'name' => 'user_register',
       'value' => 'i:0;',
     ))->values(array(
@@ -730,3 +734,4 @@ class Variable extends DrupalDumpBase {
   }
 
 }
+#f34f009027a42145859ceca526d4c297

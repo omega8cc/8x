@@ -7,7 +7,7 @@
 
 namespace Drupal\views_ui\Tests;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\views\ViewExecutable;
 
 /**
@@ -123,8 +123,8 @@ class HandlerTest extends UITestBase {
 
     $add_handler_url = "admin/structure/views/nojs/add-handler/test_view_empty/default/field";
     $type_info = $handler_types['field'];
-    $this->drupalPostForm($add_handler_url, array('name[users_field_data.signature]' => TRUE), t('Add and configure @handler', array('@handler' => $type_info['ltitle'])));
-    $id = 'signature';
+    $this->drupalPostForm($add_handler_url, array('name[users_field_data.name]' => TRUE), t('Add and configure @handler', array('@handler' => $type_info['ltitle'])));
+    $id = 'name';
     $edit_handler_url = "admin/structure/views/nojs/handler/test_view_empty/default/field/$id";
 
     $this->assertUrl($edit_handler_url, array(), 'The user got redirected to the handler edit form.');
@@ -148,9 +148,9 @@ class HandlerTest extends UITestBase {
       $href = "admin/structure/views/nojs/handler/test_view_broken/default/$type/id_broken";
 
       $result = $this->xpath('//a[contains(@href, :href)]', array(':href' => $href));
-      $this->assertEqual(count($result), 1, String::format('Handler (%type) edit link found.', array('%type' => $type)));
+      $this->assertEqual(count($result), 1, SafeMarkup::format('Handler (%type) edit link found.', array('%type' => $type)));
 
-      $text = t('Broken/missing handler');
+      $text = 'Broken/missing handler';
 
       $this->assertIdentical((string) $result[0], $text, 'Ensure the broken handler text was found.');
 
@@ -167,7 +167,7 @@ class HandlerTest extends UITestBase {
       ];
 
       foreach ($original_configuration as $key => $value) {
-        $this->assertText(String::format('@key: @value', array('@key' => $key, '@value' => $value)));
+        $this->assertText(SafeMarkup::format('@key: @value', array('@key' => $key, '@value' => $value)));
       }
     }
   }

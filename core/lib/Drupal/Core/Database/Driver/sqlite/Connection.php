@@ -2,33 +2,19 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Database\Driver\sqlite\Connection
+ * Contains \Drupal\Core\Database\Driver\sqlite\Connection.
  */
 
 namespace Drupal\Core\Database\Driver\sqlite;
 
 use Drupal\Core\Database\Database;
 use Drupal\Core\Database\DatabaseNotFoundException;
-use Drupal\Core\Database\TransactionNoActiveException;
-use Drupal\Core\Database\TransactionNameNonUniqueException;
-use Drupal\Core\Database\TransactionCommitFailedException;
-use Drupal\Core\Database\Driver\sqlite\Statement;
 use Drupal\Core\Database\Connection as DatabaseConnection;
 
 /**
  * Specific SQLite implementation of DatabaseConnection.
  */
 class Connection extends DatabaseConnection {
-
-  /**
-   * Whether this database connection supports savepoints.
-   *
-   * Version of sqlite lower then 3.6.8 can't use savepoints.
-   * See http://www.sqlite.org/releaselog/3_6_8.html
-   *
-   * @var boolean
-   */
-  protected $savepointSupport = FALSE;
 
   /**
    * Error code for "Unable to open database file" error.
@@ -38,7 +24,7 @@ class Connection extends DatabaseConnection {
   /**
    * Whether or not the active transaction (if any) will be rolled back.
    *
-   * @var boolean
+   * @var bool
    */
   protected $willRollback;
 
@@ -58,7 +44,7 @@ class Connection extends DatabaseConnection {
    * This variable is set to public because Schema needs to
    * access it. However, it should not be manually set.
    *
-   * @var boolean
+   * @var bool
    */
   var $tableDropped = FALSE;
 
@@ -66,10 +52,11 @@ class Connection extends DatabaseConnection {
    * Constructs a \Drupal\Core\Database\Driver\sqlite\Connection object.
    */
   public function __construct(\PDO $connection, array $connection_options) {
-    parent::__construct($connection, $connection_options);
-
-    // We don't need a specific PDOStatement class here, we simulate it below.
+    // We don't need a specific PDOStatement class here, we simulate it in
+    // static::prepare().
     $this->statementClass = NULL;
+
+    parent::__construct($connection, $connection_options);
 
     // This driver defaults to transaction support, except if explicitly passed FALSE.
     $this->transactionSupport = $this->transactionalDDLSupport = !isset($connection_options['transactions']) || $connection_options['transactions'] !== FALSE;
@@ -84,7 +71,15 @@ class Connection extends DatabaseConnection {
         // Only attach the database once.
         if (!isset($this->attachedDatabases[$prefix])) {
           $this->attachedDatabases[$prefix] = $prefix;
-          $this->query('ATTACH DATABASE :database AS :prefix', array(':database' => $connection_options['database'] . '-' . $prefix, ':prefix' => $prefix));
+          if ($connection_options['database'] === ':memory:') {
+            // In memory database use ':memory:' as database name. According to
+            // http://www.sqlite.org/inmemorydb.html it will open a unique
+            // database so attaching it twice is not a problem.
+            $this->query('ATTACH DATABASE :database AS :prefix', array(':database' => $connection_options['database'], ':prefix' => $prefix));
+          }
+          else {
+            $this->query('ATTACH DATABASE :database AS :prefix', array(':database' => $connection_options['database'] . '-' . $prefix, ':prefix' => $prefix));
+          }
         }
 
         // Add a ., so queries become prefix.table, which is proper syntax for
@@ -94,10 +89,6 @@ class Connection extends DatabaseConnection {
     }
     // Regenerate the prefixes replacement table.
     $this->setPrefix($prefixes);
-
-    // Detect support for SAVEPOINT.
-    $version = $this->query('SELECT sqlite_version()')->fetchField();
-    $this->savepointSupport = (version_compare($version, '3.6.8') >= 0);
   }
 
   /**
@@ -119,6 +110,7 @@ class Connection extends DatabaseConnection {
     $pdo->sqliteCreateFunction('if', array(__CLASS__, 'sqlFunctionIf'));
     $pdo->sqliteCreateFunction('greatest', array(__CLASS__, 'sqlFunctionGreatest'));
     $pdo->sqliteCreateFunction('pow', 'pow', 2);
+    $pdo->sqliteCreateFunction('exp', 'exp', 1);
     $pdo->sqliteCreateFunction('length', 'strlen', 1);
     $pdo->sqliteCreateFunction('md5', 'md5', 1);
     $pdo->sqliteCreateFunction('concat', array(__CLASS__, 'sqlFunctionConcat'));
@@ -127,6 +119,15 @@ class Connection extends DatabaseConnection {
     $pdo->sqliteCreateFunction('substring_index', array(__CLASS__, 'sqlFunctionSubstringIndex'), 3);
     $pdo->sqliteCreateFunction('rand', array(__CLASS__, 'sqlFunctionRand'));
     $pdo->sqliteCreateFunction('regexp', array(__CLASS__, 'sqlFunctionRegexp'));
+
+    // SQLite does not support the LIKE BINARY operator, so we overload the
+    // non-standard GLOB operator for case-sensitive matching. Another option
+    // would have been to override another non-standard operator, MATCH, but
+    // that does not support the NOT keyword prefix.
+    $pdo->sqliteCreateFunction('glob', array(__CLASS__, 'sqlFunctionLikeBinary'));
+
+    // Create a user-space case-insensitive collation with UTF-8 support.
+    $pdo->sqliteCreateCollation('NOCASE_UTF8', array('Drupal\Component\Utility\Unicode', 'strcasecmp'));
 
     // Execute sqlite init_commands.
     if (isset($connection_options['init_commands'])) {
@@ -153,9 +154,9 @@ class Connection extends DatabaseConnection {
 
           // We can prune the database file if it doesn't have any tables.
           if ($count == 0) {
-            // Detach the database.
-            $this->query('DETACH DATABASE :schema', array(':schema' => $prefix));
-            // Destroy the database file.
+            // Detaching the database fails at this point, but no other queries
+            // are executed after the connection is destructed so we can simply
+            // remove the database file.
             unlink($this->connectionOptions['database'] . '-' . $prefix);
           }
         }
@@ -165,6 +166,18 @@ class Connection extends DatabaseConnection {
         }
       }
     }
+  }
+
+  /**
+   * Gets all the attached databases.
+   *
+   * @return array
+   *   An array of attached database names.
+   *
+   * @see \Drupal\Core\Database\Driver\sqlite\Connection::__construct()
+   */
+  public function getAttachedDatabases() {
+    return $this->attachedDatabases;
   }
 
   /**
@@ -270,14 +283,45 @@ class Connection extends DatabaseConnection {
   }
 
   /**
-   * SQLite-specific implementation of DatabaseConnection::prepare().
+   * SQLite compatibility implementation for the LIKE BINARY SQL operator.
    *
-   * We don't use prepared statements at all at this stage. We just create
-   * a Statement object, that will create a PDOStatement
-   * using the semi-private PDOPrepare() method below.
+   * SQLite supports case-sensitive LIKE operations through the
+   * 'case_sensitive_like' PRAGMA statement, but only for ASCII characters, so
+   * we have to provide our own implementation with UTF-8 support.
+   *
+   * @see https://sqlite.org/pragma.html#pragma_case_sensitive_like
+   * @see https://sqlite.org/lang_expr.html#like
+   */
+  public static function sqlFunctionLikeBinary($pattern, $subject) {
+    // Replace the SQL LIKE wildcard meta-characters with the equivalent regular
+    // expression meta-characters and escape the delimiter that will be used for
+    // matching.
+    $pattern = str_replace(array('%', '_'), array('.*?', '.'), preg_quote($pattern, '/'));
+    return preg_match('/^' . $pattern . '$/', $subject);
+  }
+
+  /**
+   * {@inheritdoc}
    */
   public function prepare($statement, array $driver_options = array()) {
     return new Statement($this->connection, $this, $statement, $driver_options);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function handleQueryException(\PDOException $e, $query, array $args = array(), $options = array()) {
+    // The database schema might be changed by another process in between the
+    // time that the statement was prepared and the time the statement was run
+    // (e.g. usually happens when running tests). In this case, we need to
+    // re-run the query.
+    // @see http://www.sqlite.org/faq.html#q15
+    // @see http://www.sqlite.org/rescode.html#schema
+    if (!empty($e->errorInfo[1]) && $e->errorInfo[1] === 17) {
+      return $this->query($query, $args, $options);
+    }
+
+    parent::handleQueryException($e, $query, $args, $options);
   }
 
   public function queryRange($query, $from, $count, array $args = array(), array $options = array()) {
@@ -325,8 +369,17 @@ class Connection extends DatabaseConnection {
     static $specials = array(
       'LIKE' => array('postfix' => " ESCAPE '\\'"),
       'NOT LIKE' => array('postfix' => " ESCAPE '\\'"),
+      'LIKE BINARY' => array('postfix' => " ESCAPE '\\'", 'operator' => 'GLOB'),
+      'NOT LIKE BINARY' => array('postfix' => " ESCAPE '\\'", 'operator' => 'NOT GLOB'),
     );
     return isset($specials[$operator]) ? $specials[$operator] : NULL;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function prepareQuery($query) {
+    return $this->prepare($this->prefixTables($query));
   }
 
   public function nextId($existing_id = 0) {
@@ -352,86 +405,14 @@ class Connection extends DatabaseConnection {
     return $this->query('SELECT value FROM {sequences}')->fetchField();
   }
 
-  public function rollback($savepoint_name = 'drupal_transaction') {
-    if ($this->savepointSupport) {
-      return parent::rollBack($savepoint_name);
-    }
+  /**
+   * {@inheritdoc}
+   */
+  public function getFullQualifiedTableName($table) {
+    $prefix = $this->tablePrefix($table);
 
-    if (!$this->inTransaction()) {
-      throw new TransactionNoActiveException();
-    }
-    // A previous rollback to an earlier savepoint may mean that the savepoint
-    // in question has already been rolled back.
-    if (!isset($this->transactionLayers[$savepoint_name])) {
-      return;
-    }
-
-    // We need to find the point we're rolling back to, all other savepoints
-    // before are no longer needed.
-    while ($savepoint = array_pop($this->transactionLayers)) {
-      if ($savepoint == $savepoint_name) {
-        // Mark whole stack of transactions as needed roll back.
-        $this->willRollback = TRUE;
-        // If it is the last the transaction in the stack, then it is not a
-        // savepoint, it is the transaction itself so we will need to roll back
-        // the transaction rather than a savepoint.
-        if (empty($this->transactionLayers)) {
-          break;
-        }
-        return;
-      }
-    }
-    if ($this->supportsTransactions()) {
-      $this->connection->rollBack();
-    }
-  }
-
-  public function pushTransaction($name) {
-    if ($this->savepointSupport) {
-      return parent::pushTransaction($name);
-    }
-    if (!$this->supportsTransactions()) {
-      return;
-    }
-    if (isset($this->transactionLayers[$name])) {
-      throw new TransactionNameNonUniqueException($name . " is already in use.");
-    }
-    if (!$this->inTransaction()) {
-      $this->connection->beginTransaction();
-    }
-    $this->transactionLayers[$name] = $name;
-  }
-
-  public function popTransaction($name) {
-    if ($this->savepointSupport) {
-      return parent::popTransaction($name);
-    }
-    if (!$this->supportsTransactions()) {
-      return;
-    }
-    if (!$this->inTransaction()) {
-      throw new TransactionNoActiveException();
-    }
-
-    // Commit everything since SAVEPOINT $name.
-    while($savepoint = array_pop($this->transactionLayers)) {
-      if ($savepoint != $name) continue;
-
-      // If there are no more layers left then we should commit or rollback.
-      if (empty($this->transactionLayers)) {
-        // If there was any rollback() we should roll back whole transaction.
-        if ($this->willRollback) {
-          $this->willRollback = FALSE;
-          $this->connection->rollBack();
-        }
-        elseif (!$this->connection->commit()) {
-          throw new TransactionCommitFailedException();
-        }
-      }
-      else {
-        break;
-      }
-    }
+    // Don't include the SQLite database file name as part of the table name.
+    return $prefix . $table;
   }
 
 }

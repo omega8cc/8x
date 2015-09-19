@@ -58,8 +58,8 @@ function locale_translation_get_projects(array $project_names = array()) {
   if (empty($projects)) {
     // Get project data from the database.
     $row_count = \Drupal::service('locale.project')->countProjects();
-    // http://drupal.org/node/1777106 is a follow-up issue to make the check for
-    // possible out-of-date project information more robust.
+    // https://www.drupal.org/node/1777106 is a follow-up issue to make the
+    // check for possible out-of-date project information more robust.
     if ($row_count == 0 && \Drupal::moduleHandler()->moduleExists('update')) {
       module_load_include('compare.inc', 'locale');
       // At least the core project should be in the database, so we build the
@@ -208,7 +208,7 @@ function locale_translation_source_check_file($source) {
  *   - "type": Most recent translation source found. LOCALE_TRANSLATION_REMOTE
  *      and LOCALE_TRANSLATION_LOCAL indicate available new translations,
  *      LOCALE_TRANSLATION_CURRENT indicate that the current translation is them
- *      most recent. "type" sorresponds with a key of the "files" array.
+ *      most recent. "type" corresponds with a key of the "files" array.
  *   - "timestamp": The creation time of the "type" translation (file).
  *   - "last_checked": The time when the "type" translation was last checked.
  *   The "files" array can hold file objects of type:
@@ -226,7 +226,7 @@ function locale_translation_source_check_file($source) {
  *   - "keep": TRUE to keep the downloaded file.
  */
 function locale_translation_source_build($project, $langcode, $filename = NULL) {
-  // Followup issue: http://drupal.org/node/1842380
+  // Follow-up issue: https://www.drupal.org/node/1842380.
   // Convert $source object to a TranslatableProject class and use a typed class
   // for $source-file.
 

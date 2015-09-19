@@ -8,7 +8,7 @@
 namespace Drupal\views\Form;
 
 use Drupal\Component\Utility\Html;
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\SafeMarkup;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
@@ -118,10 +118,10 @@ class ViewsExposedForm extends FormBase {
 
     $form['#action'] = $view->hasUrl() ? $view->getUrl()->toString() : Url::fromRoute('<current>')->toString();
     $form['#theme'] = $view->buildThemeFunctions('views_exposed_form');
-    $form['#id'] = Html::cleanCssIdentifier('views_exposed_form-' . String::checkPlain($view->storage->id()) . '-' . String::checkPlain($display['id']));
+    $form['#id'] = Html::cleanCssIdentifier('views_exposed_form-' . $view->storage->id() . '-' . $display['id']);
 
     /** @var \Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase $exposed_form_plugin */
-    $exposed_form_plugin = $form_state->get('exposed_form_plugin');
+    $exposed_form_plugin = $view->display_handler->getPlugin('exposed_form');
     $exposed_form_plugin->exposedFormAlter($form, $form_state);
 
     // Save the form.
@@ -134,15 +134,17 @@ class ViewsExposedForm extends FormBase {
    * {@inheritdoc}
    */
   public function validateForm(array &$form, FormStateInterface $form_state) {
+    $view = $form_state->get('view');
+
     foreach (array('field', 'filter') as $type) {
       /** @var \Drupal\views\Plugin\views\ViewsHandlerInterface[] $handlers */
-      $handlers = &$form_state->get('view')->$type;
+      $handlers = &$view->$type;
       foreach ($handlers as $key => $handler) {
         $handlers[$key]->validateExposed($form, $form_state);
       }
     }
     /** @var \Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase $exposed_form_plugin */
-    $exposed_form_plugin = $form_state->get('exposed_form_plugin');
+    $exposed_form_plugin = $view->display_handler->getPlugin('exposed_form');
     $exposed_form_plugin->exposedFormValidate($form, $form_state);
   }
 
@@ -157,13 +159,14 @@ class ViewsExposedForm extends FormBase {
         $handlers[$key]->submitExposed($form, $form_state);
       }
     }
+
     $view = $form_state->get('view');
     $view->exposed_data = $form_state->getValues();
     $view->exposed_raw_input = [];
 
-    $exclude = array('submit', 'form_build_id', 'form_id', 'form_token', 'exposed_form_plugin', '', 'reset');
+    $exclude = array('submit', 'form_build_id', 'form_id', 'form_token', 'exposed_form_plugin', 'reset');
     /** @var \Drupal\views\Plugin\views\exposed_form\ExposedFormPluginBase $exposed_form_plugin */
-    $exposed_form_plugin = $form_state->get('exposed_form_plugin');
+    $exposed_form_plugin = $view->display_handler->getPlugin('exposed_form');
     $exposed_form_plugin->exposedFormSubmit($form, $form_state, $exclude);
 
     foreach ($form_state->getValues() as $key => $value) {

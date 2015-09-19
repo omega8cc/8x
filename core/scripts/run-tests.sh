@@ -15,7 +15,7 @@ use Drupal\Core\Test\TestRunnerKernel;
 use Drupal\simpletest\Form\SimpletestResultsForm;
 use Symfony\Component\HttpFoundation\Request;
 
-$autoloader = require_once __DIR__ . '/../vendor/autoload.php';
+$autoloader = require_once __DIR__ . '/../../autoload.php';
 
 const SIMPLETEST_SCRIPT_COLOR_PASS = 32; // Green.
 const SIMPLETEST_SCRIPT_COLOR_FAIL = 31; // Red.
@@ -175,6 +175,8 @@ All arguments are long options.
               Specify the path and the extension
               (i.e. 'core/modules/user/user.test').
 
+  --directory Run all tests found within the specified file directory.
+
   --xml       <path>
 
               If provided, test results will be written as xml files to this path.
@@ -253,6 +255,7 @@ function simpletest_script_parse_args() {
     'module' => NULL,
     'class' => FALSE,
     'file' => FALSE,
+    'directory' => NULL,
     'color' => FALSE,
     'verbose' => FALSE,
     'keep-results' => FALSE,
@@ -356,6 +359,17 @@ function simpletest_script_init() {
     }
   }
 
+  if (isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') {
+    $base_url = 'https://';
+  }
+  else {
+    $base_url = 'http://';
+  }
+  $base_url .= $host;
+  if ($path !== '') {
+    $base_url .= $path;
+  }
+  putenv('SIMPLETEST_BASE_URL=' . $base_url);
   $_SERVER['HTTP_HOST'] = $host;
   $_SERVER['REMOTE_ADDR'] = '127.0.0.1';
   $_SERVER['SERVER_ADDR'] = '127.0.0.1';
@@ -419,35 +433,12 @@ function simpletest_script_setup_database($new = FALSE) {
   if (!empty($args['dburl'])) {
     // Remove a possibly existing default connection (from settings.php).
     Database::removeConnection('default');
-
-    $info = parse_url($args['dburl']);
-    if (!isset($info['scheme'], $info['host'], $info['path'])) {
-      simpletest_script_print_error('Invalid --dburl. Minimum requirement: driver://host/database');
+    try {
+      $databases['default']['default'] = Database::convertDbUrlToConnectionInfo($args['dburl'], DRUPAL_ROOT);
+    }
+    catch (\InvalidArgumentException $e) {
+      simpletest_script_print_error('Invalid --dburl. Reason: ' . $e->getMessage());
       exit(1);
-    }
-    $info += array(
-      'user' => '',
-      'pass' => '',
-      'fragment' => '',
-    );
-    if ($info['path'][0] === '/') {
-      $info['path'] = substr($info['path'], 1);
-    }
-    if ($info['scheme'] === 'sqlite' && $info['path'][0] !== '/') {
-      $info['path'] = DRUPAL_ROOT . '/' . $info['path'];
-    }
-    $databases['default']['default'] = array(
-      'driver' => $info['scheme'],
-      'username' => $info['user'],
-      'password' => $info['pass'],
-      'host' => $info['host'],
-      'database' => $info['path'],
-      'prefix' => array(
-        'default' => $info['fragment'],
-      ),
-    );
-    if (isset($info['port'])) {
-      $databases['default']['default']['port'] = $info['port'];
     }
   }
   // Otherwise, use the default database connection from settings.php.
@@ -721,7 +712,7 @@ function simpletest_script_command($test_id, $test_class) {
  * @see simpletest_script_run_one_test()
  */
 function simpletest_script_cleanup($test_id, $test_class, $exitcode) {
-  if (strpos($test_class, 'Drupal\\Tests\\') === 0) {
+  if (is_subclass_of($test_class, '\PHPUnit_Framework_TestCase')) {
     // PHPUnit test, move on.
     return;
   }
@@ -848,6 +839,60 @@ function simpletest_script_get_test_list() {
         }
       }
     }
+    elseif ($args['directory']) {
+      // Extract test case class names from specified directory.
+      // Find all tests in the PSR-X structure; Drupal\$extension\Tests\*.php
+      // Since we do not want to hard-code too many structural file/directory
+      // assumptions about PSR-0/4 files and directories, we check for the
+      // minimal conditions only; i.e., a '*.php' file that has '/Tests/' in
+      // its path.
+      // Ignore anything from third party vendors.
+      $ignore = array('.', '..', 'vendor');
+      $files = [];
+      if ($args['directory'][0] === '/') {
+        $directory = $args['directory'];
+      }
+      else {
+        $directory = DRUPAL_ROOT . "/" . $args['directory'];
+      }
+      foreach (file_scan_directory($directory, '/\.php$/', $ignore) as $file) {
+        // '/Tests/' can be contained anywhere in the file's path (there can be
+        // sub-directories below /Tests), but must be contained literally.
+        // Case-insensitive to match all Simpletest and PHPUnit tests:
+        //   ./lib/Drupal/foo/Tests/Bar/Baz.php
+        //   ./foo/src/Tests/Bar/Baz.php
+        //   ./foo/tests/Drupal/foo/Tests/FooTest.php
+        //   ./foo/tests/src/FooTest.php
+        // $file->filename doesn't give us a directory, so we use $file->uri
+        // Strip the drupal root directory and trailing slash off the URI
+        $filename = substr($file->uri, strlen(DRUPAL_ROOT)+1);
+        if (stripos($filename, '/Tests/')) {
+          $files[$filename] = $filename;
+        }
+      }
+      foreach ($files as $file) {
+        $content = file_get_contents($file);
+        // Extract a potential namespace.
+        $namespace = FALSE;
+        if (preg_match('@^namespace ([^ ;]+)@m', $content, $matches)) {
+          $namespace = $matches[1];
+        }
+        // Extract all class names.
+        // Abstract classes are excluded on purpose.
+        preg_match_all('@^class ([^ ]+)@m', $content, $matches);
+        if (!$namespace) {
+          $test_list = array_merge($test_list, $matches[1]);
+        }
+        else {
+          foreach ($matches[1] as $class_name) {
+            $namespace_class = $namespace . '\\' . $class_name;
+            if (is_subclass_of($namespace_class, '\Drupal\simpletest\TestBase') || is_subclass_of($namespace_class, '\PHPUnit_Framework_TestCase')) {
+              $test_list[] = $namespace_class;
+            }
+          }
+        }
+      }
+    }
     else {
       $groups = simpletest_test_get_all();
       foreach ($args['test_names'] as $group_name) {
@@ -949,7 +994,7 @@ function simpletest_script_reporter_write_xml_results() {
       if ($result->test_class != $test_class) {
         // We've moved onto a new class, so write the last classes results to a file:
         if (isset($xml_files[$test_class])) {
-          file_put_contents($args['xml'] . '/' . $test_class . '.xml', $xml_files[$test_class]['doc']->saveXML());
+          file_put_contents($args['xml'] . '/' . str_replace('\\', '_', $test_class) . '.xml', $xml_files[$test_class]['doc']->saveXML());
           unset($xml_files[$test_class]);
         }
         $test_class = $result->test_class;
@@ -967,7 +1012,12 @@ function simpletest_script_reporter_write_xml_results() {
       // Create the XML element for this test case:
       $case = $dom_document->createElement('testcase');
       $case->setAttribute('classname', $test_class);
-      list($class, $name) = explode('->', $result->function, 2);
+      if (strpos($result->function, '->') !== FALSE) {
+        list($class, $name) = explode('->', $result->function, 2);
+      }
+      else {
+        $name = $result->function;
+      }
       $case->setAttribute('name', $name);
 
       // Passes get no further attention, but failures and exceptions get to add more detail:
@@ -998,7 +1048,7 @@ function simpletest_script_reporter_write_xml_results() {
   }
   // The last test case hasn't been saved to a file yet, so do that now:
   if (isset($xml_files[$test_class])) {
-    file_put_contents($args['xml'] . '/' . $test_class . '.xml', $xml_files[$test_class]['doc']->saveXML());
+    file_put_contents($args['xml'] . '/' . str_replace('\\', '_', $test_class) . '.xml', $xml_files[$test_class]['doc']->saveXML());
     unset($xml_files[$test_class]);
   }
 }
@@ -1211,7 +1261,8 @@ function simpletest_script_open_browser() {
   $css_assets = \Drupal::service('asset.css.collection_renderer')->render($resolver->getCssAssets($assets, FALSE));
 
   // Make the html page to write to disk.
-  $html = '<head>' . drupal_render($js_assets_header) . drupal_render($css_assets) . '</head><body>' . drupal_render($form) . drupal_render($js_assets_footer) .'</body>';
+  $render_service = \Drupal::service('renderer');
+  $html = '<head>' . ($js_assets_header) . $render_service->renderPlain($css_assets) . '</head><body>' . $render_service->renderPlain($form) . $render_service->renderPlain($js_assets_footer) .'</body>';
 
   // Ensure we have assets verbose directory - tests with no verbose output will not
   // have created one.

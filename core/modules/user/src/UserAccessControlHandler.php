@@ -34,14 +34,14 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
 
     // Administrators can view/update/delete all user profiles.
     if ($account->hasPermission('administer users')) {
-      return AccessResult::allowed()->cachePerRole();
+      return AccessResult::allowed()->cachePerPermissions();
     }
 
     switch ($operation) {
       case 'view':
         // Only allow view access if the account is active.
         if ($account->hasPermission('access user profiles') && $entity->isActive()) {
-          return AccessResult::allowed()->cachePerRole()->cacheUntilEntityChanges($entity);
+          return AccessResult::allowed()->cachePerPermissions()->cacheUntilEntityChanges($entity);
         }
         // Users can view own profiles at all times.
         else if ($account->id() == $entity->id()) {
@@ -55,7 +55,7 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
 
       case 'delete':
         // Users with 'cancel account' permission can cancel their own account.
-        return AccessResult::allowedIf($account->id() == $entity->id() && $account->hasPermission('cancel account'))->cachePerRole()->cachePerUser();
+        return AccessResult::allowedIf($account->id() == $entity->id() && $account->hasPermission('cancel account'))->cachePerPermissions()->cachePerUser();
     }
 
     // No opinion.
@@ -73,21 +73,24 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
 
     // Administrative users are allowed to edit and view all fields.
     if (!in_array($field_definition->getName(), $explicit_check_fields) && $account->hasPermission('administer users')) {
-      return AccessResult::allowed()->cachePerRole();
+      return AccessResult::allowed()->cachePerPermissions();
     }
 
     // Flag to indicate if this user entity is the own user account.
     $is_own_account = $items ? $items->getEntity()->id() == $account->id() : FALSE;
     switch ($field_definition->getName()) {
       case 'name':
-        // Allow view access to anyone with access to the entity.
-        if ($operation == 'view') {
-          return AccessResult::allowed()->cachePerRole();
+        // Allow view access to anyone with access to the entity. Anonymous
+        // users should be able to access the username field during the
+        // registration process, otherwise the username and email constraints
+        // are not checked.
+        if ($operation == 'view' || ($items && $account->isAnonymous() && $items->getEntity()->isAnonymous())) {
+          return AccessResult::allowed()->cachePerPermissions();
         }
         // Allow edit access for the own user name if the permission is
         // satisfied.
         if ($is_own_account && $account->hasPermission('change own username')) {
-          return AccessResult::allowed()->cachePerRole()->cachePerUser();
+          return AccessResult::allowed()->cachePerPermissions()->cachePerUser();
         }
         else {
           return AccessResult::forbidden();
@@ -95,8 +98,6 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
 
       case 'preferred_langcode':
       case 'preferred_admin_langcode':
-      case 'signature':
-      case 'signature_format':
       case 'timezone':
       case 'mail':
         // Allow view access to own mail address and other personalization
@@ -105,7 +106,7 @@ class UserAccessControlHandler extends EntityAccessControlHandler {
           return $is_own_account ? AccessResult::allowed()->cachePerUser() : AccessResult::forbidden();
         }
         // Anyone that can edit the user can also edit this field.
-        return AccessResult::allowed()->cachePerRole();
+        return AccessResult::allowed()->cachePerPermissions();
 
       case 'pass':
         // Allow editing the password, but not viewing it.

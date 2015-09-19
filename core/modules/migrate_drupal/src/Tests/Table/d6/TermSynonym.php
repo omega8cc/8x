@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\TermSynonym.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\TermSynonym.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -44,6 +44,7 @@ class TermSynonym extends DrupalDumpBase {
           'default' => '',
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("term_synonym")->fields(array(
       'tsid',
@@ -54,3 +55,4 @@ class TermSynonym extends DrupalDumpBase {
   }
 
 }
+#f872b9f69bd357799c9aebbfc65dd736

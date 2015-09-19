@@ -9,6 +9,7 @@ namespace Drupal\views_ui\Tests;
 
 use Drupal\Core\Url;
 use Drupal\user\Entity\Role;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests enabling, disabling, and reverting default views via the listing page.
@@ -112,7 +113,7 @@ class DefaultViewsTest extends UITestBase {
     $this->assertLinkByHref($edit_href);
 
     // Clear permissions for anonymous users to check access for default views.
-    Role::load(DRUPAL_ANONYMOUS_RID)->revokePermission('access content')->save();
+    Role::load(RoleInterface::ANONYMOUS_ID)->revokePermission('access content')->save();
 
     // Test the default views disclose no data by default.
     $this->drupalLogout();
@@ -199,7 +200,7 @@ class DefaultViewsTest extends UITestBase {
    * @param $unique_href_part
    *   A unique string that is expected to occur within the href of the desired
    *   link. For example, if the link URL is expected to look like
-   *   "admin/structure/views/view/glossary/...", then "/glossary/" could be
+   *   "admin/structure/views/view/glossary/*", then "/glossary/" could be
    *   passed as the expected unique string.
    *
    * @return

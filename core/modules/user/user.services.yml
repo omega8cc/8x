@@ -15,28 +15,16 @@ services:
     class: Drupal\user\Access\LoginStatusCheck
     tags:
       - { name: access_check, applies_to: _user_is_logged_in }
-  authentication.cookie:
-    class: Drupal\Core\Authentication\Provider\Cookie
+  user.authentication.cookie:
+    class: Drupal\user\Authentication\Provider\Cookie
+    arguments: ['@session_configuration', '@database']
     tags:
-      - { name: authentication_provider, priority: 0 }
-  cache_context.user:
-    class: Drupal\user\Cache\UserCacheContext
-    arguments: ['@current_user']
-    tags:
-      - { name: cache.context}
-  cache_context.user.roles:
-    class: Drupal\user\Cache\UserRolesCacheContext
-    arguments: ['@current_user']
-    tags:
-      - { name: cache.context}
+      - { name: authentication_provider, provider_id: 'cookie', priority: 0, global: TRUE }
   user.data:
     class: Drupal\user\UserData
     arguments: ['@database']
     tags:
       - { name: backend_overridable }
-  user.autocomplete:
-    class: Drupal\user\UserAutocomplete
-    arguments: ['@config.factory', '@entity.manager', '@entity.query']
   user_maintenance_mode_subscriber:
     class: Drupal\user\EventSubscriber\MaintenanceModeSubscriber
     arguments: ['@maintenance_mode', '@current_user']
@@ -47,14 +35,16 @@ services:
     arguments: ['@current_user', '@url_generator']
     tags:
       - { name: event_subscriber }
+  user_last_access_subscriber:
+    class: Drupal\user\EventSubscriber\UserRequestSubscriber
+    arguments: ['@current_user', '@entity.manager']
+    tags:
+      - { name: event_subscriber }
   theme.negotiator.admin_theme:
     class: Drupal\user\Theme\AdminNegotiator
     arguments: ['@current_user', '@config.factory', '@entity.manager', '@router.admin_context']
     tags:
       - { name: theme_negotiator, priority: -40 }
-  user.permissions_hash:
-    class: Drupal\user\PermissionsHash
-    arguments: ['@private_key', '@cache.default']
   user.auth:
     class: Drupal\user\UserAuth
     arguments: ['@entity.manager', '@password']
@@ -65,12 +55,20 @@ services:
       - { name: backend_overridable }
   user.shared_tempstore:
     class: Drupal\user\SharedTempStoreFactory
-    arguments: ['@keyvalue.expirable', '@lock', '%user.tempstore.expire%']
+    arguments: ['@keyvalue.expirable', '@lock', '@request_stack', '%user.tempstore.expire%']
     tags:
       - { name: backend_overridable }
   user.permissions:
     class: Drupal\user\PermissionHandler
     arguments: ['@module_handler', '@string_translation', '@controller_resolver']
+  user.current_user_context:
+    class: Drupal\user\ContextProvider\CurrentUserContext
+    arguments: ['@current_user', '@entity.manager']
+    tags:
+      - { name: 'context_provider' }
+  password_migrate:
+    class: Drupal\user\MigratePassword
+    arguments: ['@password_original']
 
 parameters:
   user.tempstore.expire: 604800

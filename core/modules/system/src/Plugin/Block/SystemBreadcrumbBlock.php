@@ -77,10 +77,12 @@ class SystemBreadcrumbBlock extends BlockBase implements ContainerFactoryPluginI
     $breadcrumb = $this->breadcrumbManager->build($this->routeMatch);
     if (!empty($breadcrumb)) {
       // $breadcrumb is expected to be an array of rendered breadcrumb links.
-      return array(
+      $build = [
         '#theme' => 'breadcrumb',
-        '#links' => $breadcrumb,
-      );
+        '#links' => $breadcrumb->getLinks(),
+      ];
+      $breadcrumb->applyTo($build);
+      return $build;
     }
   }
 

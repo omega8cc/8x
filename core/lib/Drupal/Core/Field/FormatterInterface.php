@@ -19,7 +19,7 @@ interface FormatterInterface extends PluginSettingsInterface {
   /**
    * Returns a form to configure settings for the formatter.
    *
-   * Invoked from \Drupal\field_ui\Form\FieldEditForm to allow
+   * Invoked from \Drupal\field_ui\Form\EntityDisplayFormBase to allow
    * administrators to configure the formatter. The field_ui module takes care
    * of handling submitted form values.
    *
@@ -60,7 +60,7 @@ interface FormatterInterface extends PluginSettingsInterface {
    * items.
    *
    * @param \Drupal\Core\Field\FieldItemListInterface[] $entities_items
-   *   Array of field values, keyed by entity ID.
+   *   An array with the field values from the multiple entities being rendered.
    */
   public function prepareView(array $entities_items);
 

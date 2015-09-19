@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Entity\EntityTranslationFormTest.
+ * Contains \Drupal\system\Tests\Entity\EntityTranslationFormTest.
  */
 
 namespace Drupal\system\Tests\Entity;
@@ -106,6 +106,7 @@ class EntityTranslationFormTest extends WebTestBase {
 
     // Create a body translation and check the form language.
     $langcode2 = $this->langcodes[1];
+    $node->getTranslation($langcode2)->title->value = $this->randomString();
     $node->getTranslation($langcode2)->body->value = $this->randomMachineName(16);
     $node->getTranslation($langcode2)->setOwnerId($web_user->id());
     $node->save();

@@ -2,13 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\file\Tests\FileFieldValidateTest.
+ * Contains \Drupal\file\Tests\FileFieldValidateTest.
  */
 
 namespace Drupal\file\Tests;
 
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\field\Entity\FieldConfig;
+use Drupal\file\Entity\File;
 
 /**
  * Tests validation functions such as file type, max file size, max size per
@@ -17,8 +18,6 @@ use Drupal\field\Entity\FieldConfig;
  * @group file
  */
 class FileFieldValidateTest extends FileFieldTestBase {
-  protected $field;
-  protected $node_type;
 
   /**
    * Tests the required property on file fields.
@@ -36,7 +35,8 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $edit = array();
     $edit['title[0][value]'] = $this->randomMachineName();
     $this->drupalPostForm('node/add/' . $type_name, $edit, t('Save and publish'));
-    $this->assertRaw(t('!title field is required.', array('!title' => $field->getLabel())), 'Node save failed when required file field was empty.');
+    $this->assertText('1 error has been found:   ' . $field->label(), 'Node save failed when required file field was empty.');
+    $this->assertIdentical(1, count($this->xpath('//div[contains(concat(" ", normalize-space(@class), " "), :class)]//a', [':class' => ' messages--error '])), 'There is one link in the error message.');
 
     // Create a new node with the uploaded file.
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
@@ -45,7 +45,7 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $node_storage->resetCache(array($nid));
     $node = $node_storage->load($nid);
 
-    $node_file = file_load($node->{$field_name}->target_id);
+    $node_file = File::load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, 'File exists after uploading to the required field.');
     $this->assertFileEntryExists($node_file, 'File entry exists after uploading to the required field.');
 
@@ -57,13 +57,14 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $edit = array();
     $edit['title[0][value]'] = $this->randomMachineName();
     $this->drupalPostForm('node/add/' . $type_name, $edit, t('Save and publish'));
-    $this->assertRaw(t('!title field is required.', array('!title' => $field->getLabel())), 'Node save failed when required multiple value file field was empty.');
+    $this->assertText('1 error has been found:   '  . $field->label(), 'Node save failed when required multiple value file field was empty.');
+    $this->assertIdentical(1, count($this->xpath('//div[contains(concat(" ", normalize-space(@class), " "), :class)]//a', [':class' => ' messages--error '])), 'There is one link in the error message.');
 
     // Create a new node with the uploaded file into the multivalue field.
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
     $node_storage->resetCache(array($nid));
     $node = $node_storage->load($nid);
-    $node_file = file_load($node->{$field_name}->target_id);
+    $node_file = File::load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, 'File exists after uploading to the required multiple value field.');
     $this->assertFileEntryExists($node_file, 'File entry exists after uploading to the required multiple value field.');
   }
@@ -95,7 +96,7 @@ class FileFieldValidateTest extends FileFieldTestBase {
       $nid = $this->uploadNodeFile($small_file, $field_name, $type_name);
       $node_storage->resetCache(array($nid));
       $node = $node_storage->load($nid);
-      $node_file = file_load($node->{$field_name}->target_id);
+      $node_file = File::load($node->{$field_name}->target_id);
       $this->assertFileExists($node_file, format_string('File exists after uploading a file (%filesize) under the max limit (%maxsize).', array('%filesize' => format_size($small_file->getSize()), '%maxsize' => $max_filesize)));
       $this->assertFileEntryExists($node_file, format_string('File entry exists after uploading a file (%filesize) under the max limit (%maxsize).', array('%filesize' => format_size($small_file->getSize()), '%maxsize' => $max_filesize)));
 
@@ -112,7 +113,7 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $nid = $this->uploadNodeFile($large_file, $field_name, $type_name);
     $node_storage->resetCache(array($nid));
     $node = $node_storage->load($nid);
-    $node_file = file_load($node->{$field_name}->target_id);
+    $node_file = File::load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, format_string('File exists after uploading a file (%filesize) with no max limit.', array('%filesize' => format_size($large_file->getSize()))));
     $this->assertFileEntryExists($node_file, format_string('File entry exists after uploading a file (%filesize) with no max limit.', array('%filesize' => format_size($large_file->getSize()))));
   }
@@ -136,7 +137,7 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
     $node_storage->resetCache(array($nid));
     $node = $node_storage->load($nid);
-    $node_file = file_load($node->{$field_name}->target_id);
+    $node_file = File::load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, 'File exists after uploading a file with no extension checking.');
     $this->assertFileEntryExists($node_file, 'File entry exists after uploading a file with no extension checking.');
 
@@ -155,7 +156,7 @@ class FileFieldValidateTest extends FileFieldTestBase {
     $nid = $this->uploadNodeFile($test_file, $field_name, $type_name);
     $node_storage->resetCache(array($nid));
     $node = $node_storage->load($nid);
-    $node_file = file_load($node->{$field_name}->target_id);
+    $node_file = File::load($node->{$field_name}->target_id);
     $this->assertFileExists($node_file, 'File exists after uploading a file with extension checking.');
     $this->assertFileEntryExists($node_file, 'File entry exists after uploading a file with extension checking.');
   }

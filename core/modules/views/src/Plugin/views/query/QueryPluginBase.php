@@ -2,12 +2,14 @@
 
 /**
  * @file
- * Definition of Drupal\views\Plugin\views\query\QueryPluginBase.
+ * Contains \Drupal\views\Plugin\views\query\QueryPluginBase.
  */
 
 namespace Drupal\views\Plugin\views\query;
 
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\views\Plugin\CacheablePluginInterface;
 use Drupal\views\Plugin\views\PluginBase;
 use Drupal\views\Plugin\views\display\DisplayPluginBase;
 use Drupal\views\ViewExecutable;
@@ -35,7 +37,7 @@ use Drupal\views\Views;
 /**
  * Base plugin class for Views queries.
  */
-abstract class QueryPluginBase extends PluginBase {
+abstract class QueryPluginBase extends PluginBase implements CacheablePluginInterface {
 
   /**
    * A pager plugin that should be provided by the display.
@@ -235,12 +237,15 @@ abstract class QueryPluginBase extends PluginBase {
    *   An appropriate query expression pointing to the date field.
    * @param string $format
    *   A format string for the result, like 'Y-m-d H:i:s'.
+   * @param boolean $string_date
+   *   For certain databases, date format functions vary depending on string or
+   *   numeric storage.
    *
    * @return string
    *   A string representing the field formatted as a date in the format
    *   specified by $format.
    */
-  public function getDateFormat($field, $format) {
+  public function getDateFormat($field, $format, $string_date = FALSE) {
     return $field;
   }
 
@@ -273,7 +278,7 @@ abstract class QueryPluginBase extends PluginBase {
         'alias' => $base_table,
         'relationship_id' => 'none',
         'entity_type' => $base_table_data['table']['entity type'],
-        'revision' => FALSE,
+        'revision' => $base_table_data['table']['entity revision'],
       );
 
       // Include the entity provider.
@@ -291,7 +296,7 @@ abstract class QueryPluginBase extends PluginBase {
           'relationship_id' => $relationship_id,
           'alias' => $relationship->alias,
           'entity_type' => $table_data['table']['entity type'],
-          'revision' => FALSE,
+          'revision' => $table_data['table']['entity revision'],
         );
 
         // Include the entity provider.
@@ -310,6 +315,41 @@ abstract class QueryPluginBase extends PluginBase {
     }
 
     return $entity_tables;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function isCacheable() {
+    // This plugin can't really determine that.
+    return TRUE;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    $contexts = [];
+    if (($views_data = Views::viewsData()->get($this->view->storage->get('base_table'))) && !empty($views_data['table']['entity type'])) {
+      $entity_type_id = $views_data['table']['entity type'];
+      $entity_type = \Drupal::entityManager()->getDefinition($entity_type_id);
+      $contexts = $entity_type->getListCacheContexts();
+    }
+    return $contexts;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+    return [];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheMaxAge() {
+    return Cache::PERMANENT;
   }
 
 }

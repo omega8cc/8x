@@ -25,7 +25,6 @@ class UserViewsData extends EntityViewsData {
 
     $data['users_field_data']['table']['wizard_id'] = 'user';
 
-    $data['users_field_data']['uid']['field']['id'] = 'user';
     $data['users_field_data']['uid']['argument']['id'] = 'user_uid';
     $data['users_field_data']['uid']['argument'] += array(
       'name table' => 'users_field_data',
@@ -80,15 +79,13 @@ class UserViewsData extends EntityViewsData {
     );
 
     $data['users_field_data']['name']['help'] = t('The user or author name.');
-    $data['users_field_data']['name']['field']['id'] = 'user_name';
+    $data['users_field_data']['name']['field']['default_formatter'] = 'user_name';
     $data['users_field_data']['name']['filter']['title'] = t('Name (raw)');
     $data['users_field_data']['name']['filter']['help'] = t('The user or author name. This filter does not check if the user exists and allows partial matching. Does not use autocomplete.');
 
     // Note that this field implements field level access control.
     $data['users_field_data']['mail']['help'] = t('Email address for a given user. This field is normally not shown to users, so be cautious when using it.');
-    $data['users_field_data']['mail']['field']['id'] = 'user_mail';
 
-    $data['users_field_data']['langcode']['id'] = 'user_language';
     $data['users_field_data']['langcode']['help'] = t('Original language of the user information');
     $data['users_field_data']['langcode']['help'] = t('Language of the translation of user information');
 
@@ -96,15 +93,6 @@ class UserViewsData extends EntityViewsData {
     $data['users_field_data']['preferred_langcode']['help'] = t('Preferred language of the user');
     $data['users_field_data']['preferred_admin_langcode']['title'] = t('Preferred admin language');
     $data['users_field_data']['preferred_admin_langcode']['help'] = t('Preferred administrative language of the user');
-
-    $data['users']['view_user'] = array(
-      'field' => array(
-        'title' => t('Link to user'),
-        'help' => t('Provide a simple link to the user.'),
-        'id' => 'user_link',
-        'click sortable' => FALSE,
-      ),
-    );
 
     $data['users_field_data']['created_fulldate'] = array(
       'title' => t('Created date'),
@@ -160,9 +148,6 @@ class UserViewsData extends EntityViewsData {
       ),
     );
 
-    $data['users_field_data']['status']['field']['output formats'] = array(
-      'active-blocked' => array(t('Active'), t('Blocked')),
-    );
     $data['users_field_data']['status']['filter']['label'] = t('Active');
     $data['users_field_data']['status']['filter']['type'] = 'yes-no';
 
@@ -222,52 +207,6 @@ class UserViewsData extends EntityViewsData {
       ),
     );
 
-    unset($data['users_field_data']['signature']);
-    unset($data['users_field_data']['signature_format']);
-
-    if (\Drupal::moduleHandler()->moduleExists('filter')) {
-      $data['users_field_data']['signature'] = array(
-        'title' => t('Signature'),
-        'help' => t("The user's signature."),
-        'field' => array(
-          'id' => 'markup',
-          'format' => filter_fallback_format(),
-          'click sortable' => FALSE,
-        ),
-        'filter' => array(
-          'id' => 'string',
-        ),
-      );
-    }
-
-    if (\Drupal::moduleHandler()->moduleExists('content_translation')) {
-      $data['users']['translation_link'] = array(
-        'title' => t('Translation link'),
-        'help' => t('Provide a link to the translations overview for users.'),
-        'field' => array(
-          'id' => 'content_translation_link',
-        ),
-      );
-    }
-
-    $data['users']['edit_node'] = array(
-      'field' => array(
-        'title' => t('Link to edit user'),
-        'help' => t('Provide a simple link to edit the user.'),
-        'id' => 'user_link_edit',
-        'click sortable' => FALSE,
-      ),
-    );
-
-    $data['users']['cancel_node'] = array(
-      'field' => array(
-        'title' => t('Link to cancel user'),
-        'help' => t('Provide a simple link to cancel the user.'),
-        'id' => 'user_link_cancel',
-        'click sortable' => FALSE,
-      ),
-    );
-
     $data['users']['data'] = array(
       'title' => t('Data'),
       'help' => t('Provides access to the user data service.'),
@@ -306,7 +245,7 @@ class UserViewsData extends EntityViewsData {
         'allow empty' => TRUE,
       ),
       'argument' => array(
-        'id' => 'user__roles_target_id',
+        'id' => 'user__roles_rid',
         'name table' => 'role',
         'name field' => 'name',
         'empty field name' => t('No role'),

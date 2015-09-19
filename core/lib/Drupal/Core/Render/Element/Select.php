@@ -13,8 +13,12 @@ use Drupal\Core\Render\Element;
 /**
  * Provides a form element for a drop-down menu or scrolling selection box.
  *
- * See #empty_option and #empty_value for an explanation of various settings for
- * a select element, including behavior if #required is TRUE or FALSE.
+ * Properties:
+ * - #options: An associative array, where the keys are the retured values for
+ *   each option, and the values are the options to be shown in the drop-down
+ *   list.
+ * - #empty_option: The label that will be displayed to denote no selection.
+ * - #empty_value: The value of the option that is used to denote no selection.
  *
  * @FormElement("select")
  */
@@ -59,8 +63,8 @@ class Select extends FormElement {
    *   - #required: (optional) Whether the user needs to select an option (TRUE)
    *     or not (FALSE). Defaults to FALSE.
    *   - #empty_option: (optional) The label to show for the first default option.
-   *     By default, the label is automatically set to "- Please select -" for a
-   *     required field and "- None -" for an optional field.
+   *     By default, the label is automatically set to "- Select -" for a required
+   *     field and "- None -" for an optional field.
    *   - #empty_value: (optional) The value for the first default option, which is
    *     used to determine whether the user submitted a value or not.
    *     - If #required is TRUE, this defaults to '' (an empty string).

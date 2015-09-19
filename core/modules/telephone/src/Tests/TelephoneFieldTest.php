@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\telephone\TelephoneFieldTest.
+ * Contains \Drupal\telephone\Tests\TelephoneFieldTest.
  */
 
 namespace Drupal\telephone\Tests;
@@ -83,7 +83,7 @@ class TelephoneFieldTest extends WebTestBase {
     $this->assertFieldByName("field_telephone[0][value]", '', 'Widget found.');
     $this->assertRaw('placeholder="123-456-7890"');
 
-    // Test basic entery of telephone field.
+    // Test basic entry of telephone field.
     $edit = array(
       'title[0][value]' => $this->randomMachineName(),
       'field_telephone[0][value]' => "123456789",

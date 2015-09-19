@@ -83,7 +83,7 @@ class VocabularyForm extends EntityForm {
     // $form['langcode'] is not wrapped in an
     // if ($this->moduleHandler->moduleExists('language')) check because the
     // language_select form element works also without the language module being
-    // installed. http://drupal.org/node/1749954 documents the new element.
+    // installed. https://www.drupal.org/node/1749954 documents the new element.
     $form['langcode'] = array(
       '#type' => 'language_select',
       '#title' => $this->t('Vocabulary language'),
@@ -113,26 +113,6 @@ class VocabularyForm extends EntityForm {
     );
 
     return parent::form($form, $form_state, $vocabulary);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  protected function actions(array $form, FormStateInterface $form_state) {
-    // If we are displaying the delete confirmation skip the regular actions.
-    if (!$form_state->get('confirm_delete')) {
-      $actions = parent::actions($form, $form_state);
-      // We cannot leverage the regular submit handler definition because we
-      // have button-specific ones here. Hence we need to explicitly set it for
-      // the submit action, otherwise it would be ignored.
-      if ($this->moduleHandler->moduleExists('content_translation')) {
-        array_unshift($actions['submit']['#submit'], 'content_translation_language_configuration_element_submit');
-      }
-      return $actions;
-    }
-    else {
-      return array();
-    }
   }
 
   /**

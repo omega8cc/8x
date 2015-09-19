@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\user\Tests\UserAdminTest.
+ * Contains \Drupal\user\Tests\UserAdminTest.
  */
 
 namespace Drupal\user\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 
 /**
  * Tests user administration page functionality.
@@ -37,6 +38,8 @@ class UserAdminTest extends WebTestBase {
     $user_c = $this->drupalCreateUser(array('administer taxonomy'));
     $user_c->name = 'User C';
     $user_c->save();
+
+    $user_storage = $this->container->get('entity.manager')->getStorage('user');
 
     // Create admin user to delete registered user.
     $admin_user = $this->drupalCreateUser(array('administer users'));
@@ -84,7 +87,7 @@ class UserAdminTest extends WebTestBase {
 
     // Filter the users by role. Grab the system-generated role name for User C.
     $roles = $user_c->getRoles();
-    unset($roles[array_search(DRUPAL_AUTHENTICATED_RID, $roles)]);
+    unset($roles[array_search(RoleInterface::AUTHENTICATED_ID, $roles)]);
     $this->drupalGet('admin/people', array('query' => array('role' => reset($roles))));
 
     // Check if the correct users show up when filtered by role.
@@ -93,7 +96,7 @@ class UserAdminTest extends WebTestBase {
     $this->assertText($user_c->getUsername(), 'User C on filtered by role on admin users page');
 
     // Test blocking of a user.
-    $account = user_load($user_c->id());
+    $account = $user_storage->load($user_c->id());
     $this->assertTrue($account->isActive(), 'User C not blocked');
     $edit = array();
     $edit['action'] = 'user_block_user_action';
@@ -103,7 +106,8 @@ class UserAdminTest extends WebTestBase {
       // targeted with the blocking action.
       'query' => array('order' => 'name', 'sort' => 'asc')
     ));
-    $account = user_load($user_c->id(), TRUE);
+    $user_storage->resetCache(array($user_c->id()));
+    $account = $user_storage->load($user_c->id());
     $this->assertTrue($account->isBlocked(), 'User C blocked');
 
     // Test filtering on admin page for blocked users
@@ -121,18 +125,22 @@ class UserAdminTest extends WebTestBase {
       // targeted with the blocking action.
       'query' => array('order' => 'name', 'sort' => 'asc')
     ));
-    $account = user_load($user_c->id(), TRUE);
+    $user_storage->resetCache(array($user_c->id()));
+    $account = $user_storage->load($user_c->id());
     $this->assertTrue($account->isActive(), 'User C unblocked');
     $this->assertMail("to", $account->getEmail(), "Activation mail sent to user C");
 
     // Test blocking and unblocking another user from /user/[uid]/edit form and sending of activation mail
     $user_d = $this->drupalCreateUser(array());
-    $account1 = user_load($user_d->id(), TRUE);
+    $user_storage->resetCache(array($user_d->id()));
+    $account1 = $user_storage->load($user_d->id());
     $this->drupalPostForm('user/' . $account1->id() . '/edit', array('status' => 0), t('Save'));
-    $account1 = user_load($user_d->id(), TRUE);
+    $user_storage->resetCache(array($user_d->id()));
+    $account1 = $user_storage->load($user_d->id());
     $this->assertTrue($account1->isBlocked(), 'User D blocked');
     $this->drupalPostForm('user/' . $account1->id() . '/edit', array('status' => TRUE), t('Save'));
-    $account1 = user_load($user_d->id(), TRUE);
+    $user_storage->resetCache(array($user_d->id()));
+    $account1 = $user_storage->load($user_d->id());
     $this->assertTrue($account1->isActive(), 'User D unblocked');
     $this->assertMail("to", $account1->getEmail(), "Activation mail sent to user D");
   }

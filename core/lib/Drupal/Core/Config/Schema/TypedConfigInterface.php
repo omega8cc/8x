@@ -24,7 +24,7 @@ interface TypedConfigInterface extends TraversableTypedDataInterface {
   /**
    * Determines whether the data structure is empty.
    *
-   * @return boolean
+   * @return bool
    *   TRUE if the data structure is empty, FALSE otherwise.
    */
   public function isEmpty();
@@ -52,18 +52,6 @@ interface TypedConfigInterface extends TraversableTypedDataInterface {
    *   The property object.
    */
   public function get($name);
-
-  /**
-   * Replaces the item at the specified position in this list.
-   *
-   * @param int|string $key
-   *   Property name or index of the item to replace.
-   * @param mixed $value
-   *   Value to be stored at the specified position.
-   *
-   * @return $this
-   */
-  public function set($key, $value);
 
   /**
    * Returns an array of all property values.

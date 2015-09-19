@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Theme\RegistryTest.
+ * Contains \Drupal\system\Tests\Theme\RegistryTest.
  */
 
 namespace Drupal\system\Tests\Theme;
@@ -23,9 +23,10 @@ class RegistryTest extends KernelTestBase {
    *
    * @var array
    */
-  public static $modules = array('theme_test');
+  public static $modules = array('theme_test', 'system');
 
   protected $profile = 'testing';
+
   /**
    * Tests the behavior of the theme registry class.
    */
@@ -72,8 +73,11 @@ class RegistryTest extends KernelTestBase {
     $theme_handler->install(['test_basetheme', 'test_subtheme', 'test_subsubtheme']);
 
     $registry_subsub_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_subsubtheme');
+    $registry_subsub_theme->setThemeManager(\Drupal::theme());
     $registry_sub_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_subtheme');
+    $registry_sub_theme->setThemeManager(\Drupal::theme());
     $registry_base_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_basetheme');
+    $registry_base_theme->setThemeManager(\Drupal::theme());
 
     $preprocess_functions = $registry_subsub_theme->get()['theme_test_template_test']['preprocess functions'];
     $this->assertIdentical([
@@ -95,5 +99,62 @@ class RegistryTest extends KernelTestBase {
       'template_preprocess',
       'test_basetheme_preprocess_theme_test_template_test',
     ], $preprocess_functions);
+
   }
+
+  /**
+   * Tests the theme registry with suggestions.
+   */
+  public function testSuggestionPreprocessFunctions() {
+    $theme_handler = \Drupal::service('theme_handler');
+    $theme_handler->install(['test_theme']);
+
+    $registry_theme = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_theme');
+    $registry_theme->setThemeManager(\Drupal::theme());
+
+    $suggestions = ['__kitten', '__flamingo'];
+    $expected_preprocess_functions = [
+      'template_preprocess',
+      'theme_test_preprocess_theme_test_preprocess_suggestions',
+    ];
+    $suggestion = '';
+    $hook = 'theme_test_preprocess_suggestions';
+    do {
+      $hook .= "$suggestion";
+      $expected_preprocess_functions[] = "test_theme_preprocess_$hook";
+      $preprocess_functions = $registry_theme->get()[$hook]['preprocess functions'];
+      $this->assertIdentical($expected_preprocess_functions, $preprocess_functions, "$hook has correct preprocess functions.");
+    } while ($suggestion = array_shift($suggestions));
+
+    $expected_preprocess_functions = [
+      'template_preprocess',
+      'theme_test_preprocess_theme_test_preprocess_suggestions',
+      'test_theme_preprocess_theme_test_preprocess_suggestions',
+      'test_theme_preprocess_theme_test_preprocess_suggestions__kitten',
+    ];
+
+    $preprocess_functions = $registry_theme->get()['theme_test_preprocess_suggestions__kitten__meerkat']['preprocess functions'];
+    $this->assertIdentical($expected_preprocess_functions, $preprocess_functions, 'Suggestion implemented as a function correctly inherits preprocess functions.');
+
+    $preprocess_functions = $registry_theme->get()['theme_test_preprocess_suggestions__kitten__bearcat']['preprocess functions'];
+    $this->assertIdentical($expected_preprocess_functions, $preprocess_functions, 'Suggestion implemented as a template correctly inherits preprocess functions.');
+
+    $this->assertTrue(isset($registry_theme->get()['theme_test_preprocess_suggestions__kitten__meerkat__tarsier__moose']), 'Preprocess function with an unimplemented lower-level suggestion is added to the registry.');
+  }
+
+  /**
+   * Tests that the theme registry can be altered by themes.
+   */
+  public function testThemeRegistryAlterByTheme() {
+
+    /** @var \Drupal\Core\Extension\ThemeHandlerInterface $theme_handler */
+    $theme_handler = \Drupal::service('theme_handler');
+    $theme_handler->install(['test_theme']);
+    $theme_handler->setDefault('test_theme');
+
+    $registry = new Registry(\Drupal::root(), \Drupal::cache(), \Drupal::lock(), \Drupal::moduleHandler(), $theme_handler, \Drupal::service('theme.initialization'), 'test_theme');
+    $registry->setThemeManager(\Drupal::theme());
+    $this->assertEqual('value', $registry->get()['theme_test_template_test']['variables']['additional']);
+  }
+
 }

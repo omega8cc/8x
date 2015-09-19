@@ -7,8 +7,9 @@
 
 namespace Drupal\system\Tests\System;
 
-use Drupal\Component\Utility\String;
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Xss;
+use Drupal\Core\Render\BubbleableMetadata;
 
 /**
  * Generates text using placeholders for dummy content to check token
@@ -17,6 +18,15 @@ use Drupal\Component\Utility\Xss;
  * @group system
  */
 class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
+
+  /**
+   * @inheritdoc
+   */
+  protected function setUp() {
+    parent::setUp();
+    // Set the site name to something other than an empty string.
+    $this->config('system.site')->set('name', 'Drupal')->save();
+  }
 
   /**
    * Test whether token-replacement works in various contexts.
@@ -60,7 +70,7 @@ class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
     $source .= '[bogus:token]';
 
     // Replace with with the clear parameter, only the valid token should remain.
-    $target = String::checkPlain($this->config('system.site')->get('name'));
+    $target = Html::escape($this->config('system.site')->get('name'));
     $result = $this->tokenService->replace($source, array(), array('langcode' => $this->interfaceLanguage->getId(), 'clear' => TRUE));
     $this->assertEqual($target, $result, 'Valid tokens replaced while invalid tokens ignored.');
 
@@ -95,19 +105,32 @@ class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
 
     // Generate and test sanitized tokens.
     $tests = array();
-    $tests['[site:name]'] = String::checkPlain($config->get('name'));
+    $tests['[site:name]'] = Html::escape($config->get('name'));
     $tests['[site:slogan]'] = $safe_slogan;
     $tests['[site:mail]'] = $config->get('mail');
     $tests['[site:url]'] = \Drupal::url('<front>', [], $url_options);
     $tests['[site:url-brief]'] = preg_replace(array('!^https?://!', '!/$!'), '', \Drupal::url('<front>', [], $url_options));
     $tests['[site:login-url]'] = \Drupal::url('user.page', [], $url_options);
 
+    $base_bubbleable_metadata = new BubbleableMetadata();
+
+    $metadata_tests = [];
+    $metadata_tests['[site:name]'] = BubbleableMetadata::createFromObject(\Drupal::config('system.site'));
+    $metadata_tests['[site:slogan]'] = BubbleableMetadata::createFromObject(\Drupal::config('system.site'));
+    $metadata_tests['[site:mail]'] = BubbleableMetadata::createFromObject(\Drupal::config('system.site'));
+    $bubbleable_metadata = clone $base_bubbleable_metadata;
+    $metadata_tests['[site:url]'] = $bubbleable_metadata->addCacheContexts(['url.site']);
+    $metadata_tests['[site:url-brief]'] = $bubbleable_metadata;
+    $metadata_tests['[site:login-url]'] = $bubbleable_metadata;
+
     // Test to make sure that we generated something for each token.
     $this->assertFalse(in_array(0, array_map('strlen', $tests)), 'No empty tokens generated.');
 
     foreach ($tests as $input => $expected) {
-      $output = $this->tokenService->replace($input, array(), array('langcode' => $this->interfaceLanguage->getId()));
+      $bubbleable_metadata = new BubbleableMetadata();
+      $output = $this->tokenService->replace($input, array(), array('langcode' => $this->interfaceLanguage->getId()), $bubbleable_metadata);
       $this->assertEqual($output, $expected, format_string('Sanitized system site information token %token replaced.', array('%token' => $input)));
+      $this->assertEqual($bubbleable_metadata, $metadata_tests[$input]);
     }
 
     // Generate and test unsanitized tokens.
@@ -115,7 +138,7 @@ class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
     $tests['[site:slogan]'] = $config->get('slogan');
 
     foreach ($tests as $input => $expected) {
-      $output = $this->tokenService->replace($input, array(), array('langcode' => $this->interfaceLanguage->getId(), 'sanitize' => FALSE));
+      $output = $this->tokenService->replace($input, array(), array('langcode' => $this->interfaceLanguage->getId(), 'sanitize' => FALSE), $bubbleable_metadata);
       $this->assertEqual($output, $expected, format_string('Unsanitized system site information token %token replaced.', array('%token' => $input)));
     }
 
@@ -124,10 +147,10 @@ class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
     // flag is being passed properly through the call stack and being handled
     // correctly by a 'known' token, [site:slogan].
     $raw_tokens = array('slogan' => '[site:slogan]');
-    $generated = $this->tokenService->generate('site', $raw_tokens);
+    $generated = $this->tokenService->generate('site', $raw_tokens, [], [], $bubbleable_metadata);
     $this->assertEqual($generated['[site:slogan]'], $safe_slogan, 'Token sanitized.');
 
-    $generated = $this->tokenService->generate('site', $raw_tokens, array(), array('sanitize' => FALSE));
+    $generated = $this->tokenService->generate('site', $raw_tokens, array(), array('sanitize' => FALSE), $bubbleable_metadata);
     $this->assertEqual($generated['[site:slogan]'], $slogan, 'Unsanitized token generated properly.');
   }
 
@@ -145,7 +168,7 @@ class TokenReplaceUnitTest extends TokenReplaceUnitTestBase {
     $tests['[date:medium]'] = $date_formatter->format($date, 'medium', '', NULL, $this->interfaceLanguage->getId());
     $tests['[date:long]'] = $date_formatter->format($date, 'long', '', NULL, $this->interfaceLanguage->getId());
     $tests['[date:custom:m/j/Y]'] = $date_formatter->format($date, 'custom', 'm/j/Y', NULL, $this->interfaceLanguage->getId());
-    $tests['[date:since]'] = $date_formatter->formatInterval(REQUEST_TIME - $date, 2, $this->interfaceLanguage->getId());
+    $tests['[date:since]'] = $date_formatter->formatTimeDiffSince($date, array('langcode' => $this->interfaceLanguage->getId()));
     $tests['[date:raw]'] = Xss::filter($date);
 
     // Test to make sure that we generated something for each token.

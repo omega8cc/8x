@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\views\Tests\GlossaryTest.
+ * Contains \Drupal\views\Tests\GlossaryTest.
  */
 
 namespace Drupal\views\Tests;
 
 use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Url;
 use Drupal\views\Views;
 
@@ -17,6 +18,8 @@ use Drupal\views\Views;
  * @group views
  */
 class GlossaryTest extends ViewTestBase {
+
+  use AssertViewsCacheTagsTrait;
 
   /**
    * Modules to enable.
@@ -29,7 +32,7 @@ class GlossaryTest extends ViewTestBase {
    * Tests the default glossary view.
    */
   public function testGlossaryView() {
-    // create a contentype and add some nodes, with a non random title.
+    // Create a content type and add some nodes, with a non-random title.
     $type = $this->drupalCreateContentType();
     $nodes_per_char = array(
       'd' => 1,
@@ -39,6 +42,7 @@ class GlossaryTest extends ViewTestBase {
       'a' => 3,
       'l' => 6,
     );
+    $nodes_by_char = [];
     foreach ($nodes_per_char as $char => $count) {
       $setting = array(
         'type' => $type->id()
@@ -46,7 +50,8 @@ class GlossaryTest extends ViewTestBase {
       for ($i = 0; $i < $count; $i++) {
         $node = $setting;
         $node['title'] = $char . $this->randomString(3);
-        $this->drupalCreateNode($node);
+        $node = $this->drupalCreateNode($node);
+        $nodes_by_char[$char][] = $node;
       }
     }
 
@@ -62,10 +67,38 @@ class GlossaryTest extends ViewTestBase {
 
     // Enable the glossary to be displayed.
     $view->storage->enable()->save();
-    // Check the actual page response.
-    $this->drupalGet('glossary');
-    $this->assertResponse(200);
+    $this->container->get('router.builder')->rebuildIfNeeded();
+    $url = Url::fromRoute('view.glossary.page_1');
 
+    // Verify cache tags.
+    $this->assertPageCacheContextsAndTags(
+      $url,
+      [
+        'timezone',
+        'languages:' . LanguageInterface::TYPE_CONTENT,
+        'languages:' . LanguageInterface::TYPE_INTERFACE,
+        'theme',
+        'url',
+        'user.node_grants:view',
+        'user.permissions',
+        'route',
+      ],
+      [
+        'config:views.view.glossary',
+        'node:' . $nodes_by_char['a'][0]->id(), 'node:' . $nodes_by_char['a'][1]->id(), 'node:' . $nodes_by_char['a'][2]->id(),
+        'node_list',
+        'user:0',
+        'user_list',
+        'rendered',
+        // FinishResponseSubscriber adds this cache tag to responses that have the
+        // 'user.permissions' cache context for anonymous users.
+        'config:user.role.anonymous',
+      ]
+    );
+
+    // Check the actual page response.
+    $this->drupalGet($url);
+    $this->assertResponse(200);
     foreach ($nodes_per_char as $char => $count) {
       $href = Url::fromRoute('view.glossary.page_1', ['arg_0' => $char])->toString();
       $label = Unicode::strtoupper($char);

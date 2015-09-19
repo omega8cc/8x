@@ -2,16 +2,16 @@
 
 /**
  * @file
- * Definition of Drupal\file\Entity\File.
+ * Contains \Drupal\file\Entity\File.
  */
 
 namespace Drupal\file\Entity;
 
 use Drupal\Core\Entity\ContentEntityBase;
+use Drupal\Core\Entity\EntityChangedTrait;
 use Drupal\Core\Entity\EntityStorageInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
-use Drupal\Core\Language\LanguageInterface;
 use Drupal\file\FileInterface;
 use Drupal\user\UserInterface;
 
@@ -25,7 +25,6 @@ use Drupal\user\UserInterface;
  *     "storage" = "Drupal\file\FileStorage",
  *     "storage_schema" = "Drupal\file\FileStorageSchema",
  *     "access" = "Drupal\file\FileAccessControlHandler",
- *     "view_builder" = "Drupal\Core\Entity\EntityViewBuilder",
  *     "views_data" = "Drupal\file\FileViewsData",
  *   },
  *   base_table = "file_managed",
@@ -38,6 +37,8 @@ use Drupal\user\UserInterface;
  * )
  */
 class File extends ContentEntityBase implements FileInterface {
+
+  use EntityChangedTrait;
 
   /**
    * {@inheritdoc}
@@ -251,10 +252,12 @@ class File extends ContentEntityBase implements FileInterface {
       ->setLabel(t('URI'))
       ->setDescription(t('The URI to access the file (either local or remote).'))
       ->setSetting('max_length', 255)
-      ->setSetting('case_sensitive', TRUE);
+      ->setSetting('case_sensitive', TRUE)
+      ->addConstraint('FileUriUnique');
 
     $fields['filemime'] = BaseFieldDefinition::create('string')
       ->setLabel(t('File MIME type'))
+      ->setSetting('is_ascii', TRUE)
       ->setDescription(t("The file's MIME type."));
 
     $fields['filesize'] = BaseFieldDefinition::create('integer')

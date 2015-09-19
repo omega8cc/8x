@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\Tests\views\Unit\ViewExecutableTest.
+ * Contains \Drupal\Tests\views\Unit\ViewExecutableTest.
  */
 
 namespace Drupal\Tests\views\Unit;
@@ -405,6 +405,10 @@ class ViewExecutableTest extends UnitTestCase {
     $page_display = $this->getMockBuilder('Drupal\views\Plugin\views\display\DisplayPluginBase')
       ->disableOriginalConstructor()
       ->getMock();
+
+    $page_display->expects($this->atLeastOnce())
+      ->method('isEnabled')
+      ->willReturn(TRUE);
 
     $display_collection = $this->getMockBuilder('Drupal\views\DisplayPluginCollection')
       ->disableOriginalConstructor()

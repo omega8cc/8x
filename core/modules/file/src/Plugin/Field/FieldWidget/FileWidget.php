@@ -7,15 +7,20 @@
 
 namespace Drupal\file\Plugin\Field\FieldWidget;
 
-use Drupal\Component\Utility\String;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Field\FieldDefinitionInterface;
+use Drupal\Core\Field\FieldFilteredString;
 use Drupal\Core\Field\FieldItemListInterface;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\WidgetBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Plugin\ContainerFactoryPluginInterface;
 use Drupal\Core\Render\Element;
-use Drupal\file\Element\ManagedFile;
+use Drupal\Core\Render\ElementInfoManagerInterface;
 use Drupal\Core\Url;
+use Drupal\file\Element\ManagedFile;
+use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\file\Entity\File;
 
 /**
  * Plugin implementation of the 'file_generic' widget.
@@ -28,7 +33,22 @@ use Drupal\Core\Url;
  *   }
  * )
  */
-class FileWidget extends WidgetBase {
+class FileWidget extends WidgetBase implements ContainerFactoryPluginInterface {
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct($plugin_id, $plugin_definition, FieldDefinitionInterface $field_definition, array $settings, array $third_party_settings, ElementInfoManagerInterface $element_info) {
+    parent::__construct($plugin_id, $plugin_definition, $field_definition, $settings, $third_party_settings);
+    $this->elementInfo = $element_info;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public static function create(ContainerInterface $container, array $configuration, $plugin_id, $plugin_definition) {
+    return new static($plugin_id, $plugin_definition,$configuration['field_definition'], $configuration['settings'], $configuration['third_party_settings'], $container->get('element_info'));
+  }
 
   /**
    * {@inheritdoc}
@@ -98,8 +118,8 @@ class FileWidget extends WidgetBase {
         break;
     }
 
-    $title = String::checkPlain($this->fieldDefinition->getLabel());
-    $description = $this->fieldFilterXss($this->fieldDefinition->getDescription());
+    $title = $this->fieldDefinition->getLabel();
+    $description = FieldFilteredString::create($this->fieldDefinition->getDescription());
 
     $elements = array();
 
@@ -212,7 +232,7 @@ class FileWidget extends WidgetBase {
 
     // Essentially we use the managed_file type, extended with some
     // enhancements.
-    $element_info = element_info('managed_file');
+    $element_info = $this->elementInfo->getInfo('managed_file');
     $element += array(
       '#type' => 'managed_file',
       '#upload_location' => $items[$delta]->getUploadLocation(),
@@ -248,7 +268,7 @@ class FileWidget extends WidgetBase {
         '#upload_validators' => $element['#upload_validators'],
         '#cardinality' => $cardinality,
       );
-      $element['#description'] = drupal_render($file_upload_help);
+      $element['#description'] = \Drupal::service('renderer')->renderPlain($file_upload_help);
       $element['#multiple'] = $cardinality != 1 ? TRUE : FALSE;
       if ($cardinality != 1 && $cardinality != -1) {
         $element['#element_validate'] = array(array(get_class($this), 'validateMultipleCount'));
@@ -327,10 +347,10 @@ class FileWidget extends WidgetBase {
       $removed_files = array_slice($values['fids'], $keep);
       $removed_names = array();
       foreach ($removed_files as $fid) {
-        $file = file_load($fid);
+        $file = File::load($fid);
         $removed_names[] = $file->getFilename();
       }
-      $args = array('%field' => $field_storage->getFieldName(), '@max' => $field_storage->getCardinality(), '@count' => $keep, '%list' => implode(', ', $removed_names));
+      $args = array('%field' => $field_storage->getName(), '@max' => $field_storage->getCardinality(), '@count' => $uploaded, '%list' => implode(', ', $removed_names));
       $message = t('Field %field can only hold @max values but there were @count uploaded. The following files have been omitted as a result: %list.', $args);
       drupal_set_message($message, 'warning');
       $values['fids'] = array_slice($values['fids'], 0, $keep);
@@ -388,18 +408,15 @@ class FileWidget extends WidgetBase {
     // file, the entire group of file fields is updated together.
     if ($element['#cardinality'] != 1) {
       $parents = array_slice($element['#array_parents'], 0, -1);
-      $new_url = Url::fromRoute('file.ajax_upload');
       $new_options = array(
         'query' => array(
           'element_parents' => implode('/', $parents),
-          'form_build_id' => $form['form_build_id']['#value'],
         ),
       );
       $field_element = NestedArray::getValue($form, $parents);
       $new_wrapper = $field_element['#id'] . '-ajax-wrapper';
       foreach (Element::children($element) as $key) {
         if (isset($element[$key]['#ajax'])) {
-          $element[$key]['#ajax']['url'] = $new_url->setOptions($new_options);
           $element[$key]['#ajax']['options'] = $new_options;
           $element[$key]['#ajax']['wrapper'] = $new_wrapper;
         }
@@ -431,6 +448,19 @@ class FileWidget extends WidgetBase {
   public static function processMultiple($element, FormStateInterface $form_state, $form) {
     $element_children = Element::children($element, TRUE);
     $count = count($element_children);
+
+    // Count the number of already uploaded files, in order to display new
+    // items in \Drupal\file\Element\ManagedFile::uploadAjaxCallback().
+    if (!$form_state->isRebuilding()) {
+      $count_items_before = 0;
+      foreach ($element_children as $children) {
+        if (!empty($element[$children]['#default_value']['fids'])) {
+          $count_items_before++;
+        }
+      }
+
+      $form_state->set('file_upload_delta_initial', $count_items_before);
+    }
 
     foreach ($element_children as $delta => $key) {
       if ($key != $element['#file_upload_delta']) {

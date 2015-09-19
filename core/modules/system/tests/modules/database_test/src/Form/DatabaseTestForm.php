@@ -7,9 +7,9 @@
 
 namespace Drupal\database_test\Form;
 
-use Drupal\Component\Utility\String;
 use Drupal\Core\Form\FormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\user\Entity\User;
 
 /**
  * Form controller for database_test module.
@@ -53,10 +53,10 @@ class DatabaseTestForm extends FormBase {
 
     $options = array();
 
-    foreach (user_load_multiple($uids) as $account) {
+    foreach (User::loadMultiple($uids) as $account) {
       $options[$account->id()] = array(
-        'title' => array('data' => array('#title' => String::checkPlain($account->getUsername()))),
-        'username' => String::checkPlain($account->getUsername()),
+        'title' => array('data' => array('#title' => $account->getUsername())),
+        'username' => $account->getUsername(),
         'status' =>  $account->isActive() ? t('active') : t('blocked'),
       );
     }

@@ -7,15 +7,16 @@
 
 namespace Drupal\dblog\Tests;
 
+use Drupal\Component\Utility\Html;
 use Drupal\Component\Utility\Unicode;
-use Drupal\Component\Utility\Xss;
 use Drupal\Core\Logger\RfcLogLevel;
+use Drupal\Core\Url;
 use Drupal\dblog\Controller\DbLogController;
 use Drupal\simpletest\WebTestBase;
 
 /**
  * Generate events and verify dblog entries; verify user access to log reports
- * based on persmissions.
+ * based on permissions.
  *
  * @group dblog
  */
@@ -71,6 +72,7 @@ class DbLogTest extends WebTestBase {
     $this->verifyEvents();
     $this->verifyReports();
     $this->verifyBreadcrumbs();
+    $this->verifyLinkEscaping();
     // Verify the overview table sorting.
     $orders = array('Date', 'Type', 'User');
     $sorts = array('asc', 'desc');
@@ -129,33 +131,50 @@ class DbLogTest extends WebTestBase {
    *
    * @param int $count
    *   Number of watchdog entries to generate.
-   * @param string $type
-   *   (optional) The type of watchdog entry. Defaults to 'custom'.
-   * @param int $severity
-   *   (optional) The severity of the watchdog entry. Defaults to
-   *   \Drupal\Core\Logger\RfcLogLevel::NOTICE.
+   * @param array $options
+   *   These options are used to override the defaults for the test.
+   *   An associative array containing any of the following keys:
+   *   - 'channel': String identifying the log channel to be output to.
+   *     If the channel is not set, the default of 'custom' will be used.
+   *   - 'message': String containing a message to be output to the log.
+   *     A simple default message is used if not provided.
+   *   - 'variables': Array of variables that match the message string.
+   *   - 'severity': Log severity level as defined in logging_severity_levels.
+   *   - 'link': String linking to view the result of the event.
+   *   - 'user': String identifying the username.
+   *   - 'uid': Int identifying the user id for the user.
+   *   - 'request_uri': String identifying the location of the request.
+   *   - 'referer': String identifying the referring url.
+   *   - 'ip': String The ip address of the client machine triggering the log
+   *     entry.
+   *   - 'timestamp': Int unix timestamp.
    */
-  private function generateLogEntries($count, $type = 'custom', $severity = RfcLogLevel::NOTICE) {
+  private function generateLogEntries($count, $options = array()) {
     global $base_root;
 
+    // Make it just a little bit harder to pass the link part of the test.
+    $link = urldecode('/content/xo%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A%E9%85%B1%E5%87%89%E6%8B%8C%E7%B4%A0%E9%B8%A1%E7%85%A7%E7%83%A7%E9%B8%A1%E9%BB%84%E7%8E%AB%E7%91%B0-%E7%A7%91%E5%B7%9E%E7%9A%84%E5%B0%8F%E4%B9%9D%E5%AF%A8%E6%B2%9F%E7%BB%9D%E7%BE%8E%E9%AB%98%E5%B1%B1%E6%B9%96%E6%B3%8A-lake-isabelle');
+
     // Prepare the fields to be logged
-    $log = array(
-      'channel'     => $type,
-      'message'     => 'Log entry added to test the dblog row limit.',
+    $log = $options + array(
+      'channel'     => 'custom',
+      'message'     => 'Dblog test log message',
       'variables'   => array(),
-      'severity'    => $severity,
-      'link'        => NULL,
+      'severity'    => RfcLogLevel::NOTICE,
+      'link'        => $link,
       'user'        => $this->adminUser,
       'uid'         => $this->adminUser->id(),
-      'request_uri' => $base_root . request_uri(),
+      'request_uri' => $base_root . \Drupal::request()->getRequestUri(),
       'referer'     => \Drupal::request()->server->get('HTTP_REFERER'),
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
-      );
-    $message = 'Log entry added to test the dblog row limit. Entry #';
+    );
+
+    $logger = $this->container->get('logger.dblog');
+    $message = $log['message'] . ' Entry #';
     for ($i = 0; $i < $count; $i++) {
       $log['message'] = $message . $i;
-      $this->container->get('logger.dblog')->log($severity, $log['message'], $log);
+      $logger->log($log['severity'], $log['message'], $log);
     }
   }
 
@@ -247,6 +266,25 @@ class DbLogTest extends WebTestBase {
   }
 
   /**
+   * Tests the escaping of links in the operation row of a database log detail
+   * page.
+   */
+  private function verifyLinkEscaping() {
+    $link = \Drupal::l('View', Url::fromRoute('entity.node.canonical', array('node' => 1)));
+    $message = 'Log entry added to do the verifyLinkEscaping test.';
+    $this->generateLogEntries(1, array(
+      'message' => $message,
+      'link' => $link,
+    ));
+
+    $result = db_query_range('SELECT wid FROM {watchdog} ORDER BY wid DESC', 0, 1);
+    $this->drupalGet('admin/reports/dblog/event/' . $result->fetchField());
+
+    // Check if the link exists (unescaped).
+    $this->assertRaw($link);
+  }
+
+  /**
    * Generates and then verifies some user events.
    */
   private function doUser() {
@@ -301,10 +339,10 @@ class DbLogTest extends WebTestBase {
     $this->assertLogMessage(t('Session closed for %name.', array('%name' => $name)), 'DBLog event was recorded: [logout user]');
     // Delete user.
     $message = t('Deleted user: %name %email.', array('%name' => $name, '%email' => '<' . $user->getEmail() . '>'));
-    $message_text = Unicode::truncate(Xss::filter($message, array()), 56, TRUE, TRUE);
+    $message_text = Unicode::truncate(Html::decodeEntities(strip_tags($message)), 56, TRUE, TRUE);
     // Verify that the full message displays on the details page.
     $link = FALSE;
-    if ($links = $this->xpath('//a[text()="' . html_entity_decode($message_text) . '"]')) {
+    if ($links = $this->xpath('//a[text()="' . $message_text . '"]')) {
       // Found link with the message text.
       $links = array_shift($links);
       foreach ($links->attributes() as $attr => $value) {
@@ -444,7 +482,7 @@ class DbLogTest extends WebTestBase {
    * Logs in the admin user, creates a database log event, and tests the
    * functionality of clearing the database log through the admin interface.
    */
-  protected function testDBLogAddAndClear() {
+  public function testDBLogAddAndClear() {
     global $base_root;
     // Get a count of how many watchdog entries already exist.
     $count = db_query('SELECT COUNT(*) FROM {watchdog}')->fetchField();
@@ -456,7 +494,7 @@ class DbLogTest extends WebTestBase {
       'link'        => NULL,
       'user'        => $this->adminUser,
       'uid'         => $this->adminUser->id(),
-      'request_uri' => $base_root . request_uri(),
+      'request_uri' => $base_root . \Drupal::request()->getRequestUri(),
       'referer'     => \Drupal::request()->server->get('HTTP_REFERER'),
       'ip'          => '127.0.0.1',
       'timestamp'   => REQUEST_TIME,
@@ -479,7 +517,7 @@ class DbLogTest extends WebTestBase {
   /**
    * Tests the database log filter functionality at admin/reports/dblog.
    */
-  protected function testFilter() {
+  public function testFilter() {
     $this->drupalLogin($this->adminUser);
 
     // Clear the log to ensure that only generated entries will be found.
@@ -497,7 +535,10 @@ class DbLogTest extends WebTestBase {
           'type' => $type_name,
           'severity' => $severity++,
         );
-        $this->generateLogEntries($type['count'], $type['type'], $type['severity']);
+        $this->generateLogEntries($type['count'], array(
+          'channel' => $type['type'],
+          'severity' => $type['severity'],
+        ));
       }
     }
 
@@ -654,10 +695,50 @@ class DbLogTest extends WebTestBase {
    *   The message to pass to simpletest.
    */
   protected function assertLogMessage($log_message, $message) {
-    $message_text = Unicode::truncate(Xss::filter($log_message, array()), 56, TRUE, TRUE);
-    // After \Drupal\Component\Utility\Xss::filter(), HTML entities should be
-    // converted to their character equivalents because assertLink() uses this
-    // string in xpath() to query the Document Object Model (DOM).
-    $this->assertLink(html_entity_decode($message_text), 0, $message);
+    $message_text = Unicode::truncate(Html::decodeEntities(strip_tags($log_message)), 56, TRUE, TRUE);
+    $this->assertLink($message_text, 0, $message);
   }
+
+  /**
+   * Tests that the details page displays correctly for a temporary user.
+   */
+  public function testTemporaryUser() {
+    // Create a temporary user.
+    $tempuser = $this->drupalCreateUser();
+    $tempuser_uid = $tempuser->id();
+
+    // Log in as the admin user.
+    $this->drupalLogin($this->adminUser);
+
+    // Generate a single watchdog entry.
+    $this->generateLogEntries(1, array('user' => $tempuser, 'uid' => $tempuser_uid));
+    $wid = db_query('SELECT MAX(wid) FROM {watchdog}')->fetchField();
+
+    // Check if the full message displays on the details page.
+    $this->drupalGet('admin/reports/dblog/event/' . $wid);
+    $this->assertText('Dblog test log message');
+
+    // Delete the user.
+    user_delete($tempuser->id());
+    $this->drupalGet('user/' . $tempuser_uid);
+    $this->assertResponse(404);
+
+    // Check if the full message displays on the details page.
+    $this->drupalGet('admin/reports/dblog/event/' . $wid);
+    $this->assertText('Dblog test log message');
+  }
+
+  /**
+   * Make sure HTML tags are filtered out in the log overview links.
+   */
+  public function testOverviewLinks() {
+    $this->drupalLogin($this->adminUser);
+    $this->generateLogEntries(1, ['message' => "&lt;script&gt;alert('foo');&lt;/script&gt;<strong>Lorem</strong> ipsum dolor sit amet, consectetur adipiscing & elit."]);
+    $this->drupalGet('admin/reports/dblog');
+    $this->assertResponse(200);
+    // Make sure HTML tags are filtered out.
+    $this->assertRaw('title="alert(&#039;foo&#039;);Lorem ipsum dolor sit amet, consectetur adipiscing &amp; elit. Entry #0">&lt;script&gt;alert(&#039;foo&#039;);&lt;/script&gt;Lorem ipsum dolor sit…</a>');
+    $this->assertNoRaw("<script>alert('foo');</script>");
+  }
+
 }

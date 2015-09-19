@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Module\ModuleTestBase.
+ * Contains \Drupal\system\Tests\Module\ModuleTestBase.
  */
 
 namespace Drupal\system\Tests\Module;
@@ -25,13 +25,13 @@ abstract class ModuleTestBase extends WebTestBase {
    */
   public static $modules = array('system_test');
 
-  protected $admin_user;
+  protected $adminUser;
 
   protected function setUp() {
     parent::setUp();
 
-    $this->admin_user = $this->drupalCreateUser(array('access administration pages', 'administer modules'));
-    $this->drupalLogin($this->admin_user);
+    $this->adminUser = $this->drupalCreateUser(array('access administration pages', 'administer modules'));
+    $this->drupalLogin($this->adminUser);
   }
 
   /**
@@ -59,8 +59,7 @@ abstract class ModuleTestBase extends WebTestBase {
    *   The name of the module.
    */
   function assertModuleTablesExist($module) {
-    $this->rebuildContainer();
-    $tables = array_keys(drupal_get_schema_unprocessed($module));
+    $tables = array_keys(drupal_get_module_schema($module));
     $tables_exist = TRUE;
     foreach ($tables as $table) {
       if (!db_table_exists($table)) {
@@ -77,7 +76,7 @@ abstract class ModuleTestBase extends WebTestBase {
    *   The name of the module.
    */
   function assertModuleTablesDoNotExist($module) {
-    $tables = array_keys(drupal_get_schema_unprocessed($module));
+    $tables = array_keys(drupal_get_module_schema($module));
     $tables_exist = FALSE;
     foreach ($tables as $table) {
       if (db_table_exists($table)) {

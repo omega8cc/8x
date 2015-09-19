@@ -80,6 +80,7 @@ class ConfigTranslationListUiTest extends WebTestBase {
     $this->config('locale.settings')
       ->set('translation.import_enabled', TRUE)
       ->save();
+    $this->drupalPlaceBlock('local_tasks_block');
   }
 
   /**
@@ -362,6 +363,7 @@ class ConfigTranslationListUiTest extends WebTestBase {
     $edit = array();
     $edit['label'] = $this->randomMachineName();
     $edit['id'] = strtolower($edit['label']);
+    $edit['fallback_image_style'] = 'thumbnail';
 
     $this->drupalPostForm('admin/config/media/responsive-image-style/add', $edit, t('Save'));
     $this->assertRaw(t('Responsive image style %label saved.', array('%label' => $edit['label'])));

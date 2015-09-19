@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\Core\Routing\Router.
+ * Contains \Drupal\Core\Routing\AccessAwareRouter.
  */
 
 namespace Drupal\Core\Routing;
@@ -88,10 +88,6 @@ class AccessAwareRouter implements AccessAwareRouterInterface {
   public function matchRequest(Request $request) {
     $parameters = $this->chainRouter->matchRequest($request);
     $request->attributes->add($parameters);
-    // Trigger a session start and authentication by accessing any property of
-    // the current user.
-    // @todo This will be removed in https://www.drupal.org/node/2229145.
-    $this->account->id();
     $this->checkAccess($request);
     // We can not return $parameters because the access check can change the
     // request attributes.
@@ -105,7 +101,15 @@ class AccessAwareRouter implements AccessAwareRouterInterface {
    *   The request to access check.
    */
   protected function checkAccess(Request $request) {
-    if (!$this->accessManager->checkRequest($request, $this->account)) {
+    // The cacheability (if any) of this request's access check result must be
+    // applied to the response.
+    $access_result = $this->accessManager->checkRequest($request, $this->account, TRUE);
+    // Allow a master request to set the access result for a subrequest: if an
+    // access result attribute is already set, don't overwrite it.
+    if (!$request->attributes->has(AccessAwareRouterInterface::ACCESS_RESULT)) {
+      $request->attributes->set(AccessAwareRouterInterface::ACCESS_RESULT, $access_result);
+    }
+    if (!$access_result->isAllowed()) {
       throw new AccessDeniedHttpException();
     }
   }

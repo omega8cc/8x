@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\system\Tests\Form\ElementsLabelsTest.
+ * Contains \Drupal\system\Tests\Form\ElementsLabelsTest.
  */
 
 namespace Drupal\system\Tests\Form;
@@ -24,7 +24,7 @@ class ElementsLabelsTest extends WebTestBase {
   public static $modules = array('form_test');
 
   /**
-   * Test form elements, labels, title attibutes and required marks output
+   * Test form elements, labels, title attributes and required marks output
    * correctly and have the correct label option class if needed.
    */
   function testFormLabels() {
@@ -53,16 +53,16 @@ class ElementsLabelsTest extends WebTestBase {
 
     // Exercise various defaults for textboxes and modifications to ensure
     // appropriate override and correct behavior.
-    $elements = $this->xpath('//label[@for="edit-form-textfield-test-title-and-required" and @class="form-required"]/following-sibling::input[@id="edit-form-textfield-test-title-and-required"]');
+    $elements = $this->xpath('//label[@for="edit-form-textfield-test-title-and-required" and @class="js-form-required form-required"]/following-sibling::input[@id="edit-form-textfield-test-title-and-required"]');
     $this->assertTrue(isset($elements[0]), 'Label precedes textfield, with required marker inside label.');
 
-    $elements = $this->xpath('//input[@id="edit-form-textfield-test-no-title-required"]/preceding-sibling::label[@for="edit-form-textfield-test-no-title-required" and @class="form-required"]');
+    $elements = $this->xpath('//input[@id="edit-form-textfield-test-no-title-required"]/preceding-sibling::label[@for="edit-form-textfield-test-no-title-required" and @class="js-form-required form-required"]');
     $this->assertTrue(isset($elements[0]), 'Label tag with required marker precedes required textfield with no title.');
 
     $elements = $this->xpath('//input[@id="edit-form-textfield-test-title-invisible"]/preceding-sibling::label[@for="edit-form-textfield-test-title-invisible" and @class="visually-hidden"]');
     $this->assertTrue(isset($elements[0]), 'Label preceding field and label class is visually-hidden.');
 
-    $elements = $this->xpath('//input[@id="edit-form-textfield-test-title"]/preceding-sibling::span[@class="form-required"]');
+    $elements = $this->xpath('//input[@id="edit-form-textfield-test-title"]/preceding-sibling::span[@class="js-form-required form-required"]');
     $this->assertFalse(isset($elements[0]), 'No required marker on non-required field.');
 
     $elements = $this->xpath('//input[@id="edit-form-textfield-test-title-after"]/following-sibling::label[@for="edit-form-textfield-test-title-after" and @class="option"]');

@@ -22,7 +22,7 @@ function simpletest_help($route_name, RouteMatchInterface $route_match) {
     case 'help.page.simpletest':
       $output = '';
       $output .= '<h3>' . t('About') . '</h3>';
-      $output .= '<p>' . t('The Testing module provides a framework for running automated tests. It can be used to verify a working state of Drupal before and after any code changes, or as a means for developers to write and execute tests for their modules. For more information, see <a href="!simpletest">the online documentation for the Testing module</a>.', array('!simpletest' => 'https://drupal.org/documentation/modules/simpletest')) . '</p>';
+      $output .= '<p>' . t('The Testing module provides a framework for running automated tests. It can be used to verify a working state of Drupal before and after any code changes, or as a means for developers to write and execute tests for their modules. For more information, see <a href="!simpletest">the online documentation for the Testing module</a>.', array('!simpletest' => 'https://www.drupal.org/documentation/modules/simpletest')) . '</p>';
       $output .= '<h3>' . t('Uses') . '</h3>';
       $output .= '<dl>';
       $output .= '<dt>' . t('Running tests') . '</dt>';
@@ -238,6 +238,9 @@ function simpletest_phpunit_configuration_filepath() {
  *  The results as returned by exec().
  */
 function simpletest_phpunit_run_command(array $unescaped_test_classnames, $phpunit_file) {
+  // Setup an environment variable containing the database connection so that
+  // functional tests can connect to the database.
+  putenv('SIMPLETEST_DB=' . Database::getConnectionInfoAsUrl());
   $phpunit_bin = simpletest_phpunit_command();
 
   $command = array(
@@ -273,6 +276,7 @@ function simpletest_phpunit_run_command(array $unescaped_test_classnames, $phpun
   // via the simpletest UI.
   $ret = exec(join($command, " "));
   chdir($old_cwd);
+  putenv('SIMPLETEST_DB=');
   return $ret;
 }
 
@@ -283,15 +287,21 @@ function simpletest_phpunit_run_command(array $unescaped_test_classnames, $phpun
  *   The command that can be run through exec().
  */
 function simpletest_phpunit_command() {
+  // Load the actual autoloader being used and determine its filename using
+  // reflection. We can determine the vendor directory based on that filename.
+  $autoloader = require \Drupal::root() . '/autoload.php';
+  $reflector = new ReflectionClass($autoloader);
+  $vendor_dir = dirname(dirname($reflector->getFileName()));
+
   // Don't use the committed version in composer's bin dir if running on
   // windows.
   if (substr(PHP_OS, 0, 3) == 'WIN') {
     $php_executable_finder = new PhpExecutableFinder();
     $php = $php_executable_finder->find();
-    $phpunit_bin = escapeshellarg($php) . " -f " . escapeshellarg(\Drupal::root() . "/core/vendor/phpunit/phpunit/composer/bin/phpunit") . " --";
+    $phpunit_bin = escapeshellarg($php) . ' -f ' . escapeshellarg($vendor_dir . '/phpunit/phpunit/composer/bin/phpunit') . ' --';
   }
   else {
-    $phpunit_bin = \Drupal::root() . "/core/vendor/bin/phpunit";
+    $phpunit_bin = $vendor_dir . '/phpunit/phpunit/phpunit';
   }
   return $phpunit_bin;
 }
@@ -465,7 +475,7 @@ function simpletest_log_read($test_id, $database_prefix, $test_class) {
  *     $groups['Block'] => array(
  *       'BlockTestCase' => array(
  *         'name' => 'Block functionality',
- *         'description' => 'Add, edit and delete custom block...',
+ *         'description' => 'Add, edit and delete custom block.',
  *         'group' => 'Block',
  *       ),
  *     );
@@ -483,41 +493,47 @@ function simpletest_classloader_register() {
 }
 
 /**
- * Generates test file.
+ * Generates a test file.
  *
  * @param string $filename
- *   The name of the file, including the path.
+ *   The name of the file, including the path. The suffix '.txt' is appended to
+ *   the supplied file name and the file is put into the public:// files
+ *   directory.
  * @param int $width
  *   The number of characters on one line.
  * @param int $lines
  *   The number of lines in the file.
  * @param string $type
- *   (optional) The type, for example: "text", "binary", or "binary-text".
+ *   (optional) The type, one of:
+ *   - text: The generated file contains random ASCII characters.
+ *   - binary: The generated file contains random characters whose codes are in
+ *     the range of 0 to 31.
+ *   - binary-text: The generated file contains random sequence of '0' and '1'
+ *     values.
  *
  * @return string
  *   The name of the file, including the path.
  */
 function simpletest_generate_file($filename, $width, $lines, $type = 'binary-text') {
-  $size = $width * $lines - $lines;
-
-  // Generate random text
   $text = '';
-  for ($i = 0; $i < $size; $i++) {
-    switch ($type) {
-      case 'text':
-        $text .= chr(rand(32, 126));
-        break;
-      case 'binary':
-        $text .= chr(rand(0, 31));
-        break;
-      case 'binary-text':
-      default:
-        $text .= rand(0, 1);
-        break;
+    for ($i = 0; $i < $lines; $i++) {
+      // Generate $width - 1 characters to leave space for the "\n" character.
+      for ($j = 0; $j < $width - 1; $j++) {
+        switch ($type) {
+          case 'text':
+            $text .= chr(rand(32, 126));
+            break;
+          case 'binary':
+            $text .= chr(rand(0, 31));
+            break;
+          case 'binary-text':
+          default:
+            $text .= rand(0, 1);
+            break;
+        }
+      }
+      $text .= "\n";
     }
-  }
-  // Add \n for symmetrical file.
-  $text = wordwrap($text, $width - 1, "\n", TRUE) . "\n";
 
   // Create filename.
   file_put_contents('public://' . $filename . '.txt', $text);
@@ -548,7 +564,7 @@ function simpletest_clean_environment() {
  */
 function simpletest_clean_database() {
   $tables = db_find_tables(Database::getConnection()->prefixTables('{simpletest}') . '%');
-  $schema = drupal_get_schema_unprocessed('simpletest');
+  $schema = drupal_get_module_schema('simpletest');
   $count = 0;
   foreach (array_diff_key($tables, $schema) as $table) {
     // Strip the prefix and skip tables without digits following "simpletest",

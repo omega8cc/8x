@@ -1,8 +1,8 @@
 /**
  * @file toolbar.menu.css
  */
-.toolbar .menu,
-[dir="rtl"] .toolbar .menu {
+.toolbar .toolbar-menu,
+[dir="rtl"] .toolbar .toolbar-menu {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -13,9 +13,9 @@
   position: relative;
   width: auto;
 }
-.toolbar .toolbar-tray-horizontal .menu .toolbar-handle,
-.toolbar .toolbar-tray-horizontal .menu ul,
-.toolbar .toolbar-tray-vertical .menu ul {
+.toolbar .toolbar-tray-horizontal .toolbar-menu .toolbar-handle,
+.toolbar .toolbar-tray-horizontal .toolbar-menu ul,
+.toolbar .toolbar-tray-vertical .toolbar-menu ul {
   display: none;
 }
 .toolbar .toolbar-tray-vertical li.open > ul {
@@ -29,14 +29,14 @@
   margin-right: 0;
 }
 .toolbar .toolbar-tray .menu-item--active-trail > .toolbar-box a,
-.toolbar .toolbar-tray a.active {
+.toolbar .toolbar-tray a.is-active {
   color: #000;
   font-weight: bold;
 }
 
 /* ----- Toolbar menu tray for viewports less than 320px ------ */
 @media screen and (max-width: 319px) {
-  .toolbar .toolbar-tray-vertical.active {
+  .toolbar .toolbar-tray-vertical.is-active {
     width: 100%;
   }
 }

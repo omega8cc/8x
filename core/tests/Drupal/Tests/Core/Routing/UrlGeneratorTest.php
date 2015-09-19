@@ -2,13 +2,16 @@
 
 /**
  * @file
- * Contains Drupal\Tests\Core\Routing\UrlGeneratorTest.
+ * Contains \Drupal\Tests\Core\Routing\UrlGeneratorTest.
  */
 
 namespace Drupal\Tests\Core\Routing;
 
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\DependencyInjection\ContainerBuilder;
 use Drupal\Core\PathProcessor\PathProcessorAlias;
 use Drupal\Core\PathProcessor\PathProcessorManager;
+use Drupal\Core\Render\BubbleableMetadata;
 use Drupal\Core\Routing\RequestContext;
 use Drupal\Core\Routing\UrlGenerator;
 use Drupal\Tests\UnitTestCase;
@@ -20,6 +23,7 @@ use Symfony\Component\Routing\RouteCollection;
 /**
  * Confirm that the UrlGenerator is functioning properly.
  *
+ * @coversDefaultClass \Drupal\Core\Routing\UrlGenerator
  * @group Routing
  */
 class UrlGeneratorTest extends UnitTestCase {
@@ -52,17 +56,29 @@ class UrlGeneratorTest extends UnitTestCase {
    */
   protected $requestStack;
 
+  /**
+   * {@inheritdoc}
+   */
   protected function setUp() {
+    $cache_contexts_manager = $this->getMockBuilder('Drupal\Core\Cache\Context\CacheContextsManager')
+      ->disableOriginalConstructor()
+      ->getMock();
+    $container = new ContainerBuilder();
+    $container->set('cache_contexts_manager', $cache_contexts_manager);
+    \Drupal::setContainer($container);
 
     $routes = new RouteCollection();
     $first_route = new Route('/test/one');
     $second_route = new Route('/test/two/{narf}');
     $third_route = new Route('/test/two/');
-    $fourth_route = new Route('/test/four', array(), array('_scheme' => 'https'));
+    $fourth_route = new Route('/test/four', [], [], [], '', ['https']);
+    $none_route = new Route('', [], [], ['_no_path' => TRUE]);
+
     $routes->add('test_1', $first_route);
     $routes->add('test_2', $second_route);
     $routes->add('test_3', $third_route);
     $routes->add('test_4', $fourth_route);
+    $routes->add('<none>', $none_route);
 
     // Create a route provider stub.
     $provider = $this->getMockBuilder('Drupal\Core\Routing\RouteProvider')
@@ -73,22 +89,26 @@ class UrlGeneratorTest extends UnitTestCase {
     // are not passed in and default to an empty array.
     $route_name_return_map = $routes_names_return_map = array();
     $return_map_values = array(
-      array(
+      [
         'route_name' => 'test_1',
         'return' => $first_route,
-      ),
-      array(
+      ],
+      [
         'route_name' => 'test_2',
         'return' => $second_route,
-      ),
-      array(
+      ],
+      [
         'route_name' => 'test_3',
         'return' => $third_route,
-      ),
-      array(
+      ],
+      [
         'route_name' => 'test_4',
         'return' => $fourth_route,
-      ),
+      ],
+      [
+        'route_name' => '<none>',
+        'return' => $none_route,
+      ],
     );
     foreach ($return_map_values as $values) {
       $route_name_return_map[] = array($values['route_name'], $values['return']);
@@ -127,9 +147,7 @@ class UrlGeneratorTest extends UnitTestCase {
       ->disableOriginalConstructor()
       ->getMock();
 
-    $config_factory_stub = $this->getConfigFactoryStub(array('system.filter' => array('protocols' => array('http', 'https'))));
-
-    $generator = new UrlGenerator($provider, $processor_manager, $this->routeProcessorManager, $config_factory_stub, NULL, $this->requestStack);
+    $generator = new UrlGenerator($provider, $processor_manager, $this->routeProcessorManager, $this->requestStack, ['http', 'https']);
     $generator->setContext($context);
     $this->generator = $generator;
   }
@@ -147,12 +165,12 @@ class UrlGeneratorTest extends UnitTestCase {
   public function aliasManagerCallback() {
     $args = func_get_args();
     switch($args[0]) {
-      case 'test/one':
-        return 'hello/world';
-      case 'test/two/5':
-        return 'goodbye/cruel/world';
-      case '<front>':
-        return '';
+      case '/test/one':
+        return '/hello/world';
+      case '/test/two/5':
+        return '/goodbye/cruel/world';
+      case '/<front>':
+        return '/';
       default:
         return $args[0];
     }
@@ -164,15 +182,16 @@ class UrlGeneratorTest extends UnitTestCase {
   public function testAliasGeneration() {
     $url = $this->generator->generate('test_1');
     $this->assertEquals('/hello/world', $url);
+    // No cacheability to test; UrlGenerator::generate() doesn't support
+    // collecting cacheability metadata.
 
-    $this->routeProcessorManager->expects($this->exactly(2))
+    $this->routeProcessorManager->expects($this->exactly(3))
       ->method('processOutbound')
       ->with($this->anything());
 
 
     // Check that the two generate methods return the same result.
-    $url_from_route = $this->generator->generateFromRoute('test_1');
-    $this->assertEquals($url_from_route, $url);
+    $this->assertGenerateFromRoute('test_1', [], [], $url, (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     $path = $this->generator->getPathFromRoute('test_1');
     $this->assertEquals('test/one', $path);
@@ -195,23 +214,22 @@ class UrlGeneratorTest extends UnitTestCase {
   public function testAliasGenerationWithParameters() {
     $url = $this->generator->generate('test_2', array('narf' => '5'));
     $this->assertEquals('/goodbye/cruel/world', $url);
+    // No cacheability to test; UrlGenerator::generate() doesn't support
+    // collecting cacheability metadata.
 
-    $this->routeProcessorManager->expects($this->exactly(4))
+    $this->routeProcessorManager->expects($this->exactly(7))
       ->method('processOutbound')
       ->with($this->anything());
 
     $options = array('fragment' => 'top');
     // Extra parameters should appear in the query string.
-    $url = $this->generator->generateFromRoute('test_1', array('zoo' => '5'), $options);
-    $this->assertEquals('/hello/world?zoo=5#top', $url);
+    $this->assertGenerateFromRoute('test_1', ['zoo' => 5], $options, '/hello/world?zoo=5#top', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     $options = array('query' => array('page' => '1'), 'fragment' => 'bottom');
-    $url = $this->generator->generateFromRoute('test_2', array('narf' => '5'), $options);
-    $this->assertEquals('/goodbye/cruel/world?page=1#bottom', $url);
+    $this->assertGenerateFromRoute('test_2', ['narf' => 5], $options, '/goodbye/cruel/world?page=1#bottom', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     // Changing the parameters, the route still matches but there is no alias.
-    $url = $this->generator->generateFromRoute('test_2', array('narf' => '7'), $options);
-    $this->assertEquals('/test/two/7?page=1#bottom', $url);
+    $this->assertGenerateFromRoute('test_2', ['narf' => 7], $options, '/test/two/7?page=1#bottom', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     $path = $this->generator->getPathFromRoute('test_2', array('narf' => '5'));
     $this->assertEquals('test/two/5', $path);
@@ -223,8 +241,7 @@ class UrlGeneratorTest extends UnitTestCase {
    * @dataProvider providerTestAliasGenerationWithOptions
    */
   public function testAliasGenerationWithOptions($route_name, $route_parameters, $options, $expected) {
-    $url = $this->generator->generateFromRoute($route_name, $route_parameters, $options);
-    $this->assertSame($expected, $url);
+    $this->assertGenerateFromRoute($route_name, $route_parameters, $options, $expected, (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
   }
 
   /**
@@ -279,15 +296,16 @@ class UrlGeneratorTest extends UnitTestCase {
   public function testAbsoluteURLGeneration() {
     $url = $this->generator->generate('test_1', array(), TRUE);
     $this->assertEquals('http://localhost/hello/world', $url);
+    // No cacheability to test; UrlGenerator::generate() doesn't support
+    // collecting cacheability metadata.
 
-    $this->routeProcessorManager->expects($this->once())
+    $this->routeProcessorManager->expects($this->exactly(2))
       ->method('processOutbound')
       ->with($this->anything());
 
     $options = array('absolute' => TRUE, 'fragment' => 'top');
     // Extra parameters should appear in the query string.
-    $url = $this->generator->generateFromRoute('test_1', array('zoo' => '5'), $options);
-    $this->assertEquals('http://localhost/hello/world?zoo=5#top', $url);
+    $this->assertGenerateFromRoute('test_1', ['zoo' => 5], $options, 'http://localhost/hello/world?zoo=5#top', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT)->setCacheContexts(['url.site']));
   }
 
   /**
@@ -295,25 +313,21 @@ class UrlGeneratorTest extends UnitTestCase {
    */
   public function testBaseURLGeneration() {
     $options = array('base_url' => 'http://www.example.com:8888');
-    $url = $this->generator->generateFromRoute('test_1', array(), $options);
-    $this->assertEquals('http://www.example.com:8888/hello/world', $url);
+    $this->assertGenerateFromRoute('test_1', [], $options, 'http://www.example.com:8888/hello/world', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     $options = array('base_url' => 'http://www.example.com:8888', 'https' => TRUE);
-    $url = $this->generator->generateFromRoute('test_1', array(), $options);
-    $this->assertEquals('https://www.example.com:8888/hello/world', $url);
+    $this->assertGenerateFromRoute('test_1', [], $options, 'https://www.example.com:8888/hello/world', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
     $options = array('base_url' => 'https://www.example.com:8888', 'https' => FALSE);
-    $url = $this->generator->generateFromRoute('test_1', array(), $options);
-    $this->assertEquals('http://www.example.com:8888/hello/world', $url);
+    $this->assertGenerateFromRoute('test_1', [], $options, 'http://www.example.com:8888/hello/world', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
 
-    $this->routeProcessorManager->expects($this->once())
+    $this->routeProcessorManager->expects($this->exactly(2))
       ->method('processOutbound')
       ->with($this->anything());
 
     $options = array('base_url' => 'http://www.example.com:8888', 'fragment' => 'top');
     // Extra parameters should appear in the query string.
-    $url = $this->generator->generateFromRoute('test_1', array('zoo' => '5'), $options);
-    $this->assertEquals('http://www.example.com:8888/hello/world?zoo=5#top', $url);
+    $this->assertGenerateFromRoute('test_1', ['zoo' => 5], $options, 'http://www.example.com:8888/hello/world?zoo=5#top', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT));
   }
 
   /**
@@ -322,14 +336,15 @@ class UrlGeneratorTest extends UnitTestCase {
   public function testUrlGenerationWithHttpsRequirement() {
     $url = $this->generator->generate('test_4', array(), TRUE);
     $this->assertEquals('https://localhost/test/four', $url);
+    // No cacheability to test; UrlGenerator::generate() doesn't support
+    // collecting cacheability metadata.
 
-    $this->routeProcessorManager->expects($this->exactly(1))
+    $this->routeProcessorManager->expects($this->exactly(2))
       ->method('processOutbound')
       ->with($this->anything());
 
     $options = array('absolute' => TRUE, 'https' => TRUE);
-    $url = $this->generator->generateFromRoute('test_1', array(), $options);
-    $this->assertEquals('https://localhost/hello/world', $url);
+    $this->assertGenerateFromRoute('test_1', [], $options, 'https://localhost/hello/world', (new BubbleableMetadata())->setCacheMaxAge(Cache::PERMANENT)->setCacheContexts(['url.site']));
   }
 
   /**
@@ -353,33 +368,118 @@ class UrlGeneratorTest extends UnitTestCase {
         $request->headers->set('host', ['www.example.com']);
         $this->requestStack->push($request);
 
+        // Determine the expected bubbleable metadata.
+        $expected_cacheability = (new BubbleableMetadata())
+          ->setCacheContexts($absolute ? ['url.site'] : [])
+          ->setCacheMaxAge(Cache::PERMANENT);
+
         // Get the expected start of the path string.
         $base = ($absolute ? $base_url . '/' : $base_path . '/') . $script_path;
         $url = $base . 'node/123';
         $result = $this->generator->generateFromPath('node/123', array('absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('node/123', array('absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
 
         $url = $base . 'node/123#foo';
         $result = $this->generator->generateFromPath('node/123', array('fragment' => 'foo', 'absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('node/123', array('fragment' => 'foo', 'absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
 
         $url = $base . 'node/123?foo';
         $result = $this->generator->generateFromPath('node/123', array('query' => array('foo' => NULL), 'absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('node/123', array('query' => array('foo' => NULL), 'absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
 
         $url = $base . 'node/123?foo=bar&bar=baz';
         $result = $this->generator->generateFromPath('node/123', array('query' => array('foo' => 'bar', 'bar' => 'baz'), 'absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('node/123', array('query' => array('foo' => 'bar', 'bar' => 'baz'), 'absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
 
         $url = $base . 'node/123?foo#bar';
         $result = $this->generator->generateFromPath('node/123', array('query' => array('foo' => NULL), 'fragment' => 'bar', 'absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('node/123', array('query' => array('foo' => NULL), 'fragment' => 'bar', 'absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
 
         $url = $base;
         $result = $this->generator->generateFromPath('<front>', array('absolute' => $absolute));
         $this->assertEquals($url, $result, "$url == $result");
+        $generated_url = $this->generator->generateFromPath('<front>', array('absolute' => $absolute), TRUE);
+        $this->assertEquals($url, $generated_url->getGeneratedUrl(), "$url == $result");
+        $this->assertEquals($expected_cacheability, BubbleableMetadata::createFromObject($generated_url));
       }
     }
+  }
+
+  /**
+   * Tests generating a relative URL with no path.
+   *
+   * @param array $options
+   *   An array of URL options.
+   * @param string $expected_url
+   *   The expected relative URL.
+   *
+   * @covers ::generateFromRoute
+   *
+   * @dataProvider providerTestNoPath
+   */
+  public function testNoPath($options, $expected_url) {
+    $url = $this->generator->generateFromRoute('<none>', [], $options);
+    $this->assertEquals($expected_url, $url);
+  }
+
+  /**
+   * Data provider for ::testNoPath().
+   */
+  public function providerTestNoPath() {
+    return [
+      // Empty options.
+      [[], ''],
+      // Query parameters only.
+      [['query' => ['foo' => 'bar']], '?foo=bar'],
+      // Multiple query parameters.
+      [['query' => ['foo' => 'bar', 'baz' => '']], '?foo=bar&baz='],
+      // Fragment only.
+      [['fragment' => 'foo'], '#foo'],
+      // Query parameters and fragment.
+      [['query' => ['bar' => 'baz'], 'fragment' => 'foo'], '?bar=baz#foo'],
+      // Multiple query parameters and fragment.
+      [['query' => ['bar' => 'baz', 'foo' => 'bar'], 'fragment' => 'foo'], '?bar=baz&foo=bar#foo'],
+    ];
+  }
+
+  /**
+   * Asserts \Drupal\Core\Routing\UrlGenerator::generateFromRoute()'s output.
+   *
+   * @param $route_name
+   *   The route name to test.
+   * @param array $route_parameters
+   *   The route parameters to test.
+   * @param array $options
+   *   The options to test.
+   * @param $expected_url
+   *   The expected generated URL string.
+   * @param \Drupal\Core\Render\BubbleableMetadata $expected_bubbleable_metadata
+   *   The expected generated bubbleable metadata.
+   */
+  protected function assertGenerateFromRoute($route_name, array $route_parameters, array $options, $expected_url, BubbleableMetadata $expected_bubbleable_metadata) {
+    // First, test with $collect_cacheability_metadata set to the default value.
+    $url = $this->generator->generateFromRoute($route_name, $route_parameters, $options);
+    $this->assertSame($expected_url, $url);
+
+    // Second, test with it set to TRUE.
+    $generated_url = $this->generator->generateFromRoute($route_name, $route_parameters, $options, TRUE);
+    $this->assertSame($expected_url, $generated_url->getGeneratedUrl());
+    $this->assertEquals($expected_bubbleable_metadata, BubbleableMetadata::createFromObject($generated_url));
   }
 
 }

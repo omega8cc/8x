@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentFieldMultivalue.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentFieldMultivalue.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -27,9 +27,10 @@ class ContentFieldMultivalue extends DrupalDumpBase {
       ),
       'fields' => array(
         'vid' => array(
-          'type' => 'serial',
+          'type' => 'int',
           'not null' => TRUE,
           'length' => '10',
+          'default' => '0',
           'unsigned' => TRUE,
         ),
         'nid' => array(
@@ -53,6 +54,7 @@ class ContentFieldMultivalue extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_field_multivalue")->fields(array(
       'vid',
@@ -74,3 +76,4 @@ class ContentFieldMultivalue extends DrupalDumpBase {
   }
 
 }
+#3c8ab8a4159f22b3d38be702b6eaa647

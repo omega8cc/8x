@@ -2,12 +2,13 @@
 
 /**
  * @file
- * Definition of Drupal\user\Tests\UserPermissionsTest.
+ * Contains \Drupal\user\Tests\UserPermissionsTest.
  */
 
 namespace Drupal\user\Tests;
 
 use Drupal\simpletest\WebTestBase;
+use Drupal\user\RoleInterface;
 use Drupal\user\Entity\Role;
 use Drupal\user\RoleStorage;
 
@@ -40,7 +41,7 @@ class UserPermissionsTest extends WebTestBase {
 
     // Find the new role ID.
     $all_rids = $this->adminUser->getRoles();
-    unset($all_rids[array_search(DRUPAL_AUTHENTICATED_RID, $all_rids)]);
+    unset($all_rids[array_search(RoleInterface::AUTHENTICATED_ID, $all_rids)]);
     $this->rid = reset($all_rids);
   }
 
@@ -48,7 +49,7 @@ class UserPermissionsTest extends WebTestBase {
    * Test changing user permissions through the permissions page.
    */
   function testUserPermissionChanges() {
-    $permissions_hash_generator = $this->container->get('user.permissions_hash');
+    $permissions_hash_generator = $this->container->get('user_permissions_hash_generator');
 
     $storage = $this->container->get('entity.manager')->getStorage('user_role');
 
@@ -141,7 +142,7 @@ class UserPermissionsTest extends WebTestBase {
    * Verify proper permission changes by user_role_change_permissions().
    */
   function testUserRoleChangePermissions() {
-    $permissions_hash_generator = $this->container->get('user.permissions_hash');
+    $permissions_hash_generator = $this->container->get('user_permissions_hash_generator');
 
     $rid = $this->rid;
     $account = $this->adminUser;

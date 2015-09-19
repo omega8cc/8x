@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\file\Tests\FileManagedFileElementTest.
+ * Contains \Drupal\file\Tests\FileManagedFileElementTest.
  */
 
 namespace Drupal\file\Tests;
@@ -36,6 +36,18 @@ class FileManagedFileElementTest extends FileFieldTestBase {
           // Submit without a file.
           $this->drupalPostForm($path, array(), t('Save'));
           $this->assertRaw(t('The file ids are %fids.', array('%fids' => implode(',', array()))), 'Submitted without a file.');
+
+          // Submit with a file, but with an invalid form token. Ensure the file
+          // was not saved.
+          $last_fid_prior = $this->getLastFileId();
+          $edit = [
+            $file_field_name => drupal_realpath($test_file->getFileUri()),
+            'form_token' => 'invalid token',
+          ];
+          $this->drupalPostForm($path, $edit, t('Save'));
+          $this->assertText('The form has become outdated. Copy any unsaved work in the form below');
+          $last_fid = $this->getLastFileId();
+          $this->assertEqual($last_fid_prior, $last_fid, 'File was not saved when uploaded with an invalid form token.');
 
           // Submit a new file, without using the Upload button.
           $last_fid_prior = $this->getLastFileId();

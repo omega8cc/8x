@@ -26,7 +26,6 @@ use Drupal\responsive_image\ResponsiveImageStyleInterface;
  *       "duplicate" = "Drupal\responsive_image\ResponsiveImageStyleForm"
  *     }
  *   },
- *   list_path = "admin/config/media/responsive-image-style",
  *   admin_permission = "administer responsive images",
  *   config_prefix = "styles",
  *   entity_keys = {
@@ -87,6 +86,13 @@ class ResponsiveImageStyle extends ConfigEntityBase implements ResponsiveImageSt
    * @var string
    */
   protected $breakpoint_group = '';
+
+  /**
+   * The fallback image style.
+   *
+   * @var string
+   */
+  protected $fallback_image_style = '';
 
   /**
    * {@inheritdoc}
@@ -170,6 +176,21 @@ class ResponsiveImageStyle extends ConfigEntityBase implements ResponsiveImageSt
   /**
    * {@inheritdoc}
    */
+  public function setFallbackImageStyle($fallback_image_style) {
+    $this->fallback_image_style = $fallback_image_style;
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getFallbackImageStyle() {
+    return $this->fallback_image_style;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   public function removeImageStyleMappings() {
     $this->image_style_mappings = array();
     $this->keyedImageStyleMappings = NULL;
@@ -231,7 +252,7 @@ class ResponsiveImageStyle extends ConfigEntityBase implements ResponsiveImageSt
    * {@inheritdoc}
    */
   public function getImageStyleIds() {
-    $image_styles = [];
+    $image_styles = [$this->getFallbackImageStyle()];
     foreach ($this->getImageStyleMappings() as $image_style_mapping) {
       // Only image styles of non-empty mappings should be loaded.
       if (!$this::isEmptyImageStyleMapping($image_style_mapping)) {

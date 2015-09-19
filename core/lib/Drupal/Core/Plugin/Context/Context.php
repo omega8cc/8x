@@ -9,7 +9,8 @@ namespace Drupal\Core\Plugin\Context;
 
 use Drupal\Component\Plugin\Context\Context as ComponentContext;
 use Drupal\Component\Plugin\Exception\ContextException;
-use Drupal\Component\Utility\String;
+use Drupal\Core\Cache\CacheableDependencyInterface;
+use Drupal\Core\Cache\CacheableMetadata;
 use Drupal\Core\TypedData\TypedDataInterface;
 use Drupal\Core\TypedData\TypedDataTrait;
 
@@ -35,24 +36,58 @@ class Context extends ComponentContext implements ContextInterface {
   protected $contextDefinition;
 
   /**
+   * The cacheability metadata.
+   *
+   * @var \Drupal\Core\Cache\CacheableMetadata
+   */
+  protected $cacheabilityMetadata;
+
+  /**
+   * {@inheritdoc}
+   */
+  public function __construct(ContextDefinitionInterface $context_definition) {
+    parent::__construct($context_definition);
+    $this->cacheabilityMetadata = new CacheableMetadata();
+  }
+
+  /**
    * {@inheritdoc}
    */
   public function getContextValue() {
     if (!isset($this->contextData)) {
       $definition = $this->getContextDefinition();
-      if ($definition->isRequired()) {
-        $type = $definition->getDataType();
-        throw new ContextException(String::format("The @type context is required and not present.", array('@type' => $type)));
+      $default_value = $definition->getDefaultValue();
+
+      if (isset($default_value)) {
+        // Keep the default value here so that subsequent calls don't have to
+        // look it up again.
+        $this->setContextValue($default_value);
       }
-      return NULL;
+      elseif ($definition->isRequired()) {
+        $type = $definition->getDataType();
+        throw new ContextException("The '$type' context is required and not present.");
+      }
+      return $default_value;
     }
-    return $this->contextData->getValue();
+    return $this->getTypedDataManager()->getCanonicalRepresentation($this->contextData);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function hasContextValue() {
+    return (bool) $this->contextData || parent::hasContextValue();
   }
 
   /**
    * {@inheritdoc}
    */
   public function setContextValue($value) {
+    // Add the value as a cacheable dependency only if implements the interface
+    // to prevent it from disabling caching with a max-age 0.
+    if ($value instanceof CacheableDependencyInterface) {
+      $this->addCacheableDependency($value);
+    }
     if ($value instanceof TypedDataInterface) {
       return $this->setContextData($value);
     }
@@ -72,6 +107,15 @@ class Context extends ComponentContext implements ContextInterface {
    * {@inheritdoc}
    */
   public function getContextData() {
+    if (!isset($this->contextData)) {
+      $definition = $this->getContextDefinition();
+      $default_value = $definition->getDefaultValue();
+      if (isset($default_value)) {
+        // Store the default value so that subsequent calls don't have to look
+        // it up again.
+        $this->contextData = $this->getTypedDataManager()->create($definition->getDataDefinition(), $default_value);
+      }
+    }
     return $this->contextData;
   }
 
@@ -95,6 +139,35 @@ class Context extends ComponentContext implements ContextInterface {
    */
   public function validate() {
     return $this->getContextData()->validate();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function addCacheableDependency($dependency) {
+    $this->cacheabilityMetadata = $this->cacheabilityMetadata->merge(CacheableMetadata::createFromObject($dependency));
+    return $this;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheContexts() {
+    return $this->cacheabilityMetadata->getCacheContexts();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheTags() {
+    return $this->cacheabilityMetadata->getCacheTags();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getCacheMaxAge() {
+    return $this->cacheabilityMetadata->getCacheMaxAge();
   }
 
 }

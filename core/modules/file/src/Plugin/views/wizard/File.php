@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\file\Plugin\views\wizard\File.
+ * Contains \Drupal\file\Plugin\views\wizard\File.
  */
 
 namespace Drupal\file\Plugin\views\wizard;
@@ -54,8 +54,8 @@ class File extends WizardPluginBase {
     $display_options['fields']['filename']['alter']['html'] = 0;
     $display_options['fields']['filename']['hide_empty'] = 0;
     $display_options['fields']['filename']['empty_zero'] = 0;
-    $display_options['fields']['filename']['link_to_file'] = 1;
-    $display_options['fields']['filename']['plugin_id'] = 'file';
+    $display_options['fields']['filename']['plugin_id'] = 'field';
+    $display_options['fields']['filename']['type'] = 'file_link';
 
     return $display_options;
   }

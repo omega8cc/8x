@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\search\Plugin\SearchPluginBase
+ * Contains \Drupal\search\Plugin\SearchPluginBase.
  */
 
 namespace Drupal\search\Plugin;
@@ -83,6 +83,13 @@ abstract class SearchPluginBase extends PluginBase implements ContainerFactoryPl
   public function isSearchExecutable() {
     // Default implementation suitable for plugins that only use keywords.
     return !empty($this->keywords);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function getType() {
+    return NULL;
   }
 
   /**

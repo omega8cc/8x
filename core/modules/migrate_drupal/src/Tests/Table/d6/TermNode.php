@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\TermNode.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\TermNode.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -48,6 +48,7 @@ class TermNode extends DrupalDumpBase {
         'vid',
         'tid',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("term_node")->fields(array(
       'nid',
@@ -78,3 +79,4 @@ class TermNode extends DrupalDumpBase {
   }
 
 }
+#5aba7dc704d20cec864b7ba64af4c48c

@@ -1,7 +1,7 @@
 <?php
 /**
  * @file
- * Contains \Drupal\Core\Asset\AssetCollectionOptimizerInterface.
+ * Contains \Drupal\Core\Asset\AssetOptimizerInterface.
  */
 
 namespace Drupal\Core\Asset;
@@ -21,5 +21,16 @@ interface AssetOptimizerInterface {
    *   The optimized asset's contents.
    */
   public function optimize(array $asset);
+
+  /**
+   * Removes unwanted content from an asset.
+   *
+   * @param string $content
+   *   The content of an asset.
+   *
+   * @return string
+   *   The cleaned asset's contents.
+   */
+  public function clean($content);
 
 }

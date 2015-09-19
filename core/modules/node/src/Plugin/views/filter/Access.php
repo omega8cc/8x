@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\node\Plugin\views\filter\Access.
+ * Contains \Drupal\node\Plugin\views\filter\Access.
  */
 
 namespace Drupal\node\Plugin\views\filter;
@@ -53,8 +53,7 @@ class Access extends FilterPluginBase {
   public function getCacheContexts() {
     $contexts = parent::getCacheContexts();
 
-    // Node access is potentially cacheable per user.
-    $contexts[] = 'cache.context.user';
+    $contexts[] = 'user.node_grants:view';
 
     return $contexts;
   }

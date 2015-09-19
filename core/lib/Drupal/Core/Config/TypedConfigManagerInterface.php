@@ -12,9 +12,12 @@ use Drupal\Component\Plugin\PluginManagerInterface;
 use Drupal\Core\TypedData\DataDefinitionInterface;
 
 /**
- * Defines an interface for typed configuration manager.
+ * Defines an interface for managing config schema type plugins.
  *
- * @package Drupal\Core\Config
+ * @see \Drupal\Core\Config\TypedConfigManager
+ * @see \Drupal\Core\Config\Schema\ConfigSchemaDiscovery
+ * @see hook_config_schema_info_alter()
+ * @see https://www.drupal.org/node/1905070
  */
 Interface TypedConfigManagerInterface extends PluginManagerInterface, CachedDiscoveryInterface {
 
@@ -101,5 +104,21 @@ Interface TypedConfigManagerInterface extends PluginManagerInterface, CachedDisc
    *   TRUE if configuration schema exists, FALSE otherwise.
    */
   public function hasConfigSchema($name);
+
+  /**
+   * Gets a specific plugin definition.
+   *
+   * @param string $plugin_id
+   *   A plugin id.
+   * @param bool $exception_on_invalid
+   *   Ignored with TypedConfigManagerInterface. Kept for compatibility with
+   *   DiscoveryInterface.
+   *
+   * @return array
+   *   A plugin definition array. If the given plugin id does not have typed
+   *   configuration definition assigned, the definition of an undefined
+   *   element type is returned.
+   */
+  public function getDefinition($plugin_id, $exception_on_invalid = TRUE);
 
 }

@@ -22,6 +22,14 @@ class SettingsTest extends UITestBase {
   protected $adminUser;
 
   /**
+   * {@inheritdoc}
+   */
+  protected function setUp() {
+    parent::setUp();
+    $this->drupalPlaceBlock('local_tasks_block');
+  }
+
+  /**
    * Tests the settings for the edit ui.
    */
   function testEditUI() {
@@ -71,7 +79,7 @@ class SettingsTest extends UITestBase {
     // Configure to always show the advanced settings.
     // @todo It doesn't seem to be a way to test this as this works just on js.
 
-    // Configure to show the embedable display.
+    // Configure to show the embeddable display.
     $edit = array(
       'ui_show_display_embed' => TRUE,
     );

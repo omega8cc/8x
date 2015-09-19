@@ -83,15 +83,15 @@ class PathController extends ControllerBase {
     $header[] = $this->t('Operations');
 
     $rows = array();
-    $destination = drupal_get_destination();
+    $destination = $this->getDestinationArray();
     foreach ($this->aliasStorage->getAliasesForAdminListing($header, $keys) as $data) {
       $row = array();
       // @todo Should Path module store leading slashes? See
       //   https://www.drupal.org/node/2430593.
-      $row['data']['alias'] = $this->l(Unicode::truncate($data->alias, 50, FALSE, TRUE), Url::fromUserInput('/' . $data->source, array(
+      $row['data']['alias'] = $this->l(Unicode::truncate($data->alias, 50, FALSE, TRUE), Url::fromUserInput($data->source, array(
         'attributes' => array('title' => $data->alias),
       )));
-      $row['data']['source'] = $this->l(Unicode::truncate($data->source, 50, FALSE, TRUE), Url::fromUserInput('/' . $data->source, array(
+      $row['data']['source'] = $this->l(Unicode::truncate($data->source, 50, FALSE, TRUE), Url::fromUserInput($data->source, array(
         'alias' => TRUE,
         'attributes' => array('title' => $data->source),
       )));
@@ -130,7 +130,7 @@ class PathController extends ControllerBase {
       '#rows' => $rows,
       '#empty' => $this->t('No URL aliases available. <a href="@link">Add URL alias</a>.', array('@link' => $this->url('path.admin_add'))),
     );
-    $build['path_pager'] = array('#theme' => 'pager');
+    $build['path_pager'] = array('#type' => 'pager');
 
     return $build;
   }

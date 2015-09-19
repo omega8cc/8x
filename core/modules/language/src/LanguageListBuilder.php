@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains \Drupal\language\Form\LanguageListBuilder.
+ * Contains \Drupal\language\LanguageListBuilder.
  */
 
 namespace Drupal\language;
@@ -107,7 +107,7 @@ class LanguageListBuilder extends DraggableListBuilder {
    * {@inheritdoc}
    */
   public function buildRow(EntityInterface $entity) {
-    $row['label'] = $this->getLabel($entity);
+    $row['label'] = $entity->label();
     $row['default'] = array(
       '#type' => 'radio',
       '#parents' => array('site_default_language'),
@@ -152,7 +152,7 @@ class LanguageListBuilder extends DraggableListBuilder {
     // Save the default language if changed.
     $new_id = $form_state->getValue('site_default_language');
     if ($new_id != $this->languageManager->getDefaultLanguage()->getId()) {
-      $this->configFactory->getEditable('system.site')->set('langcode', $new_id)->save();
+      $this->configFactory->getEditable('system.site')->set('default_langcode', $new_id)->save();
       $this->languageManager->reset();
     }
 

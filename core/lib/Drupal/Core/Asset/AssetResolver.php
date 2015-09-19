@@ -6,8 +6,11 @@
 
 namespace Drupal\Core\Asset;
 
+use Drupal\Component\Utility\Crypt;
 use Drupal\Component\Utility\NestedArray;
+use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 
 /**
@@ -44,6 +47,20 @@ class AssetResolver implements AssetResolverInterface {
   protected $themeManager;
 
   /**
+   * The language manager.
+   *
+   * @var \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   */
+  protected $languageManager;
+
+  /**
+   * The cache backend.
+   *
+   * @var \Drupal\Core\Cache\CacheBackendInterface
+   */
+  protected $cache;
+
+  /**
    * Constructs a new AssetResolver instance.
    *
    * @param \Drupal\Core\Asset\LibraryDiscoveryInterface $library_discovery
@@ -54,12 +71,18 @@ class AssetResolver implements AssetResolverInterface {
    *   The module handler.
    * @param \Drupal\Core\Theme\ThemeManagerInterface $theme_manager
    *   The theme manager.
+   * @param \Drupal\Core\Language\LanguageManagerInterface $language_manager
+   *   The language manager.
+   * @param \Drupal\Core\Cache\CacheBackendInterface $cache
+   *   The cache backend.
    */
-  public function __construct(LibraryDiscoveryInterface $library_discovery, LibraryDependencyResolverInterface $library_dependency_resolver, ModuleHandlerInterface $module_handler, ThemeManagerInterface $theme_manager) {
+  public function __construct(LibraryDiscoveryInterface $library_discovery, LibraryDependencyResolverInterface $library_dependency_resolver, ModuleHandlerInterface $module_handler, ThemeManagerInterface $theme_manager, LanguageManagerInterface $language_manager, CacheBackendInterface $cache) {
     $this->libraryDiscovery = $library_discovery;
     $this->libraryDependencyResolver = $library_dependency_resolver;
     $this->moduleHandler = $module_handler;
     $this->themeManager = $theme_manager;
+    $this->languageManager = $language_manager;
+    $this->cache = $cache;
   }
 
   /**
@@ -92,27 +115,33 @@ class AssetResolver implements AssetResolverInterface {
    */
   public function getCssAssets(AttachedAssetsInterface $assets, $optimize) {
     $theme_info = $this->themeManager->getActiveTheme();
+    // Add the theme name to the cache key since themes may implement
+    // hook_css_alter().
+    $cid = 'css:' . $theme_info->getName() . ':' . Crypt::hashBase64(serialize($assets)) . (int) $optimize;
+    if ($cached = $this->cache->get($cid)) {
+      return $cached->data;
+    }
 
     $css = [];
+    $default_options = [
+      'type' => 'file',
+      'group' => CSS_AGGREGATE_DEFAULT,
+      'weight' => 0,
+      'media' => 'all',
+      'preprocess' => TRUE,
+      'browsers' => [],
+    ];
 
     foreach ($this->getLibrariesToLoad($assets) as $library) {
       list($extension, $name) = explode('/', $library, 2);
       $definition = $this->libraryDiscovery->getLibraryByName($extension, $name);
       if (isset($definition['css'])) {
         foreach ($definition['css'] as $options) {
-          $options += array(
-            'type' => 'file',
-            'group' => CSS_AGGREGATE_DEFAULT,
-            'weight' => 0,
-            'every_page' => FALSE,
-            'media' => 'all',
-            'preprocess' => TRUE,
-            'browsers' => array(),
-          );
-          $options['browsers'] += array(
+          $options += $default_options;
+          $options['browsers'] += [
             'IE' => TRUE,
             '!IE' => TRUE,
-          );
+          ];
 
           // Files with a query string cannot be preprocessed.
           if ($options['type'] === 'file' && $options['preprocess'] && strpos($options['data'], '?') !== FALSE) {
@@ -123,23 +152,8 @@ class AssetResolver implements AssetResolverInterface {
           // order.
           $options['weight'] += count($css) / 1000;
 
-          // Add the data to the CSS array depending on the type.
-          switch ($options['type']) {
-            case 'file':
-              // Local CSS files are keyed by basename; if a file with the same
-              // basename is added more than once, it gets overridden.
-              // By default, take over the filename as basename.
-              if (!isset($options['basename'])) {
-                $options['basename'] = drupal_basename($options['data']);
-              }
-              $css[$options['basename']] = $options;
-              break;
-
-            default:
-              // External files are keyed by their full URI, so the same CSS
-              // file is not added twice.
-              $css[$options['data']] = $options;
-          }
+          // CSS files are being keyed by the full path.
+          $css[$options['data']] = $options;
         }
       }
     }
@@ -151,19 +165,11 @@ class AssetResolver implements AssetResolverInterface {
     // Sort CSS items, so that they appear in the correct order.
     uasort($css, 'static::sort');
 
-    // Allow themes to remove CSS files by basename.
+    // Allow themes to remove CSS files by CSS files full path and file name.
     if ($stylesheet_remove = $theme_info->getStyleSheetsRemove()) {
       foreach ($css as $key => $options) {
-        if (isset($options['basename']) && isset($stylesheet_remove[$options['basename']])) {
+        if (isset($stylesheet_remove[$key])) {
           unset($css[$key]);
-        }
-      }
-    }
-    // Allow themes to conditionally override CSS files by basename.
-    if ($stylesheet_override = $theme_info->getStyleSheetsOverride()) {
-      foreach ($css as $key => $options) {
-        if (isset($options['basename']) && isset($stylesheet_override[$options['basename']])) {
-          $css[$key]['data'] = $stylesheet_override[$options['basename']];
         }
       }
     }
@@ -171,6 +177,7 @@ class AssetResolver implements AssetResolverInterface {
     if ($optimize) {
       $css = \Drupal::service('asset.css.collection_optimizer')->optimize($css);
     }
+    $this->cache->set($cid, $css, CacheBackendInterface::CACHE_PERMANENT, ['library_info']);
 
     return $css;
   }
@@ -202,10 +209,6 @@ class AssetResolver implements AssetResolverInterface {
     // Attached settings win over settings in libraries.
     $settings = NestedArray::mergeDeepArray([$settings, $assets->getSettings()], TRUE);
 
-    // Allow modules and themes to alter the JavaScript settings.
-    $this->moduleHandler->alter('js_settings', $settings, $assets);
-    $this->themeManager->alter('js_settings', $settings, $assets);
-
     return $settings;
   }
 
@@ -213,113 +216,140 @@ class AssetResolver implements AssetResolverInterface {
    * {@inheritdoc}
    */
   public function getJsAssets(AttachedAssetsInterface $assets, $optimize) {
-    $javascript = [];
-    $libraries_to_load = $this->getLibrariesToLoad($assets);
+    $theme_info = $this->themeManager->getActiveTheme();
+    // Add the theme name to the cache key since themes may implement
+    // hook_js_alter(). Additionally add the current language to support
+    // translation of JavaScript files.
+    $cid = 'js:' . $theme_info->getName() . ':' . $this->languageManager->getCurrentLanguage()->getId() . ':' .  Crypt::hashBase64(serialize($assets)) . (int) $optimize;
 
-    // Collect all libraries that contain JS assets and are in the header.
-    $header_js_libraries = [];
-    foreach ($libraries_to_load as $library) {
-      list($extension, $name) = explode('/', $library, 2);
-      $definition = $this->libraryDiscovery->getLibraryByName($extension, $name);
-      if (isset($definition['js']) && !empty($definition['header'])) {
-        $header_js_libraries[] = $library;
-      }
+    if ($cached = $this->cache->get($cid)) {
+      list($js_assets_header, $js_assets_footer, $settings, $settings_in_header) = $cached->data;
     }
-    // The current list of header JS libraries are only those libraries that are
-    // in the header, but their dependencies must also be loaded for them to
-    // function correctly, so update the list with those.
-    $header_js_libraries = $this->libraryDependencyResolver->getLibrariesWithDependencies($header_js_libraries);
+    else {
+      $javascript = [];
+      $default_options = [
+        'type' => 'file',
+        'group' => JS_DEFAULT,
+        'weight' => 0,
+        'cache' => TRUE,
+        'preprocess' => TRUE,
+        'attributes' => [],
+        'version' => NULL,
+        'browsers' => [],
+      ];
 
-    foreach ($libraries_to_load as $library) {
-      list($extension, $name) = explode('/', $library, 2);
-      $definition = $this->libraryDiscovery->getLibraryByName($extension, $name);
-      if (isset($definition['js'])) {
-        foreach ($definition['js'] as $options) {
-          $options += array(
-            'type' => 'file',
-            'group' => JS_DEFAULT,
-            'every_page' => FALSE,
-            'weight' => 0,
-            'cache' => TRUE,
-            'preprocess' => TRUE,
-            'attributes' => array(),
-            'version' => NULL,
-            'browsers' => array(),
-          );
+      $libraries_to_load = $this->getLibrariesToLoad($assets);
 
-          // 'scope' is a calculated option, based on which libraries are marked
-          // to be loaded from the header (see above).
-          $options['scope'] = in_array($library, $header_js_libraries) ? 'header' : 'footer';
-
-          // Preprocess can only be set if caching is enabled and no attributes
-          // are set.
-          $options['preprocess'] = $options['cache'] && empty($options['attributes']) ? $options['preprocess'] : FALSE;
-
-          // Always add a tiny value to the weight, to conserve the insertion
-          // order.
-          $options['weight'] += count($javascript) / 1000;
-
-          // Local and external files must keep their name as the associative
-          // key so the same JavaScript file is not added twice.
-          $javascript[$options['data']] = $options;
+      // Collect all libraries that contain JS assets and are in the header.
+      $header_js_libraries = [];
+      foreach ($libraries_to_load as $library) {
+        list($extension, $name) = explode('/', $library, 2);
+        $definition = $this->libraryDiscovery->getLibraryByName($extension, $name);
+        if (isset($definition['js']) && !empty($definition['header'])) {
+          $header_js_libraries[] = $library;
         }
       }
-    }
+      // The current list of header JS libraries are only those libraries that
+      // are in the header, but their dependencies must also be loaded for them
+      // to function correctly, so update the list with those.
+      $header_js_libraries = $this->libraryDependencyResolver->getLibrariesWithDependencies($header_js_libraries);
 
-    // Allow modules and themes to alter the JavaScript assets.
-    $this->moduleHandler->alter('js', $javascript, $assets);
-    $this->themeManager->alter('js', $javascript, $assets);
+      foreach ($libraries_to_load as $library) {
+        list($extension, $name) = explode('/', $library, 2);
+        $definition = $this->libraryDiscovery->getLibraryByName($extension, $name);
+        if (isset($definition['js'])) {
+          foreach ($definition['js'] as $options) {
+            $options += $default_options;
 
-    // Sort JavaScript assets, so that they appear in the correct order.
-    uasort($javascript, 'static::sort');
+            // 'scope' is a calculated option, based on which libraries are
+            // marked to be loaded from the header (see above).
+            $options['scope'] = in_array($library, $header_js_libraries) ? 'header' : 'footer';
 
-    // Prepare the return value: filter JavaScript assets per scope.
-    $js_assets_header = [];
-    $js_assets_footer = [];
-    foreach ($javascript as $key => $item) {
-      if ($item['scope'] == 'header') {
-        $js_assets_header[$key] = $item;
-      }
-      elseif ($item['scope'] == 'footer') {
-        $js_assets_footer[$key] = $item;
-      }
-    }
+            // Preprocess can only be set if caching is enabled and no
+            // attributes are set.
+            $options['preprocess'] = $options['cache'] && empty($options['attributes']) ? $options['preprocess'] : FALSE;
 
-    if ($optimize) {
-      $collection_optimizer = \Drupal::service('asset.js.collection_optimizer');
-      $js_assets_header = $collection_optimizer->optimize($js_assets_header);
-      $js_assets_footer = $collection_optimizer->optimize($js_assets_footer);
-    }
+            // Always add a tiny value to the weight, to conserve the insertion
+            // order.
+            $options['weight'] += count($javascript) / 1000;
 
-    // If the core/drupalSettings library is being loaded or is already loaded,
-    // get the JavaScript settings assets, and convert them into a single
-    // "regular" JavaScript asset.
-    $libraries_to_load = $this->getLibrariesToLoad($assets);
-    $settings_needed = in_array('core/drupalSettings', $libraries_to_load) || in_array('core/drupalSettings', $this->libraryDependencyResolver->getLibrariesWithDependencies($assets->getAlreadyLoadedLibraries()));
-    $settings_have_changed = count($libraries_to_load) > 0 || count($assets->getSettings()) > 0;
-    if ($settings_needed && $settings_have_changed) {
-      $settings = $this->getJsSettingsAssets($assets);
-      if (!empty($settings)) {
-        $settings_as_inline_javascript = [
-          'type' => 'setting',
-          'group' => JS_SETTING,
-          'every_page' => TRUE,
-          'weight' => 0,
-          'browsers' => array(),
-          'data' => $settings,
-        ];
-        $settings_js_asset = ['drupalSettings' => $settings_as_inline_javascript];
-        // Prepend to the list of JS assets, to render it first. Preferably in
-        // the footer, but in the header if necessary.
-        if (in_array('core/drupalSettings', $header_js_libraries)) {
-          $js_assets_header = $settings_js_asset + $js_assets_header;
-        }
-        else {
-          $js_assets_footer = $settings_js_asset + $js_assets_footer;
+            // Local and external files must keep their name as the associative
+            // key so the same JavaScript file is not added twice.
+            $javascript[$options['data']] = $options;
+          }
         }
       }
+
+      // Allow modules and themes to alter the JavaScript assets.
+      $this->moduleHandler->alter('js', $javascript, $assets);
+      $this->themeManager->alter('js', $javascript, $assets);
+
+      // Sort JavaScript assets, so that they appear in the correct order.
+      uasort($javascript, 'static::sort');
+
+      // Prepare the return value: filter JavaScript assets per scope.
+      $js_assets_header = [];
+      $js_assets_footer = [];
+      foreach ($javascript as $key => $item) {
+        if ($item['scope'] == 'header') {
+          $js_assets_header[$key] = $item;
+        }
+        elseif ($item['scope'] == 'footer') {
+          $js_assets_footer[$key] = $item;
+        }
+      }
+
+      if ($optimize) {
+        $collection_optimizer = \Drupal::service('asset.js.collection_optimizer');
+        $js_assets_header = $collection_optimizer->optimize($js_assets_header);
+        $js_assets_footer = $collection_optimizer->optimize($js_assets_footer);
+      }
+
+      // If the core/drupalSettings library is being loaded or is already
+      // loaded, get the JavaScript settings assets, and convert them into a
+      // single "regular" JavaScript asset.
+      $libraries_to_load = $this->getLibrariesToLoad($assets);
+      $settings_required = in_array('core/drupalSettings', $libraries_to_load) || in_array('core/drupalSettings', $this->libraryDependencyResolver->getLibrariesWithDependencies($assets->getAlreadyLoadedLibraries()));
+      $settings_have_changed = count($libraries_to_load) > 0 || count($assets->getSettings()) > 0;
+
+      // Initialize settings to FALSE since they are not needed by default. This
+      // distinguishes between an empty array which must still allow
+      // hook_js_settings_alter() to be run.
+      $settings = FALSE;
+      if ($settings_required && $settings_have_changed) {
+        $settings = $this->getJsSettingsAssets($assets);
+        // Allow modules to add cached JavaScript settings.
+        foreach ($this->moduleHandler->getImplementations('js_settings_build') as $module) {
+          $function = $module . '_' . 'js_settings_build';
+          $function($settings, $assets);
+        }
+      }
+      $settings_in_header = in_array('core/drupalSettings', $header_js_libraries);
+      $this->cache->set($cid, [$js_assets_header, $js_assets_footer, $settings, $settings_in_header], CacheBackendInterface::CACHE_PERMANENT, ['library_info']);
     }
 
+
+    if ($settings !== FALSE) {
+      // Allow modules and themes to alter the JavaScript settings.
+      $this->moduleHandler->alter('js_settings', $settings, $assets);
+      $this->themeManager->alter('js_settings', $settings, $assets);
+      $settings_as_inline_javascript = [
+        'type' => 'setting',
+        'group' => JS_SETTING,
+        'weight' => 0,
+        'browsers' => [],
+        'data' => $settings,
+      ];
+      $settings_js_asset = ['drupalSettings' => $settings_as_inline_javascript];
+      // Prepend to the list of JS assets, to render it first. Preferably in
+      // the footer, but in the header if necessary.
+      if ($settings_in_header) {
+        $js_assets_header = $settings_js_asset + $js_assets_header;
+      }
+      else {
+        $js_assets_footer = $settings_js_asset + $js_assets_footer;
+      }
+    }
     return [
       $js_assets_header,
       $js_assets_footer,
@@ -349,16 +379,6 @@ class AssetResolver implements AssetResolverInterface {
       return -1;
     }
     elseif ($a['group'] > $b['group']) {
-      return 1;
-    }
-    // Within a group, order all infrequently needed, page-specific files after
-    // common files needed throughout the website. Separating this way allows
-    // for the aggregate file generated for all of the common files to be reused
-    // across a site visit without being cut by a page using a less common file.
-    elseif ($a['every_page'] && !$b['every_page']) {
-      return -1;
-    }
-    elseif (!$a['every_page'] && $b['every_page']) {
       return 1;
     }
     // Finally, order by weight.

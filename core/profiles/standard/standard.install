@@ -6,6 +6,7 @@
 
 use Drupal\comment\Plugin\Field\FieldType\CommentItemInterface;
 use Drupal\user\Entity\User;
+use Drupal\user\RoleInterface;
 
 /**
  * Implements hook_install().
@@ -15,22 +16,16 @@ use Drupal\user\Entity\User;
  * @see system_install()
  */
 function standard_install() {
-  // Now that all modules are installed, make sure the entity storage and other
-  // handlers are up to date with the current entity and field definitions. For
-  // example, Path module adds a base field to nodes and taxonomy terms after
-  // those modules are already installed.
-  \Drupal::service('entity.definition_update_manager')->applyUpdates();
-
   // Set front page to "node".
-  \Drupal::configFactory()->getEditable('system.site')->set('page.front', 'node')->save();
+  \Drupal::configFactory()->getEditable('system.site')->set('page.front', '/node')->save(TRUE);
 
   // Allow visitor account creation with administrative approval.
   $user_settings = \Drupal::configFactory()->getEditable('user.settings');
-  $user_settings->set('register', USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL)->save();
+  $user_settings->set('register', USER_REGISTER_VISITORS_ADMINISTRATIVE_APPROVAL)->save(TRUE);
 
   // Enable default permissions for system roles.
-  user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access comments'));
-  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access comments', 'post comments', 'skip comment approval'));
+  user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array('access comments'));
+  user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array('access comments', 'post comments', 'skip comment approval'));
 
   // Assign user 1 the "administrator" role.
   $user = User::load(1);
@@ -40,13 +35,13 @@ function standard_install() {
   // Enable the Contact link in the footer menu.
   /** @var \Drupal\Core\Menu\MenuLinkManagerInterface $menu_link_manager */
   $menu_link_manager = \Drupal::service('plugin.manager.menu.link');
-  $menu_link_manager->updateDefinition('contact.site_page', array('enabled' => 1));
+  $menu_link_manager->updateDefinition('contact.site_page', array('enabled' => TRUE));
 
-  user_role_grant_permissions(DRUPAL_ANONYMOUS_RID, array('access site-wide contact form'));
-  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access site-wide contact form'));
+  user_role_grant_permissions(RoleInterface::ANONYMOUS_ID, array('access site-wide contact form'));
+  user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array('access site-wide contact form'));
 
   // Allow authenticated users to use shortcuts.
-  user_role_grant_permissions(DRUPAL_AUTHENTICATED_RID, array('access shortcuts'));
+  user_role_grant_permissions(RoleInterface::AUTHENTICATED_ID, array('access shortcuts'));
 
   // Populate the default shortcut set.
   $shortcut = entity_create('shortcut', array(
@@ -66,5 +61,5 @@ function standard_install() {
   $shortcut->save();
 
   // Enable the admin theme.
-  \Drupal::configFactory()->getEditable('node.settings')->set('use_admin_theme', '1')->save();
+  \Drupal::configFactory()->getEditable('node.settings')->set('use_admin_theme', TRUE)->save(TRUE);
 }

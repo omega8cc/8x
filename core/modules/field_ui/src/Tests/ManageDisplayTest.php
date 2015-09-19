@@ -10,7 +10,9 @@ namespace Drupal\field_ui\Tests;
 use Drupal\Component\Utility\Unicode;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Language\LanguageInterface;
+use Drupal\node\Entity\NodeType;
 use Drupal\simpletest\WebTestBase;
+use Drupal\taxonomy\Entity\Vocabulary;
 
 /**
  * Tests the Field UI "Manage display" and "Manage form display" screens.
@@ -45,7 +47,7 @@ class ManageDisplayTest extends WebTestBase {
     $this->type = $type->id();
 
     // Create a default vocabulary.
-    $vocabulary = entity_create('taxonomy_vocabulary', array(
+    $vocabulary = Vocabulary::create(array(
       'name' => $this->randomMachineName(),
       'description' => $this->randomMachineName(),
       'vid' => Unicode::strtolower($this->randomMachineName()),
@@ -161,6 +163,11 @@ class ManageDisplayTest extends WebTestBase {
     $edit = array('fields[field_test][type]' => 'field_no_settings', 'refresh_rows' => 'field_test');
     $this->drupalPostAjaxForm(NULL, $edit, array('op' => t('Refresh')));
     $this->assertFieldByName('field_test_settings_edit');
+
+    // Make sure we can save the third party settings when there are no settings available
+    $this->drupalPostAjaxForm(NULL, array(), "field_test_settings_edit");
+    $this->drupalPostAjaxForm(NULL, $edit, "field_test_plugin_settings_update");
+
     // Uninstall the module providing third party settings and ensure the button
     // is no longer there.
     \Drupal::service('module_installer')->uninstall(array('field_third_party_test'));
@@ -375,7 +382,7 @@ class ManageDisplayTest extends WebTestBase {
    */
   function testNoFieldsDisplayOverview() {
     // Create a fresh content type without any fields.
-    entity_create('node_type', array(
+    NodeType::create(array(
       'type' => 'no_fields',
       'name' => 'No fields',
     ))->save();
@@ -452,7 +459,7 @@ class ManageDisplayTest extends WebTestBase {
     // Render a cloned node, so that we do not alter the original.
     $clone = clone $node;
     $element = node_view($clone, $view_mode);
-    $output = drupal_render($element);
+    $output = \Drupal::service('renderer')->renderRoot($element);
     $this->verbose(t('Rendered node - view mode: @view_mode', array('@view_mode' => $view_mode)) . '<hr />'. $output);
 
     // Assign content so that WebTestBase functions can be used.

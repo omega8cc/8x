@@ -9,6 +9,7 @@ namespace Drupal\Core\Session;
 
 use Drupal\Component\Utility\Crypt;
 use Drupal\Core\Database\Connection;
+use Drupal\Core\DependencyInjection\DependencySerializationTrait;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Session\Storage\NativeSessionStorage;
 
@@ -30,6 +31,8 @@ use Symfony\Component\HttpFoundation\Session\Storage\NativeSessionStorage;
  *   (e.g. sid-hashing) or relocated to the authentication subsystem.
  */
 class SessionManager extends NativeSessionStorage implements SessionManagerInterface {
+
+  use DependencySerializationTrait;
 
   /**
    * The request stack.
@@ -95,7 +98,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     // @todo When not using the Symfony Session object, the list of bags in the
     //   NativeSessionStorage will remain uninitialized. This will lead to
     //   errors in NativeSessionHandler::loadSession. Remove this after
-    //   https://drupal.org/node/2229145, when we will be using the Symfony
+    //   https://www.drupal.org/node/2229145, when we will be using the Symfony
     //   session object (which registers an attribute bag with the
     //   manager upon instantiation).
     $this->bags = array();
@@ -121,10 +124,6 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     }
 
     if (empty($result)) {
-      // @todo Remove global in https://www.drupal.org/node/2286971
-      global $_session_user;
-      $_session_user = new AnonymousUserSession();
-
       // Randomly generate a session identifier for this request. This is
       // necessary because \Drupal\user\SharedTempStoreFactory::get() wants to
       // know the future session ID of a lazily started session in advance.
@@ -153,7 +152,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
   /**
    * Forcibly start a PHP session.
    *
-   * @return boolean
+   * @return bool
    *   TRUE if the session is started.
    */
   protected function startNow() {
@@ -171,6 +170,7 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     // Restore session data.
     if ($this->startedLazy) {
       $_SESSION = $session_data;
+      $this->loadSession();
     }
 
     return $result;
@@ -180,18 +180,16 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
    * {@inheritdoc}
    */
   public function save() {
-    $user = \Drupal::currentUser();
-
     if ($this->isCli()) {
       // We don't have anything to do if we are not allowed to save the session.
       return;
     }
 
-    if ($user->isAnonymous() && $this->isSessionObsolete()) {
+    if ($this->isSessionObsolete()) {
       // There is no session data to store, destroy the session if it was
       // previously started.
       if ($this->getSaveHandler()->isActive()) {
-        session_destroy();
+        $this->destroy();
       }
     }
     else {
@@ -211,8 +209,6 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
    * {@inheritdoc}
    */
   public function regenerate($destroy = FALSE, $lifetime = NULL) {
-    $user = \Drupal::currentUser();
-
     // Nothing to do if we are not allowed to change the session.
     if ($this->isCli()) {
       return;
@@ -255,6 +251,22 @@ class SessionManager extends NativeSessionStorage implements SessionManagerInter
     $this->connection->delete('sessions')
       ->condition('uid', $uid)
       ->execute();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function destroy() {
+    session_destroy();
+
+    // Unset the session cookies.
+    $session_name = $this->getName();
+    $cookies = $this->requestStack->getCurrentRequest()->cookies;
+    if ($cookies->has($session_name)) {
+      $params = session_get_cookie_params();
+      setcookie($session_name, '', REQUEST_TIME - 3600, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
+      $cookies->remove($session_name);
+    }
   }
 
   /**

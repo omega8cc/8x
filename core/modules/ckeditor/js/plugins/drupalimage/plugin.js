@@ -7,8 +7,12 @@
  *   uses to track where images are being used)
  * - use a Drupal-native dialog (that is in fact just an alterable Drupal form
  *   like any other) instead of CKEditor's own dialogs.
- *   @see \Drupal\editor\Form\EditorImageDialog
+ *
+ * @see \Drupal\editor\Form\EditorImageDialog
+ *
+ * @ignore
  */
+
 (function ($, Drupal, CKEDITOR) {
 
   "use strict";
@@ -114,8 +118,8 @@
             editor.fire('saveSnapshot');
 
             // Pass `true` so DocumentFragment will also be returned.
-            var container = widget.wrapper.getParent(true),
-              image = widget.parts.image;
+            var container = widget.wrapper.getParent(true);
+            var image = widget.parts.image;
 
             // Set the updated widget data, after the necessary conversions from
             // the dialog's return values.
@@ -127,10 +131,10 @@
             // when shifting state, so might deal with a new instance.
             widget = editor.widgets.getByElement(image);
 
-            // It's first edit, just after widget instance creation, but before it was
-            // inserted into DOM. So we need to retrieve the widget wrapper from
-            // inside the DocumentFragment which we cached above and finalize other
-            // things (like ready event and flag).
+            // It's first edit, just after widget instance creation, but before
+            // it was inserted into DOM. So we need to retrieve the widget
+            // wrapper from inside the DocumentFragment which we cached above
+            // and finalize other things (like ready event and flag).
             if (firstEdit) {
               editor.widgets.finalizeCreation(container);
             }

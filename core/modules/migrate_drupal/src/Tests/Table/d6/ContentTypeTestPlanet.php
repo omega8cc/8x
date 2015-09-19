@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentTypeTestPlanet.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentTypeTestPlanet.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -39,6 +39,7 @@ class ContentTypeTestPlanet extends DrupalDumpBase {
       'primary key' => array(
         'vid',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_type_test_planet")->fields(array(
       'nid',
@@ -69,3 +70,4 @@ class ContentTypeTestPlanet extends DrupalDumpBase {
   }
 
 }
+#d824be8bf53956e1f6e275f010eb1b86

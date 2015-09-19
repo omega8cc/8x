@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\ContentTypeTestPage.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\ContentTypeTestPage.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -51,6 +51,7 @@ class ContentTypeTestPage extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("content_type_test_page")->fields(array(
       'vid',
@@ -62,3 +63,4 @@ class ContentTypeTestPage extends DrupalDumpBase {
   }
 
 }
+#cc8cbe99b5941aeb7e2ae8f0a5099945

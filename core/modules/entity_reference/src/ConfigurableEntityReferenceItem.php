@@ -7,16 +7,15 @@
 
 namespace Drupal\entity_reference;
 
-use Drupal\Component\Utility\String;
-use Drupal\Core\Field\FieldStorageDefinitionInterface;
+use Drupal\Component\Utility\SafeMarkup;
+use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Field\Plugin\Field\FieldType\EntityReferenceItem;
+use Drupal\Core\Field\PreconfiguredFieldUiOptionsInterface;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Form\OptGroup;
 use Drupal\Core\Session\AccountInterface;
 use Drupal\Core\TypedData\OptionsProviderInterface;
-use Drupal\Core\TypedData\DataDefinition;
 use Drupal\Core\Validation\Plugin\Validation\Constraint\AllowedValuesConstraint;
-use Drupal\field\FieldStorageConfigInterface;
 
 /**
  * Alternative plugin implementation of the 'entity_reference' field type.
@@ -29,7 +28,7 @@ use Drupal\field\FieldStorageConfigInterface;
  *
  * @see entity_reference_field_info_alter().
  */
-class ConfigurableEntityReferenceItem extends EntityReferenceItem implements OptionsProviderInterface {
+class ConfigurableEntityReferenceItem extends EntityReferenceItem implements OptionsProviderInterface, PreconfiguredFieldUiOptionsInterface {
 
   /**
    * {@inheritdoc}
@@ -40,15 +39,6 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements Opt
     // 'handler_settings' instance setting.
     unset($settings['target_bundle']);
     return $settings;
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public static function defaultFieldSettings() {
-    return array(
-      'handler_settings' => array(),
-    ) + parent::defaultFieldSettings();
   }
 
   /**
@@ -90,7 +80,7 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements Opt
 
     $return = array();
     foreach ($options as $bundle => $entity_ids) {
-      $bundle_label = String::checkPlain($bundles[$bundle]['label']);
+      $bundle_label = SafeMarkup::checkPlain($bundles[$bundle]['label']);
       $return[$bundle_label] = $entity_ids;
     }
 
@@ -135,21 +125,21 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements Opt
    * {@inheritdoc}
    */
   public function fieldSettingsForm(array $form, FormStateInterface $form_state) {
-    $field = $form_state->get('field');
+    $field = $form_state->getFormObject()->getEntity();
 
     // Get all selection plugins for this entity type.
     $selection_plugins = \Drupal::service('plugin.manager.entity_reference_selection')->getSelectionGroups($this->getSetting('target_type'));
     $handlers_options = array();
     foreach (array_keys($selection_plugins) as $selection_group_id) {
-      // We only display base plugins (e.g. 'default', 'views', ...) and not
-      // entity type specific plugins (e.g. 'default:node', 'default:user',
-      // ...).
+      // We only display base plugins (e.g., 'default', 'views', etc.) and not
+      // entity type specific plugins (e.g., 'default:node', 'default:user',
+      // etc.).
       if (array_key_exists($selection_group_id, $selection_plugins[$selection_group_id])) {
-        $handlers_options[$selection_group_id] = String::checkPlain($selection_plugins[$selection_group_id][$selection_group_id]['label']);
+        $handlers_options[$selection_group_id] = SafeMarkup::checkPlain($selection_plugins[$selection_group_id][$selection_group_id]['label']);
       }
       elseif (array_key_exists($selection_group_id . ':' . $this->getSetting('target_type'), $selection_plugins[$selection_group_id])) {
         $selection_group_plugin = $selection_group_id . ':' . $this->getSetting('target_type');
-        $handlers_options[$selection_group_id] = String::checkPlain($selection_plugins[$selection_group_id][$selection_group_plugin]['base_plugin_label']);
+        $handlers_options[$selection_group_plugin] = SafeMarkup::checkPlain($selection_plugins[$selection_group_id][$selection_group_plugin]['base_plugin_label']);
       }
     }
 
@@ -199,7 +189,7 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements Opt
   }
 
   /**
-   * Form element validation handler; Stores the new values in the form state.
+   * Form element validation handler; Invokes selection plugin's validation.
    *
    * @param array $form
    *   The form where the settings form is being included in.
@@ -207,13 +197,37 @@ class ConfigurableEntityReferenceItem extends EntityReferenceItem implements Opt
    *   The form state of the (entire) configuration form.
    */
   public static function fieldSettingsFormValidate(array $form, FormStateInterface $form_state) {
-    if ($form_state->hasValue('field')) {
-      $form_state->unsetValue(array('field', 'settings', 'handler_submit'));
-      $form_state->get('field')->settings = $form_state->getValue(['field', 'settings']);
+    $field = $form_state->getFormObject()->getEntity();
+    $handler = \Drupal::service('plugin.manager.entity_reference_selection')->getSelectionHandler($field);
+    $handler->validateConfigurationForm($form, $form_state);
+  }
 
-      $handler = \Drupal::service('plugin.manager.entity_reference_selection')->getSelectionHandler($form_state->get('field'));
-      $handler->validateConfigurationForm($form, $form_state);
+  /**
+   * {@inheritdoc}
+   */
+  public static function getPreconfiguredOptions() {
+    $options = array();
+
+    // Add all the commonly referenced entity types as distinct pre-configured
+    // options.
+    $entity_types = \Drupal::entityManager()->getDefinitions();
+    $common_references = array_filter($entity_types, function (EntityTypeInterface $entity_type) {
+      return $entity_type->isCommonReferenceTarget();
+    });
+
+    /** @var \Drupal\Core\Entity\EntityTypeInterface $entity_type */
+    foreach ($common_references as $entity_type) {
+      $options[$entity_type->id()] = [
+        'label' => $entity_type->getLabel(),
+        'field_storage_config' => [
+          'settings' => [
+            'target_type' => $entity_type->id(),
+          ]
+        ]
+      ];
     }
+
+    return $options;
   }
 
 }

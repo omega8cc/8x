@@ -2,14 +2,13 @@
 
 /**
  * @file
- * Contains Drupal\contact\MessageViewBuilder.
+ * Contains \Drupal\contact\MessageViewBuilder.
  */
 
 namespace Drupal\contact;
 
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityViewBuilder;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Mail\MailFormatHelper;
 use Drupal\Core\Render\Element;
 
@@ -42,7 +41,7 @@ class MessageViewBuilder extends EntityViewBuilder {
         $build[$id]['message'] = array(
           '#type' => 'item',
           '#title' => t('Message'),
-          '#markup' => String::checkPlain($entity->getMessage()),
+          '#plain_text' => $entity->getMessage(),
         );
       }
     }
@@ -65,9 +64,9 @@ class MessageViewBuilder extends EntityViewBuilder {
           $build[$key]['#label_display'] = 'hidden';
         }
       }
-      $build = array(
-        '#markup' => MailFormatHelper::htmlToText(drupal_render($build)),
-      );
+      $build['#post_render'][] = function ($html, array $elements) {
+        return MailFormatHelper::htmlToText($html);
+      };
     }
     return $build;
   }

@@ -7,6 +7,7 @@
 
 namespace Drupal\system\Tests\Entity;
 
+use Drupal\Core\Language\LanguageInterface;
 use Drupal\simpletest\WebTestBase;
 
 /**
@@ -28,10 +29,10 @@ class EntityListBuilderTest extends WebTestBase {
     parent::setUp();
 
     // Create and login user.
-    $this->web_user = $this->drupalCreateUser(array(
+    $this->webUser = $this->drupalCreateUser(array(
       'administer entity_test content',
     ));
-    $this->drupalLogin($this->web_user);
+    $this->drupalLogin($this->webUser);
   }
 
   /**
@@ -54,6 +55,19 @@ class EntityListBuilderTest extends WebTestBase {
     $this->clickLink(t('Page 2'));
     $this->assertNoRaw('Test entity 50', 'Test entity 50 is on the previous page.');
     $this->assertRaw('Test entity 51', 'Test entity 51 is shown.');
+  }
+
+  /**
+   * Tests that the correct cache contexts are set.
+   */
+  public function testCacheContexts() {
+    /** @var \Drupal\Core\Entity\EntityListBuilderInterface $list_builder */
+    $list_builder = $this->container->get('entity.manager')->getListBuilder('entity_test');
+
+    $build = $list_builder->render();
+    $this->container->get('renderer')->renderRoot($build);
+
+    $this->assertEqual(['entity_test_view_grants', 'languages:' . LanguageInterface::TYPE_INTERFACE, 'theme', 'url.query_args.pagers:0', 'user.permissions'], $build['#cache']['contexts']);
   }
 
 }

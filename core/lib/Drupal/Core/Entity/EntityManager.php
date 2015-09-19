@@ -9,23 +9,26 @@ namespace Drupal\Core\Entity;
 
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Component\Utility\String;
 use Drupal\Core\Cache\Cache;
 use Drupal\Core\Cache\CacheBackendInterface;
 use Drupal\Core\Config\Entity\ConfigEntityType;
 use Drupal\Core\DependencyInjection\ClassResolverInterface;
 use Drupal\Core\Entity\Exception\AmbiguousEntityClassException;
+use Drupal\Core\Entity\Exception\InvalidLinkTemplateException;
 use Drupal\Core\Entity\Exception\NoCorrespondingEntityClassException;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Field\BaseFieldDefinition;
+use Drupal\Core\Field\FieldDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionEvent;
 use Drupal\Core\Field\FieldStorageDefinitionEvents;
 use Drupal\Core\Field\FieldStorageDefinitionInterface;
 use Drupal\Core\Field\FieldStorageDefinitionListenerInterface;
+use Drupal\Core\KeyValueStore\KeyValueFactoryInterface;
 use Drupal\Core\KeyValueStore\KeyValueStoreInterface;
 use Drupal\Core\Language\LanguageInterface;
 use Drupal\Core\Language\LanguageManagerInterface;
 use Drupal\Core\Plugin\DefaultPluginManager;
+use Drupal\Core\Plugin\Discovery\AnnotatedClassDiscovery;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 use Drupal\Core\TypedData\TranslatableInterface;
@@ -120,11 +123,11 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   protected $languageManager;
 
   /**
-   * The keyvalue collection for tracking installed definitions.
+   * The keyvalue factory.
    *
-   * @var \Drupal\Core\KeyValueStore\KeyValueStoreInterface
+   * @var \Drupal\Core\KeyValueStore\KeyValueFactoryInterface
    */
-  protected $installedDefinitions;
+  protected $keyValueFactory;
 
   /**
    * The event dispatcher.
@@ -192,22 +195,23 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
    *   The class resolver.
    * @param \Drupal\Core\TypedData\TypedDataManager $typed_data_manager
    *   The typed data manager.
-   * @param \Drupal\Core\KeyValueStore\KeyValueStoreInterface $installed_definitions
-   *   The keyvalue collection for tracking installed definitions.
+   * @param \Drupal\Core\KeyValueStore\KeyValueFactoryInterface $key_value_factory
+   *   The keyvalue factory.
    * @param \Symfony\Component\EventDispatcher\EventDispatcherInterface $event_dispatcher
    *   The event dispatcher.
    */
-  public function __construct(\Traversable $namespaces, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache, LanguageManagerInterface $language_manager, TranslationInterface $translation_manager, ClassResolverInterface $class_resolver, TypedDataManager $typed_data_manager, KeyValueStoreInterface $installed_definitions, EventDispatcherInterface $event_dispatcher) {
-    parent::__construct('Entity', $namespaces, $module_handler, 'Drupal\Core\Entity\EntityInterface', 'Drupal\Core\Entity\Annotation\EntityType');
+  public function __construct(\Traversable $namespaces, ModuleHandlerInterface $module_handler, CacheBackendInterface $cache, LanguageManagerInterface $language_manager, TranslationInterface $translation_manager, ClassResolverInterface $class_resolver, TypedDataManager $typed_data_manager, KeyValueFactoryInterface $key_value_factory, EventDispatcherInterface $event_dispatcher) {
+    parent::__construct('Entity', $namespaces, $module_handler, 'Drupal\Core\Entity\EntityInterface');
 
     $this->setCacheBackend($cache, 'entity_type', array('entity_types'));
     $this->alterInfo('entity_type');
 
+    $this->discovery = new AnnotatedClassDiscovery('Entity', $namespaces, 'Drupal\Core\Entity\Annotation\EntityType');
     $this->languageManager = $language_manager;
     $this->translationManager = $translation_manager;
     $this->classResolver = $class_resolver;
     $this->typedDataManager = $typed_data_manager;
-    $this->installedDefinitions = $installed_definitions;
+    $this->keyValueFactory = $key_value_factory;
     $this->eventDispatcher = $event_dispatcher;
   }
 
@@ -225,8 +229,23 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   /**
    * {@inheritdoc}
    */
+  public function processDefinition(&$definition, $plugin_id) {
+    /** @var \Drupal\Core\Entity\EntityTypeInterface $definition */
+    parent::processDefinition($definition, $plugin_id);
+
+    // All link templates must have a leading slash.
+    foreach ((array) $definition->getLinkTemplates() as $link_relation_name => $link_template) {
+      if ($link_template[0] != '/') {
+        throw new InvalidLinkTemplateException("Link template '$link_relation_name' for entity type '$plugin_id' must start with a leading slash, the current link template is '$link_template'");
+      }
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
   protected function findDefinitions() {
-    $definitions = $this->discovery->getDefinitions();
+    $definitions = $this->getDiscovery()->getDefinitions();
 
     // Directly call the hook implementations to pass the definitions to them
     // by reference, so new entity types can be added.
@@ -401,18 +420,39 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   protected function buildBaseFieldDefinitions($entity_type_id) {
     $entity_type = $this->getDefinition($entity_type_id);
     $class = $entity_type->getClass();
+    $keys = array_filter($entity_type->getKeys());
 
     // Fail with an exception for non-fieldable entity types.
-    if (!$entity_type->isSubclassOf('\Drupal\Core\Entity\FieldableEntityInterface')) {
-      throw new \LogicException(String::format('Getting the base fields is not supported for entity type @type.', array('@type' => $entity_type->getLabel())));
+    if (!$entity_type->isSubclassOf(FieldableEntityInterface::class)) {
+      throw new \LogicException("Getting the base fields is not supported for entity type {$entity_type->getLabel()}.");
     }
 
-    // Retrieve base field definitions and assign them the entity type provider.
+    // Retrieve base field definitions.
+    /** @var FieldStorageDefinitionInterface[] $base_field_definitions */
     $base_field_definitions = $class::baseFieldDefinitions($entity_type);
+
+    // Make sure translatable entity types are correctly defined.
+    if ($entity_type->isTranslatable()) {
+      // The langcode field should always be translatable if the entity type is.
+      if (isset($keys['langcode']) && isset($base_field_definitions[$keys['langcode']])) {
+        $base_field_definitions[$keys['langcode']]->setTranslatable(TRUE);
+      }
+      // A default_langcode field should always be defined.
+      if (!isset($base_field_definitions[$keys['default_langcode']])) {
+        $base_field_definitions[$keys['default_langcode']] = BaseFieldDefinition::create('boolean')
+          ->setLabel($this->t('Default translation'))
+          ->setDescription($this->t('A flag indicating whether this is the default translation.'))
+          ->setTranslatable(TRUE)
+          ->setRevisionable(TRUE)
+          ->setDefaultValue(TRUE);
+      }
+    }
+
+    // Assign base field definitions the entity type provider.
     $provider = $entity_type->getProvider();
     foreach ($base_field_definitions as $definition) {
       // @todo Remove this check once FieldDefinitionInterface exposes a proper
-      //  provider setter. See https://drupal.org/node/2225961.
+      //  provider setter. See https://www.drupal.org/node/2225961.
       if ($definition instanceof BaseFieldDefinition) {
         $definition->setProvider($provider);
       }
@@ -426,7 +466,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
         // defining the field.
         foreach ($module_definitions as $field_name => $definition) {
           // @todo Remove this check once FieldDefinitionInterface exposes a
-          //  proper provider setter. See https://drupal.org/node/2225961.
+          //  proper provider setter. See https://www.drupal.org/node/2225961.
           if ($definition instanceof BaseFieldDefinition && $definition->getProvider() == NULL) {
             $definition->setProvider($module);
           }
@@ -450,15 +490,23 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
 
     // Ensure defined entity keys are there and have proper revisionable and
     // translatable values.
-    $keys = array_filter($entity_type->getKeys());
-    foreach ($keys as $key => $field_name) {
-      if (isset($base_field_definitions[$field_name]) && in_array($key, array('id', 'revision', 'uuid', 'bundle')) && $base_field_definitions[$field_name]->isRevisionable()) {
-        throw new \LogicException(String::format('The @field field cannot be revisionable as it is used as @key entity key.', array('@field' => $base_field_definitions[$field_name]->getLabel(), '@key' => $key)));
+    foreach (array_intersect_key($keys, array_flip(['id', 'revision', 'uuid', 'bundle'])) as $key => $field_name) {
+      if (!isset($base_field_definitions[$field_name])) {
+        throw new \LogicException("The $field_name field definition does not exist and it is used as $key entity key.");
       }
-      if (isset($base_field_definitions[$field_name]) && in_array($key, array('id', 'revision', 'uuid', 'bundle', 'langcode')) && $base_field_definitions[$field_name]->isTranslatable()) {
-        throw new \LogicException(String::format('The @field field cannot be translatable as it is used as @key entity key.', array('@field' => $base_field_definitions[$field_name]->getLabel(), '@key' => $key)));
+      if ($base_field_definitions[$field_name]->isRevisionable()) {
+        throw new \LogicException("The {$base_field_definitions[$field_name]->getLabel()} field cannot be revisionable as it is used as $key entity key.");
+      }
+      if ($base_field_definitions[$field_name]->isTranslatable()) {
+        throw new \LogicException("The {$base_field_definitions[$field_name]->getLabel()} field cannot be translatable as it is used as $key entity key.");
       }
     }
+
+    // Make sure translatable entity types define the "langcode" field properly.
+    if ($entity_type->isTranslatable() && (!isset($keys['langcode']) || !isset($base_field_definitions[$keys['langcode']]) || !$base_field_definitions[$keys['langcode']]->isTranslatable())) {
+      throw new \LogicException("The {$entity_type->getLabel()} entity type cannot be translatable as it does not define a translatable \"langcode\" field.");
+    }
+
     return $base_field_definitions;
   }
 
@@ -525,7 +573,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
     $provider = $entity_type->getProvider();
     foreach ($bundle_field_definitions as $definition) {
       // @todo Remove this check once FieldDefinitionInterface exposes a proper
-      //  provider setter. See https://drupal.org/node/2225961.
+      //  provider setter. See https://www.drupal.org/node/2225961.
       if ($definition instanceof BaseFieldDefinition) {
         $definition->setProvider($provider);
       }
@@ -539,7 +587,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
         // defining the field.
         foreach ($module_definitions as $field_name => $definition) {
           // @todo Remove this check once FieldDefinitionInterface exposes a
-          //  proper provider setter. See https://drupal.org/node/2225961.
+          //  proper provider setter. See https://www.drupal.org/node/2225961.
           if ($definition instanceof BaseFieldDefinition) {
             $definition->setProvider($module);
           }
@@ -602,19 +650,43 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
         $this->fieldMap = $cache->data;
       }
       else {
-        // Rebuild the definitions and put it into the cache.
+        // The field map is built in two steps. First, add all base fields, by
+        // looping over all fieldable entity types. They always exist for all
+        // bundles, and we do not expect to have so many different entity
+        // types for this to become a bottleneck.
         foreach ($this->getDefinitions() as $entity_type_id => $entity_type) {
-          if ($entity_type->isSubclassOf('\Drupal\Core\Entity\FieldableEntityInterface')) {
-            foreach ($this->getBundleInfo($entity_type_id) as $bundle => $bundle_info) {
-              foreach ($this->getFieldDefinitions($entity_type_id, $bundle) as $field_name => $field_definition) {
-                $this->fieldMap[$entity_type_id][$field_name]['type'] = $field_definition->getType();
-                $this->fieldMap[$entity_type_id][$field_name]['bundles'][] = $bundle;
-              }
+          if ($entity_type->isSubclassOf(FieldableEntityInterface::class)) {
+            $bundles = array_keys($this->getBundleInfo($entity_type_id));
+            foreach ($this->getBaseFieldDefinitions($entity_type_id) as $field_name => $base_field_definition) {
+              $this->fieldMap[$entity_type_id][$field_name] = [
+                'type' => $base_field_definition->getType(),
+                'bundles' => array_combine($bundles, $bundles),
+              ];
             }
           }
         }
 
-        $this->cacheSet($cid, $this->fieldMap, Cache::PERMANENT, array('entity_types', 'entity_field_info'));
+        // In the second step, the per-bundle fields are added, based on the
+        // persistent bundle field map stored in a key value collection. This
+        // data is managed in the EntityManager::onFieldDefinitionCreate()
+        // and EntityManager::onFieldDefinitionDelete() methods. Rebuilding this
+        // information in the same way as base fields would not scale, as the
+        // time to query would grow exponentially with more fields and bundles.
+        // A cache would be deleted during cache clears, which is the only time
+        // it is needed, so a key value collection is used.
+        $bundle_field_maps = $this->keyValueFactory->get('entity.definitions.bundle_field_map')->getAll();
+        foreach ($bundle_field_maps as $entity_type_id => $bundle_field_map) {
+          foreach ($bundle_field_map as $field_name => $map_entry) {
+            if (!isset($this->fieldMap[$entity_type_id][$field_name])) {
+              $this->fieldMap[$entity_type_id][$field_name] = $map_entry;
+            }
+            else {
+              $this->fieldMap[$entity_type_id][$field_name]['bundles'] += $map_entry['bundles'];
+            }
+          }
+        }
+
+        $this->cacheSet($cid, $this->fieldMap, Cache::PERMANENT, array('entity_types'));
       }
     }
     return $this->fieldMap;
@@ -640,6 +712,89 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   }
 
   /**
+   * {@inheritdoc}
+   */
+  public function onFieldDefinitionCreate(FieldDefinitionInterface $field_definition) {
+    $entity_type_id = $field_definition->getTargetEntityTypeId();
+    $bundle = $field_definition->getTargetBundle();
+    $field_name = $field_definition->getName();
+
+    // Notify the storage about the new field.
+    $this->getStorage($entity_type_id)->onFieldDefinitionCreate($field_definition);
+
+    // Update the bundle field map key value collection, add the new field.
+    $bundle_field_map = $this->keyValueFactory->get('entity.definitions.bundle_field_map')->get($entity_type_id);
+    if (!isset($bundle_field_map[$field_name])) {
+      // This field did not exist yet, initialize it with the type and empty
+      // bundle list.
+      $bundle_field_map[$field_name] = [
+        'type' => $field_definition->getType(),
+        'bundles' => [],
+      ];
+    }
+    $bundle_field_map[$field_name]['bundles'][$bundle] = $bundle;
+    $this->keyValueFactory->get('entity.definitions.bundle_field_map')->set($entity_type_id, $bundle_field_map);
+
+    // Delete the cache entry.
+    $this->cacheBackend->delete('entity_field_map');
+
+    // If the field map is initialized, update it as well, so that calls to it
+    // do not have to rebuild it again.
+    if ($this->fieldMap) {
+      if (!isset($this->fieldMap[$entity_type_id][$field_name])) {
+        // This field did not exist yet, initialize it with the type and empty
+        // bundle list.
+        $this->fieldMap[$entity_type_id][$field_name] = [
+          'type' => $field_definition->getType(),
+          'bundles' => [],
+        ];
+      }
+      $this->fieldMap[$entity_type_id][$field_name]['bundles'][$bundle] = $bundle;
+    }
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onFieldDefinitionUpdate(FieldDefinitionInterface $field_definition, FieldDefinitionInterface $original) {
+    // Notify the storage about the updated field.
+    $this->getStorage($field_definition->getTargetEntityTypeId())->onFieldDefinitionUpdate($field_definition, $original);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function onFieldDefinitionDelete(FieldDefinitionInterface $field_definition) {
+    $entity_type_id = $field_definition->getTargetEntityTypeId();
+    $bundle = $field_definition->getTargetBundle();
+    $field_name = $field_definition->getName();
+
+    // Notify the storage about the field deletion.
+    $this->getStorage($entity_type_id)->onFieldDefinitionDelete($field_definition);
+
+    // Unset the bundle from the bundle field map key value collection.
+    $bundle_field_map = $this->keyValueFactory->get('entity.definitions.bundle_field_map')->get($entity_type_id);
+    unset($bundle_field_map[$field_name]['bundles'][$bundle]);
+    if (empty($bundle_field_map[$field_name]['bundles'])) {
+      // If there are no bundles left, remove the field from the map.
+      unset($bundle_field_map[$field_name]);
+    }
+    $this->keyValueFactory->get('entity.definitions.bundle_field_map')->set($entity_type_id, $bundle_field_map);
+
+    // Delete the cache entry.
+    $this->cacheBackend->delete('entity_field_map');
+
+    // If the field map is initialized, update it as well, so that calls to it
+    // do not have to rebuild it again.
+    if ($this->fieldMap) {
+      unset($this->fieldMap[$entity_type_id][$field_name]['bundles'][$bundle]);
+      if (empty($this->fieldMap[$entity_type_id][$field_name]['bundles'])) {
+        unset($this->fieldMap[$entity_type_id][$field_name]);
+      }
+    }
+  }
+
+  /**
    * Builds field storage definitions for an entity type.
    *
    * @param string $entity_type_id
@@ -661,7 +816,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
         // defining the field.
         foreach ($module_definitions as $field_name => $definition) {
           // @todo Remove this check once FieldDefinitionInterface exposes a
-          //  proper provider setter. See https://drupal.org/node/2225961.
+          //  proper provider setter. See https://www.drupal.org/node/2225961.
           if ($definition instanceof BaseFieldDefinition) {
             $definition->setProvider($module);
           }
@@ -817,26 +972,29 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   public function getTranslationFromContext(EntityInterface $entity, $langcode = NULL, $context = array()) {
     $translation = $entity;
 
-    if ($entity instanceof TranslatableInterface) {
+    if ($entity instanceof TranslatableInterface && count($entity->getTranslationLanguages()) > 1) {
       if (empty($langcode)) {
         $langcode = $this->languageManager->getCurrentLanguage(LanguageInterface::TYPE_CONTENT)->getId();
+        $entity->addCacheContexts(['languages:' . LanguageInterface::TYPE_CONTENT]);
       }
 
       // Retrieve language fallback candidates to perform the entity language
-      // negotiation.
-      $context['data'] = $entity;
-      $context += array('operation' => 'entity_view', 'langcode' => $langcode);
-      $candidates = $this->languageManager->getFallbackCandidates($context);
+      // negotiation, unless the current translation is already the desired one.
+      if ($entity->language()->getId() != $langcode) {
+        $context['data'] = $entity;
+        $context += array('operation' => 'entity_view', 'langcode' => $langcode);
+        $candidates = $this->languageManager->getFallbackCandidates($context);
 
-      // Ensure the default language has the proper language code.
-      $default_language = $entity->getUntranslated()->language();
-      $candidates[$default_language->getId()] = LanguageInterface::LANGCODE_DEFAULT;
+        // Ensure the default language has the proper language code.
+        $default_language = $entity->getUntranslated()->language();
+        $candidates[$default_language->getId()] = LanguageInterface::LANGCODE_DEFAULT;
 
-      // Return the most fitting entity translation.
-      foreach ($candidates as $candidate) {
-        if ($entity->hasTranslation($candidate)) {
-          $translation = $entity->getTranslation($candidate);
-          break;
+        // Return the most fitting entity translation.
+        foreach ($candidates as $candidate) {
+          if ($entity->hasTranslation($candidate)) {
+            $translation = $entity->getTranslation($candidate);
+            break;
+          }
         }
       }
     }
@@ -873,7 +1031,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   }
 
   /**
-   * Returns the entity display mode info for all entity types.
+   * Gets the entity display mode info for all entity types.
    *
    * @param string $display_type
    *   The display type to be retrieved. It can be "view_mode" or "form_mode".
@@ -904,7 +1062,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   }
 
   /**
-   * Returns the entity display mode info for a specific entity type.
+   * Gets the entity display mode info for a specific entity type.
    *
    * @param string $display_type
    *   The display type to be retrieved. It can be "view_mode" or "form_mode".
@@ -942,7 +1100,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
   }
 
   /**
-   * Returns an array of display mode options.
+   * Gets an array of display mode options.
    *
    * @param string $display_type
    *   The display type to be retrieved. It can be "view_mode" or "form_mode".
@@ -1047,7 +1205,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
     $this->eventDispatcher->dispatch(EntityTypeEvents::CREATE, new EntityTypeEvent($entity_type));
 
     $this->setLastInstalledDefinition($entity_type);
-    if ($entity_type->isSubclassOf('\Drupal\Core\Entity\FieldableEntityInterface')) {
+    if ($entity_type->isSubclassOf(FieldableEntityInterface::class)) {
       $this->setLastInstalledFieldStorageDefinitions($entity_type_id, $this->getFieldStorageDefinitions($entity_type_id));
     }
   }
@@ -1173,8 +1331,8 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
     // Rename existing base field bundle overrides.
     $overrides = $this->getStorage('base_field_override')->loadByProperties(array('entity_type' => $entity_type_id, 'bundle' => $bundle_old));
     foreach ($overrides as $override) {
-      $override->set('id', $entity_type_id . '.' . $bundle_new . '.' . $override->field_name);
-      $override->bundle = $bundle_new;
+      $override->set('id', $entity_type_id . '.' . $bundle_new . '.' . $override->getName());
+      $override->set('bundle', $bundle_new);
       $override->allowBundleRename();
       $override->save();
     }
@@ -1203,7 +1361,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
    * {@inheritdoc}
    */
   public function getLastInstalledDefinition($entity_type_id) {
-    return $this->installedDefinitions->get($entity_type_id . '.entity_type');
+    return $this->keyValueFactory->get('entity.definitions.installed')->get($entity_type_id . '.entity_type');
   }
 
   /**
@@ -1227,7 +1385,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
    */
   protected function setLastInstalledDefinition(EntityTypeInterface $entity_type) {
     $entity_type_id = $entity_type->id();
-    $this->installedDefinitions->set($entity_type_id . '.entity_type', $entity_type);
+    $this->keyValueFactory->get('entity.definitions.installed')->set($entity_type_id . '.entity_type', $entity_type);
   }
 
   /**
@@ -1237,18 +1395,18 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
    *   The entity type definition identifier.
    */
   protected function deleteLastInstalledDefinition($entity_type_id) {
-    $this->installedDefinitions->delete($entity_type_id . '.entity_type');
+    $this->keyValueFactory->get('entity.definitions.installed')->delete($entity_type_id . '.entity_type');
     // Clean up field storage definitions as well. Even if the entity type
     // isn't currently fieldable, there might be legacy definitions or an
     // empty array stored from when it was.
-    $this->installedDefinitions->delete($entity_type_id . '.field_storage_definitions');
+    $this->keyValueFactory->get('entity.definitions.installed')->delete($entity_type_id . '.field_storage_definitions');
   }
 
   /**
    * {@inheritdoc}
    */
   public function getLastInstalledFieldStorageDefinitions($entity_type_id) {
-    return $this->installedDefinitions->get($entity_type_id . '.field_storage_definitions', array());
+    return $this->keyValueFactory->get('entity.definitions.installed')->get($entity_type_id . '.field_storage_definitions', array());
   }
 
   /**
@@ -1260,7 +1418,7 @@ class EntityManager extends DefaultPluginManager implements EntityManagerInterfa
    *   An array of field storage definitions.
    */
   protected function setLastInstalledFieldStorageDefinitions($entity_type_id, array $storage_definitions) {
-    $this->installedDefinitions->set($entity_type_id . '.field_storage_definitions', $storage_definitions);
+    $this->keyValueFactory->get('entity.definitions.installed')->set($entity_type_id . '.field_storage_definitions', $storage_definitions);
   }
 
   /**

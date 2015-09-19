@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\NodeRevisions.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\NodeRevisions.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -78,6 +78,7 @@ class NodeRevisions extends DrupalDumpBase {
       'primary key' => array(
         'vid',
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("node_revisions")->fields(array(
       'nid',
@@ -204,3 +205,4 @@ class NodeRevisions extends DrupalDumpBase {
   }
 
 }
+#8448741f18a4f40eec7bf466dcab82c1

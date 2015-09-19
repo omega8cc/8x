@@ -15,7 +15,7 @@ use Drupal\views\Views;
  * @see \Drupal\views\Tests\Handler\JoinTest
  * @see \Drupal\views\Tests\Plugin\RelationshipTest
  */
-abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
+abstract class RelationshipJoinTestBase extends PluginKernelTestBase {
 
   /**
    * Modules to enable.
@@ -25,7 +25,12 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
   public static $modules = array('system', 'user', 'field');
 
   /**
-   * Overrides \Drupal\views\Tests\ViewUnitTestBase::setUpFixtures().
+   * @var \Drupal\user\Entity\User
+   */
+  protected $rootUser;
+
+  /**
+   * Overrides \Drupal\views\Tests\ViewKernelTestBase::setUpFixtures().
    */
   protected function setUpFixtures() {
     $this->installEntitySchema('user');
@@ -33,9 +38,8 @@ abstract class RelationshipJoinTestBase extends PluginUnitTestBase {
     parent::setUpFixtures();
 
     // Create a record for uid 1.
-    $this->installSchema('system', 'sequences');
-    $root_user = entity_create('user', array('name' => $this->randomMachineName()));
-    $root_user->save();
+    $this->rootUser = entity_create('user', array('name' => $this->randomMachineName()));
+    $this->rootUser->save();
 
     Views::viewsData()->clear();
   }

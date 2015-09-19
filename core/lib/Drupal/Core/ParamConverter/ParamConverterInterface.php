@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Contains Drupal\Core\ParamConverter\ParamConverterInterface.
+ * Contains \Drupal\Core\ParamConverter\ParamConverterInterface.
  */
 
 namespace Drupal\Core\ParamConverter;
@@ -11,11 +11,26 @@ use Symfony\Component\Routing\Route;
 
 /**
  * Interface for parameter converters.
+ *
+ * Classes implementing this interface are responsible for converting a path
+ * parameter to the object it represents.
+ *
+ * Here is an example path: /admin/structure/block/manage/{block}
+ *
+ * In this case, '{block}' would be the path parameter which should be turned
+ * into a block object representing the block in question.
+ *
+ * ParamConverters are defined as services tagged with 'paramconverter', and are
+ * managed by the 'paramconverter_manager' service.
+ *
+ * @see menu
+ * @see \Drupal\Core\ParamConverter\ParamConverterManagerInterface
+ * @see \Drupal\Core\ParamConverter\EntityConverter
  */
 interface ParamConverterInterface {
 
   /**
-   * Allows to convert variables to their corresponding objects.
+   * Converts path variables to their corresponding objects.
    *
    * @param mixed $value
    *   The raw value.

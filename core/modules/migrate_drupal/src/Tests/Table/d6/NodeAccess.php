@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\NodeAccess.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\NodeAccess.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -50,25 +50,26 @@ class NodeAccess extends DrupalDumpBase {
         'grant_view' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '3',
+          'length' => '10',
           'default' => '0',
           'unsigned' => TRUE,
         ),
         'grant_update' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '3',
+          'length' => '10',
           'default' => '0',
           'unsigned' => TRUE,
         ),
         'grant_delete' => array(
           'type' => 'int',
           'not null' => TRUE,
-          'length' => '3',
+          'length' => '10',
           'default' => '0',
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("node_access")->fields(array(
       'nid',
@@ -89,3 +90,4 @@ class NodeAccess extends DrupalDumpBase {
   }
 
 }
+#47b68125af5c4b5deaffc0e19fb29dfb

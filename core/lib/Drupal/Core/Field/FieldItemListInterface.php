@@ -94,6 +94,8 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
 
   /**
    * Filters out empty field items and re-numbers the item deltas.
+   *
+   * @return $this
    */
   public function filterEmptyItems();
 
@@ -128,26 +130,29 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
   /**
    * Defines custom presave behavior for field values.
    *
-   * This method is called before either insert() or update() methods, and
-   * before values are written into storage.
+   * This method is called during the process of saving an entity, just before
+   * item values are written into storage.
+   *
+   * @see \Drupal\Core\Field\FieldItemInterface::preSave()
    */
   public function preSave();
 
   /**
-   * Defines custom insert behavior for field values.
+   * Defines custom post-save behavior for field values.
    *
-   * This method is called after the save() method, and before values are
-   * written into storage.
-   */
-  public function insert();
-
-  /**
-   * Defines custom update behavior for field values.
+   * This method is called during the process of saving an entity, just after
+   * item values are written into storage.
    *
-   * This method is called after the save() method, and before values are
-   * written into storage.
+   * @param bool $update
+   *   Specifies whether the entity is being updated or created.
+   *
+   * @return bool
+   *   Whether field items should be rewritten to the storage as a consequence
+   *   of the logic implemented by the custom behavior.
+   *
+   * @see \Drupal\Core\Field\FieldItemInterface::postSave()
    */
-  public function update();
+  public function postSave($update);
 
   /**
    * Defines custom delete behavior for field values.
@@ -192,7 +197,7 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
   /**
    * Returns a form for the default value input.
    *
-   * Invoked from \Drupal\field_ui\Form\FieldEditForm to allow
+   * Invoked from \Drupal\field_ui\Form\FieldConfigEditForm to allow
    * administrators to configure instance-level default value.
    *
    * @param array $form
@@ -208,7 +213,7 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
   /**
    * Validates the submitted default value.
    *
-   * Invoked from \Drupal\field_ui\Form\FieldEditForm to allow
+   * Invoked from \Drupal\field_ui\Form\FieldConfigEditForm to allow
    * administrators to configure instance-level default value.
    *
    * @param array $element
@@ -223,7 +228,7 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
   /**
    * Processes the submitted default value.
    *
-   * Invoked from \Drupal\field_ui\Form\FieldEditForm to allow
+   * Invoked from \Drupal\field_ui\Form\FieldConfigEditForm to allow
    * administrators to configure instance-level default value.
    *
    * @param array $element
@@ -257,5 +262,16 @@ interface FieldItemListInterface extends ListInterface, AccessibleInterface {
    *   The return default value for the field.
    */
   public static function processDefaultValue($default_value, FieldableEntityInterface $entity, FieldDefinitionInterface $definition);
+
+  /**
+   * Determines equality to another object implementing FieldItemListInterface.
+   *
+   * @param \Drupal\Core\Field\FieldItemListInterface $list_to_compare
+   *   The field item list to compare to.
+   *
+   * @return bool
+   *   TRUE if the field item lists are equal, FALSE if not.
+   */
+  public function equals(FieldItemListInterface $list_to_compare);
 
 }

@@ -2,7 +2,7 @@
 
 /**
  * @file
- * Definition of Drupal\Core\Database\Query\SelectExtender
+ * Contains \Drupal\Core\Database\Query\SelectExtender.
  */
 
 namespace Drupal\Core\Database\Query;
@@ -208,6 +208,14 @@ class SelectExtender implements SelectInterface {
    */
   public function escapeLike($string) {
     return $this->query->escapeLike($string);
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function escapeField($string) {
+    $this->query->escapeField($string);
+    return $this;
   }
 
   public function getArguments(PlaceholderInterface $queryPlaceholder = NULL) {

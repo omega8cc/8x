@@ -2,11 +2,11 @@
 
 /**
  * @file
- * Contains \Drupal\migrate_drupal\Tests\Dump\UsersRoles.
+ * Contains \Drupal\migrate_drupal\Tests\Table\d6\UsersRoles.
  *
  * THIS IS A GENERATED FILE. DO NOT EDIT.
  *
- * @see cores/scripts/dump-database-d6.sh
+ * @see core/scripts/migrate-db.sh
  * @see https://www.drupal.org/sandbox/benjy/2405029
  */
 
@@ -41,6 +41,7 @@ class UsersRoles extends DrupalDumpBase {
           'unsigned' => TRUE,
         ),
       ),
+      'mysql_character_set' => 'utf8',
     ));
     $this->database->insert("users_roles")->fields(array(
       'uid',
@@ -77,3 +78,4 @@ class UsersRoles extends DrupalDumpBase {
   }
 
 }
+#6cffea4f67e621d7c498bba3ead7d305
