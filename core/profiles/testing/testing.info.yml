@@ -1,8 +1,8 @@
 name: Testing
 type: profile
 description: 'Minimal profile for running tests. Includes absolutely required modules only.'
-# version: VERSION
-# core: 8.x
+version: VERSION
+core: 8.x
 hidden: true
 dependencies:
   # Enable page_cache in testing, to ensure that as many tests as possible run
@@ -11,9 +11,3 @@ dependencies:
 # @todo: Remove this in https://www.drupal.org/node/2352949
 themes:
   - classy
-
-# Information added by Drupal.org packaging script on 2015-02-25
-version: '8.0.0-beta7'
-core: '8.x'
-project: 'drupal'
-datestamp: 1424875577

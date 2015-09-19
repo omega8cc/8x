@@ -1,10 +1,4 @@
 type: theme
-# core: 8.x
+core: 8.x
 name: 'Test theme with a too long name'
-# version: VERSION
-
-# Information added by Drupal.org packaging script on 2015-02-25
-version: '8.0.0-beta7'
-core: '8.x'
-project: 'drupal'
-datestamp: 1424875577
+version: VERSION
