@@ -37,7 +37,7 @@ function drupal_phpunit_find_extension_directories($scan_directory) {
  */
 function drupal_phpunit_contrib_extension_directory_roots() {
   if (is_link(getcwd() . '/core')) {
-    $drupal_root = getcwd() . '/core';
+    $drupal_root = getcwd();
   }
   else {
     $drupal_root = dirname(dirname(__DIR__));
