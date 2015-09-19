@@ -117,7 +117,7 @@ const CONFIG_STAGING_DIRECTORY = 'staging';
  * This strips two levels of directories off the current directory.
  */
 if (is_link(getcwd() . '/core')) {
-  $drupal_root = getcwd() . '/core';
+  $drupal_root = getcwd();
 }
 else {
   $drupal_root = dirname(dirname(__DIR__));
